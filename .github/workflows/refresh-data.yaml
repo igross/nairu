@@ -49,10 +49,17 @@ jobs:
 #      - name: Generate index.html from charts
 #        run: Rscript R/write_index_html.R
 
-      - name: Commit
+       - name: Commit
+         run: |
+           git config --global user.name 'igross'
+           git add .
+           git add docs/*.png docs/index.html
+           git commit -m 'refreshing data' || echo "No changes to commit"
+           git push || echo "No changes to commit"
+
+      - name: Inspect workspace
         run: |
-          git config --global user.name 'igross'
-          git add .
-          git add docs/*.png docs/index.html
-          git commit -m 'refreshing data' || echo "No changes to commit"
-          git push || echo "No changes to commit"
+          echo "::group::Workspace tree"
+          ls -R
+          echo "::endgroup::"
+          
