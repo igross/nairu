@@ -161,7 +161,10 @@ est_data <- est_data %>%
   mutate(dummy4 = ifelse(date >= "2020Q2" & date <= "2020Q3", 1, 0))
 
 
-write.csv(est_data, file.path(out_dir, "EST_data.csv"), row.names = FALSE)
+write.csv(est_data,
+          file = file.path(out_dir, "EST_data.csv"),
+          row.names = FALSE)
+
 
 # Subset Data for Stan
 stan_data <- as.matrix(est_data[ , -1])   # drop the yearqtr column
