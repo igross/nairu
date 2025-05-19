@@ -46,9 +46,6 @@ jobs:
       - name: Make visuals
         run: Rscript -e 'source(here::here("R", "plot_nairu.R"), echo = TRUE)'  
 
-      - name: Render README
-        run: Rscript -e 'rmarkdown::render(here::here("README.Rmd"))'
-
 #      - name: Generate index.html from charts
 #        run: Rscript R/write_index_html.R
 
