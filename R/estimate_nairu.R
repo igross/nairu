@@ -9,9 +9,9 @@ library(readrba)
 library(lubridate)
 library(readr)
 
-options(mc.cores = parallel::detectCores()) 
 
-setwd("/Users/igro0002/Downloads/NAIRU-master/")
+setwd(Sys.getenv("GITHUB_WORKSPACE", unset = here::here()))
+
 
 #---------------------------------------------------------------------------------------------------------
 #Download Most Recent ABS and RBA Data
