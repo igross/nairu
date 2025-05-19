@@ -41,7 +41,7 @@ jobs:
 
       - name: Get data
 #        if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
-        run: Rscript -e 'source(here::here("R", "run_NAIRU.R"), echo = TRUE)'
+        run: Rscript -e 'source(here::here("R", "run_nairu.R"), echo = TRUE)'
 
       - name: Make visuals
         run: Rscript -e 'source(here::here("R", "viz_cash_rate.R"), echo = TRUE)'  
