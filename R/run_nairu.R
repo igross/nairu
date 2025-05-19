@@ -173,7 +173,7 @@ data_list <- list(T = nrow(stan_data),
 
 # Compile The Model
 compiled_model <- stan_model(file = "NAIRU_baseline.stan")
-sampled_model_baseline <- sampling(compiled_model, data = data_list, chains=10,iter = 2000, control = list(max_treedepth = 15))
+sampled_model_baseline <- sampling(compiled_model, data = data_list, chains=10,iter = 200, control = list(max_treedepth = 15))
 
 
 
