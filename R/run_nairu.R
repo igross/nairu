@@ -197,7 +197,9 @@ summarised_state_baseline <- as.data.frame(sampled_model_baseline) %>%
   mutate(LUR = est_data$LUR)  %>%
   mutate(dl4pmcg = est_data$dl4pmcg)
 
+print(summarised_state_baseline)
 
+         
 write.csv(summarised_state_baseline,
           file = "output/NAIRU_baseline.csv",
           row.names = FALSE)
