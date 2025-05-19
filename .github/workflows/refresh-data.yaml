@@ -63,7 +63,7 @@ jobs:
           git config --global user.email "action@github.com"
 
           # add exactly the files you expect to version
-          git add docs/*.png docs/index.html || true   # or output/* …
+          git add output/* || true        # does nothing if glob is empty
 
           git commit -m "Refreshing data $(date -u +'%Y-%m-%d')" \
             || echo "No changes to commit"
