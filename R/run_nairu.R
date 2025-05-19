@@ -201,9 +201,8 @@ summarised_state_baseline <- as.data.frame(sampled_model_baseline) %>%
 print(summarised_state_baseline)
 
          
-write.csv(summarised_state_baseline,
-          file = "output/NAIRU_baseline.csv",
-          row.names = FALSE)
+csv_path <- file.path(out_dir, "NAIRU_baseline.csv")
+readr::write_csv(summarised_state_baseline, csv_path)
 
 
 
