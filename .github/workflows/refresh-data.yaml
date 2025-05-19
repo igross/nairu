@@ -1,0 +1,63 @@
+
+name: refresh-data
+
+on:
+schedule:
+  # ── AEST months ──  (Apr–Sep)  UTC = local −10 h  → 11 : 40 am AEST = 01 : 40 UTC
+  - cron: '40 1 * 4-9 1-5'
+
+  # ── AEDT months ──  (Oct–Mar)  UTC = local −11 h  → 11 : 40 am AEDT = 00 : 40 UTC
+  - cron: '40 0 * 10-12,1-3 1-5'
+
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+ 
+jobs:
+  refresh-data:
+    runs-on: macOS-latest
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      R_KEEP_PKG_SOURCE: yes
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+
+      - uses: r-lib/actions/setup-pandoc@v2
+
+      - name: Install XQuartz on macOS
+        if: runner.os == 'macOS'
+        run: brew install xquartz --cask
+
+      - name: Install vctrs
+        run: Rscript -e 'install.packages(c("vctrs"))'
+
+      - name: Install packages
+        run: Rscript -e 'install.packages(c("tidyverse", "here", "jsonlite", "ggrepel", "conflicted","tidyr","scales","readabs","readrba","plotly","purrr"))'
+
+      - name: Get data
+        if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+        run: Rscript -e 'source(here::here("R", "scrape_cash_rate.R"), echo = TRUE)'
+
+      - name: Make visuals
+        run: Rscript -e 'source(here::here("R", "viz_cash_rate.R"), echo = TRUE)'  
+
+      - name: Render README
+        run: Rscript -e 'rmarkdown::render(here::here("README.Rmd"))'
+
+      - name: Generate index.html from charts
+        run: Rscript R/write_index_html.R
+
+      - name: Commit
+        run: |
+          git config --global user.name 'igross'
+          git add .
+          git add docs/*.png docs/index.html
+          git commit -m 'refreshing data' || echo "No changes to commit"
+          git push || echo "No changes to commit"
