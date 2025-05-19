@@ -60,13 +60,13 @@ jobs:
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         run: |
           git config --global user.name "igross"
-          git config --global user.email "action@github.com"
+
 
           # add exactly the files you expect to version
+          git add .          
           git add output/* || true        # does nothing if glob is empty
 
-          git commit -m "Refreshing data $(date -u +'%Y-%m-%d')" \
-            || echo "No changes to commit"
+          git commit -m "Refreshing data $(date -u +'%Y-%m-%d')"
           git push
 
           
