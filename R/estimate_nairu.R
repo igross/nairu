@@ -1,0 +1,337 @@
+library(ggthemes)
+library(reshape2)
+library(readabs)
+library(dplyr)
+library(ggplot2)
+library(zoo)
+library(rstan)
+library(readrba)
+library(lubridate)
+library(readr)
+
+options(mc.cores = parallel::detectCores()) 
+
+setwd("/Users/igro0002/Downloads/NAIRU-master/")
+
+#---------------------------------------------------------------------------------------------------------
+#Download Most Recent ABS and RBA Data
+#---------------------------------------------------------------------------------------------------------
+#Import Data from ABS Website
+abs_5206 <- read_abs(series_id = c("A2304402X", "A2302915V"))
+abs_6202 <- read_abs(series_id = c("A84423043C", "A84423047L"))
+abs_6457 <- read_abs(series_id = c("A2298279F"))
+abs_6345 <- read_abs(series_id = c("A2713849C"))
+abs_1364 <- read_abs(series_id = c("A2454521V", "A2454517C"))
+rba_g3 <- read_rba(series_id = c("GBONYLD")) 
+rba_g1 <- read_rba(series_id = c("GCPIOCPMTMQP","GCPITIQP","GCPINTIQP")) 
+
+#---------------------------------------------------------------------------------------------------------		
+#CLEANUP ABS SPREADSHEETS
+#---------------------------------------------------------------------------------------------------------
+#5206.0 Australian National Accounts: National Income, Expenditure and Product
+R_5206 <- abs_5206 %>%
+  filter(series_id %in% c("A2304402X", "A2302915V")) %>% 
+  mutate(date = zoo::as.yearqtr(date)) %>% 
+  dplyr::select(date, series_id, value) 
+R_5206 <- distinct(R_5206,date,series_id, .keep_all= TRUE)
+R_5206 <- dcast(R_5206, date ~ series_id)
+R_5206 <- R_5206 %>%
+  mutate(NULC = A2302915V/A2304402X) %>%
+  mutate(DLNULC = 100*(log(NULC)-log(lag(NULC,1)))) %>%
+  select(date,DLNULC)
+
+
+R_6345 <- abs_6345 %>%
+  filter(series_id %in% c("A2713849C")) %>% 
+  mutate(date = zoo::as.yearqtr(date)) %>% 
+  dplyr::select(date, series_id, value) 
+R_6345 <- distinct(R_6345,date,series_id, .keep_all= TRUE)
+R_6345 <- dcast(R_6345, date ~ series_id)
+R_6345 <- R_6345 %>%
+  mutate(DLWPI = 100*(log(A2713849C)-log(lag(A2713849C,1)))) %>%
+  select(date,DLWPI)
+
+#6457.0 International Trade Price Indexes, Australia
+R_6457 <- abs_6457 %>%
+  filter(series_id %in% c("A2298279F")) %>%
+  mutate(date = zoo::as.yearqtr(date)) %>%
+  mutate(dl4pmcg = 100*(log(value)-log(lag(value,4)))) %>%
+  mutate(dlpmcg = 100*(log(value)-log(lag(value,1)))) %>%
+  dplyr::select(date, dl4pmcg)
+
+#6202.0 Labour Force, Australia - Monthly
+R_6202 <- abs_6202 %>%
+  filter(series_id %in% c("A84423043C", "A84423047L")) %>%
+  select(date, series_id, value)
+R_6202 <- distinct(R_6202,date,series_id, .keep_all= TRUE)
+R_6202 <- dcast(R_6202, date ~ series_id)
+R_6202 <- R_6202 %>% group_by(date=floor_date(date, "quarter")) %>%
+  summarize(A84423043C=mean(A84423043C), A84423047L=mean(A84423047L)) %>%
+  mutate(date = zoo::as.yearqtr(date))
+R_6202 <- R_6202 %>%
+  mutate(LUR = 100*(1-A84423043C/A84423047L)) %>%
+  select(date, LUR)
+
+#Import RBA Data#
+#Trimmed-Mean Inflation
+# series_ids <- c("GCPIOCPMTMQP","GCPITIQP","GCPINTIQP")
+# new_names <- c("DLPTM", "DLPT", "DLPNT")
+# 
+# # Create a named vector for renaming
+# rename_map <- setNames( series_ids, new_names)
+# 
+# # Process the data
+# R_g1 <- rba_g1 %>%
+#   filter(series_id %in% series_ids) %>%
+#   mutate(date = zoo::as.yearqtr(date)) %>%
+#   # Use mutate and rename to handle multiple series
+#   pivot_wider(names_from = series_id, values_from = value) %>%
+#   rename(!!!rename_map) %>%
+#   select(date, all_of(new_names))
+
+R_g1 <- rba_g1 %>%
+  filter(series_id %in% c("GCPIOCPMTMQP")) %>%
+  mutate(date = zoo::as.yearqtr(date)) %>%
+  rename(DLPTM = value) %>%
+  select(date, DLPTM)
+
+R_g1T <- rba_g1 %>%
+  filter(series_id %in% c("GCPITIQP")) %>%
+  mutate(date = zoo::as.yearqtr(date)) %>%
+  rename(DLPT = value) %>%
+  select(date, DLPT)
+
+
+R_g1NT <- rba_g1 %>%
+  filter(series_id %in% c("GCPINTIQP")) %>%
+  mutate(date = zoo::as.yearqtr(date)) %>%
+  rename(DLPNT = value) %>%
+  select(date, DLPNT)
+
+
+
+#Bond-market inflation expectations
+R_g3 <- rba_g3 %>%
+  filter(series_id %in% c("GBONYLD")) %>%
+  mutate(date = zoo::as.yearqtr(date)) %>%
+  mutate(pie_bondq = ((1+value/100)^(1/4)-1)*100) %>%
+  select(date, pie_bondq)
+
+#RBA inflation expectations
+myfile <- "/Users/igro0002/Downloads/NAIRU-master/PIE_RBAQ.CSV"
+pie_rbaq <- read_csv(myfile)
+pie_rbaq <- pie_rbaq %>%
+  rename(date=OBS) %>%
+  mutate(date = zoo::as.yearqtr(date))
+
+
+  latest_date_df1 <- max(R_5206$date)
+  latest_date_df2 <- max(R_g1$date)
+  
+  # Check if the latest date in df2 is one day less than in df1
+  if (latest_date_df2 > latest_date_df1) {
+    # Get the most recent point from df2
+    recent_date <- R_g1 %>% filter(date == latest_date_df2) %>% select(date) 
+    recent_point <- R_5206 %>% filter(date == latest_date_df1) %>% select(DLNULC) 
+  
+    combined_df <- merge(recent_date, recent_point, all = TRUE)
+    
+    # Append the recent point to df2
+    R_5206 <- bind_rows(R_5206, combined_df)
+    
+}
+
+
+data_set <- list(R_6345, R_6457, R_6202, R_g1, R_g3, pie_rbaq, R_g1T,R_g1NT) %>%
+  Reduce(function(dtf1,dtf2) left_join(dtf1,dtf2,by="date"), .)
+
+data_set$pie_bondq <- replace(data_set$pie_bondq,is.na(data_set$pie_bondq),2.5/4)
+
+
+
+
+#Pick Sample
+est_data <- data_set %>%
+  filter(date>"1997q3" & date<"2025q1")
+
+est_data <- est_data %>%
+  mutate(dummy1 = ifelse(date >= "2021Q3" & date <= "2023Q1", 1, 0)) %>%
+  mutate(dummy2 = ifelse(date >= "2022Q1" & date <= "2022Q4", 1, 0))  %>%
+  mutate(dummy3 = ifelse(date == "2020Q2",1,0))  %>%
+  mutate(dummy4 = ifelse(date >= "2020Q2" & date <= "2020Q3", 1, 0))
+
+
+write.csv(est_data, "/Users/igro0002/Downloads/NAIRU-master/EST_data.csv", row.names=FALSE)
+
+# Subset Data for Stan
+stan_data <- est_data[,-1]
+
+# run model ---------------------------------------------------------------
+data_list <- list(T = nrow(stan_data),
+                  J = ncol(stan_data),
+                  Y = stan_data)
+
+# Compile The Model
+compiled_model <- stan_model(file = "NAIRU_baseline.stan")
+sampled_model_baseline <- sampling(compiled_model, data = data_list, chains=10,iter = 2000, control = list(max_treedepth = 15))
+
+
+
+
+summarised_state_baseline <- as.data.frame(sampled_model_baseline) %>% 
+  select(contains("NAIRU")) %>%
+  melt() %>% 
+  group_by(variable) %>% 
+  summarise(median = median(value),
+            lowera = quantile(value, 0.05),
+            uppera = quantile(value, 0.95),
+            lowerb = quantile(value, 0.15),
+            upperb = quantile(value, 0.85)) %>%
+  mutate(date = as.Date(est_data$date)) %>%
+  mutate(date = zoo::as.yearqtr(date)) %>%
+  mutate(LUR = est_data$LUR)  %>%
+  mutate(dl4pmcg = est_data$dl4pmcg)
+
+#write.csv(summarised_state_baseline, "/Users/igro0002/Downloads/NAIRU-master/NAIRU_baseline.csv", row.names=FALSE)
+
+# 
+# compiled_model_tight <- stan_model(file = "NAIRU_tight.stan")
+# sampled_model_tight <- sampling(compiled_model_tight, data = data_list, chains=10,iter = 500, control = list(max_treedepth = 15))
+# summarised_state_tight <- as.data.frame(sampled_model_tight) %>% 
+#   select(contains("NAIRU")) %>%
+#   melt() %>% 
+#   group_by(variable) %>% 
+#   summarise(median = median(value),
+#             lowera = quantile(value, 0.05),
+#             uppera = quantile(value, 0.95),
+#             lowerb = quantile(value, 0.15),
+#             upperb = quantile(value, 0.85)) %>%
+#   mutate(date = as.Date(est_data$date)) %>%
+#   mutate(date = zoo::as.yearqtr(date)) %>%
+#   mutate(LUR = est_data$LUR)  %>%
+#   mutate(dl4pmcg = est_data$dl4pmcg)
+# write.csv(summarised_state_tight, "/Users/igro0002/Downloads/NAIRU-master/NAIRU_tight.csv", row.names=FALSE)
+# 
+# 
+# 
+# 
+# compiled_model_loose <- stan_model(file = "NAIRU_loose.stan")
+# sampled_model_loose <- sampling(compiled_model_loose, data = data_list, chains=10,iter = 500, control = list(max_treedepth = 15))
+# summarised_state_loose <- as.data.frame(sampled_model_loose) %>% 
+#   select(contains("NAIRU")) %>%
+#   melt() %>% 
+#   group_by(variable) %>% 
+#   summarise(median = median(value),
+#             lowera = quantile(value, 0.05),
+#             uppera = quantile(value, 0.95),
+#             lowerb = quantile(value, 0.15),
+#             upperb = quantile(value, 0.85)) %>%
+#   mutate(date = as.Date(est_data$date)) %>%
+#   mutate(date = zoo::as.yearqtr(date)) %>%
+#   mutate(LUR = est_data$LUR)  %>%
+#   mutate(dl4pmcg = est_data$dl4pmcg)
+# write.csv(summarised_state_loose, "/Users/igro0002/Downloads/NAIRU-master/NAIRU_loose.csv", row.names=FALSE)
+# 
+# 
+# 
+# compiled_model_persistent <- stan_model(file = "NAIRU_persistent.stan")
+# sampled_model_persistent <- sampling(compiled_model_persistent, data = data_list, chains=10,iter = 500, control = list(max_treedepth = 15))
+# summarised_state_persistent <- as.data.frame(sampled_model_persistent) %>% 
+#   select(contains("NAIRU")) %>%
+#   melt() %>% 
+#   group_by(variable) %>% 
+#   summarise(median = median(value),
+#             lowera = quantile(value, 0.05),
+#             uppera = quantile(value, 0.95),
+#             lowerb = quantile(value, 0.15),
+#             upperb = quantile(value, 0.85)) %>%
+#   mutate(date = as.Date(est_data$date)) %>%
+#   mutate(date = zoo::as.yearqtr(date)) %>%
+#   mutate(LUR = est_data$LUR)  %>%
+#   mutate(dl4pmcg = est_data$dl4pmcg)
+# write.csv(summarised_state_persistent, "/Users/igro0002/Downloads/NAIRU-master/NAIRU_persistent.csv", row.names=FALSE)
+# 
+# 
+# 
+# compiled_model_constant <- stan_model(file = "NAIRU_constant.stan")
+# sampled_model_constant <- sampling(compiled_model_constant, data = data_list, chains=10,iter = 500, control = list(max_treedepth = 15))
+# summarised_state_constant <- as.data.frame(sampled_model_constant) %>% 
+#   select(contains("NAIRU")) %>%
+#   melt() %>% 
+#   group_by(variable) %>% 
+#   summarise(median = median(value),
+#             lowera = quantile(value, 0.05),
+#             uppera = quantile(value, 0.95),
+#             lowerb = quantile(value, 0.15),
+#             upperb = quantile(value, 0.85)) %>%
+#   mutate(date = as.Date(est_data$date)) %>%
+#   mutate(date = zoo::as.yearqtr(date)) %>%
+#   mutate(LUR = est_data$LUR)  %>%
+#   mutate(dl4pmcg = est_data$dl4pmcg)
+# write.csv(summarised_state_constant, "/Users/igro0002/Downloads/NAIRU-master/NAIRU_constant.csv", row.names=FALSE)
+# 
+# 
+# 
+# compiled_model_volatile <- stan_model(file = "NAIRU_volatile.stan")
+# sampled_model_volatile <- sampling(compiled_model_volatile, data = data_list, chains=10,iter = 500, control = list(max_treedepth = 15))
+# summarised_state_volatile <- as.data.frame(sampled_model_volatile) %>% 
+#   select(contains("NAIRU")) %>%
+#   melt() %>% 
+#   group_by(variable) %>% 
+#   summarise(median = median(value),
+#             lowera = quantile(value, 0.05),
+#             uppera = quantile(value, 0.95),
+#             lowerb = quantile(value, 0.15),
+#             upperb = quantile(value, 0.85)) %>%
+#   mutate(date = as.Date(est_data$date)) %>%
+#   mutate(date = zoo::as.yearqtr(date)) %>%
+#   mutate(LUR = est_data$LUR)  %>%
+#   mutate(dl4pmcg = est_data$dl4pmcg)
+# write.csv(summarised_state_volatile, "/Users/igro0002/Downloads/NAIRU-master/NAIRU_volatile.csv", row.names=FALSE)
+# 
+
+
+summarised_state_baseline <- summarised_state_baseline %>%
+  mutate(date = as.Date(date, format = "%Y-%m-%d"))
+
+summarised_state_baseline %>% 
+  ggplot(aes(x = date)) +
+  geom_ribbon(aes(ymin = lowera, ymax = uppera), fill = "orange", alpha = 0.3) +
+  geom_line(aes(y = median), colour = "red", size = 1) +
+  geom_line(aes(y = LUR), colour = "blue", size = 1) +
+  # geom_line(aes(y = dl4pmcg), colour = "green", size = 1) +
+  # ggthemes::theme_economist() +
+  theme_minimal() +
+  ggtitle("RBA Model of NAIRU (with WPI)") +
+  scale_y_continuous(
+    breaks = seq(
+      floor(min(summarised_state_baseline$lowera, 
+                summarised_state_baseline$median, 
+                summarised_state_baseline$LUR, na.rm = TRUE)),
+      ceiling(max(summarised_state_baseline$uppera, 
+                  summarised_state_baseline$median, 
+                  summarised_state_baseline$LUR, na.rm = TRUE)),
+      by = 1
+    )
+  ) +
+  scale_x_date(
+    date_breaks = "5 years",        # Sets breaks every 5 years
+    date_labels = "%Y"              # Formats labels to show year only
+  ) +
+  xlab("Year") +                     # Sets the x-axis label to "Year"
+  ylab("Percent") +              # (Optional) Sets the y-axis label
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),  # Centers and styles the title
+    axis.title = element_text(size = 12),                              # Styles the axis titles
+    axis.text = element_text(size = 10)                                # Styles the axis text
+  )
+
+#write.csv(summarised_state_baseline, "/Users/igro0002/Downloads/NAIRU-master/NAIRU_baseline.csv", row.names=FALSE)
+
+print(sampled_model_baseline, pars = c("tau","alpha_pt","xi_pt","eps_pu", "gamma_pu", "beta1_pt", "beta2_pt", "beta3_pt", "delta_pu", "lambda_pu", "eps_pt", "gamma_pt", "beta_pu", "delta_pt", "lambda_pt","constant_pt","constant_pu","phi_pt"))
+# print(sampled_model_nodummy, pars = c("tau","alpha_pt","eps_pu", "gamma_pu", "beta1_pt", "beta2_pt", "beta3_pt", "delta_pu", "lambda_pu", "eps_pt", "gamma_pt", "beta_pu", "delta_pt", "lambda_pt","constant_pt","constant_pu","phi_pt"))
+
+
+
+
+
