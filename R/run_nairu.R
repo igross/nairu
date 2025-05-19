@@ -175,7 +175,7 @@ data_list <- list(
 # Compile The Model
 compiled_model <- stan_model(file = file.path("stan", "NAIRU_baseline.stan"))
          
-sampled_model_baseline <- sampling(compiled_model, data = data_list, chains=10,iter = 200, control = list(max_treedepth = 15))
+sampled_model_baseline <- sampling(compiled_model, data = data_list, chains=4,iter = 200, control = list(max_treedepth = 15))
 
 
 
@@ -296,61 +296,13 @@ summarised_state_baseline <- as.data.frame(sampled_model_baseline) %>%
 summarised_state_baseline <- summarised_state_baseline %>%
   mutate(date = as.Date(date, format = "%Y-%m-%d"))
 
-summarised_state_baseline %>% 
-  ggplot(aes(x = date)) +
-  geom_ribbon(aes(ymin = lowera, ymax = uppera), fill = "orange", alpha = 0.3) +
-  geom_line(aes(y = median), colour = "red", size = 1) +
-  geom_line(aes(y = LUR), colour = "blue", size = 1) +
-  # geom_line(aes(y = dl4pmcg), colour = "green", size = 1) +
-  # ggthemes::theme_economist() +
-  theme_minimal() +
-  ggtitle("RBA Model of NAIRU (with WPI)") +
-  scale_y_continuous(
-    breaks = seq(
-      floor(min(summarised_state_baseline$lowera, 
-                summarised_state_baseline$median, 
-                summarised_state_baseline$LUR, na.rm = TRUE)),
-      ceiling(max(summarised_state_baseline$uppera, 
-                  summarised_state_baseline$median, 
-                  summarised_state_baseline$LUR, na.rm = TRUE)),
-      by = 1
-    )
-  ) +
-  scale_x_date(
-    date_breaks = "5 years",        # Sets breaks every 5 years
-    date_labels = "%Y"              # Formats labels to show year only
-  ) +
-  xlab("Year") +                     # Sets the x-axis label to "Year"
-  ylab("Percent") +              # (Optional) Sets the y-axis label
-  theme(
-    plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),  # Centers and styles the title
-    axis.title = element_text(size = 12),                              # Styles the axis titles
-    axis.text = element_text(size = 10)                                # Styles the axis text
-  )
+
 
 write.csv(summarised_state_baseline,
           file = "output/NAIRU_baseline.csv",
           row.names = FALSE)
 
-pars_show <- c(
-  "tau",
-  "alpha_pt",
-  "xi_pt[1]", "xi_pt[2]",
-  "sigma_pu",           # <- was eps_pu
-  "gamma_pu",
-  "beta1_pt", "beta2_pt", "beta3_pt",
-  "lambda_pu",
-  "sigma_pt",           # <- was eps_pt
-  "gamma_pt",
-  "beta_pu[1]", "beta_pu[2]",
-  "lambda_pt",
-  "phi_pt"
-)
 
-print(sampled_model_baseline,
-      pars   = pars_show,
-      digits = 2,
-      probs  = c(0.1, 0.9))
 
 
 
