@@ -1,0 +1,2 @@
+renv::init()      # in the project root, once
+renv::snapshot()  # every time you add / upgrade packages
