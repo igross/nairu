@@ -49,17 +49,25 @@ jobs:
 #      - name: Generate index.html from charts
 #        run: Rscript R/write_index_html.R
 
-       - name: Commit
-         run: |
-           git config --global user.name 'igross'
-           git add .
-           git add docs/*.png docs/index.html
-           git commit -m 'refreshing data' || echo "No changes to commit"
-           git push || echo "No changes to commit"
+# ── inspect workspace ─────────────────────────────────────────────
+- name: Inspect workspace
+  run: |
+    echo "::group::Workspace tree"
+    ls -R
+    echo "::endgroup::"
 
-      - name: Inspect workspace
-        run: |
-          echo "::group::Workspace tree"
-          ls -R
-          echo "::endgroup::"
+# ── commit updated artefacts (if any) ──────────────────────────────
+- name: Commit
+  if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+  run: |
+    git config --global user.name "igross"
+    git config --global user.email "action@github.com"
+
+    # add exactly the files you expect to version
+    git add docs/*.png docs/index.html || true   # or output/* …
+
+    git commit -m "Refreshing data $(date -u +'%Y-%m-%d')" \
+      || echo "No changes to commit"
+    git push
+
           
