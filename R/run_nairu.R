@@ -326,7 +326,9 @@ summarised_state_baseline %>%
     axis.text = element_text(size = 10)                                # Styles the axis text
   )
 
-#write.csv(summarised_state_baseline, "/Users/igro0002/Downloads/NAIRU-master/NAIRU_baseline.csv", row.names=FALSE)
+write.csv(summarised_state_baseline,
+          file = "output/NAIRU_baseline.csv",
+          row.names = FALSE)
 
 print(sampled_model_baseline, pars = c("tau","alpha_pt","xi_pt","eps_pu", "gamma_pu", "beta1_pt", "beta2_pt", "beta3_pt", "delta_pu", "lambda_pu", "eps_pt", "gamma_pt", "beta_pu", "delta_pt", "lambda_pt","constant_pt","constant_pu","phi_pt"))
 # print(sampled_model_nodummy, pars = c("tau","alpha_pt","eps_pu", "gamma_pu", "beta1_pt", "beta2_pt", "beta3_pt", "delta_pu", "lambda_pu", "eps_pt", "gamma_pt", "beta_pu", "delta_pt", "lambda_pt","constant_pt","constant_pu","phi_pt"))
