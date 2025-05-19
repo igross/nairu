@@ -118,7 +118,7 @@ R_g3 <- rba_g3 %>%
   select(date, pie_bondq)
 
 #RBA inflation expectations
-myfile <- "/Users/igro0002/Downloads/NAIRU-master/PIE_RBAQ.CSV"
+myfile <- "inputs/PIE_RBAQ.CSV"
 pie_rbaq <- read_csv(myfile)
 pie_rbaq <- pie_rbaq %>%
   rename(date=OBS) %>%
