@@ -164,6 +164,9 @@ print(out_dir)
          
 csv_path <- file.path(out_dir, "est_data.csv")
 readr::write_csv(est_data, csv_path)
+
+         myfile <- file.path(out_dir, "est_data.csv")
+test <- read_csv(myfile)
          
 # Subset Data for Stan
 stan_data <- as.matrix(est_data[ , -1])   # drop the yearqtr column
