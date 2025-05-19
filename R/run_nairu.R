@@ -118,7 +118,7 @@ R_g3 <- rba_g3 %>%
   select(date, pie_bondq)
 
 #RBA inflation expectations
-myfile <- "inputs/PIE_RBAQ.CSV"
+myfile <- file.path("inputs", "PIE_RBAQ.CSV")
 pie_rbaq <- read_csv(myfile)
 pie_rbaq <- pie_rbaq %>%
   rename(date=OBS) %>%
@@ -161,18 +161,20 @@ est_data <- est_data %>%
   mutate(dummy4 = ifelse(date >= "2020Q2" & date <= "2020Q3", 1, 0))
 
 
-write.csv(est_data, "/Users/igro0002/Downloads/NAIRU-master/EST_data.csv", row.names=FALSE)
+write.csv(est_data, file.path(out_dir, "EST_data.csv"), row.names = FALSE)
 
 # Subset Data for Stan
-stan_data <- est_data[,-1]
+stan_data <- as.matrix(est_data[ , -1])   # drop the yearqtr column
 
-# run model ---------------------------------------------------------------
-data_list <- list(T = nrow(stan_data),
-                  J = ncol(stan_data),
-                  Y = stan_data)
+data_list <- list(
+  T = nrow(stan_data),
+  J = ncol(stan_data),
+  Y = stan_data
+)
 
 # Compile The Model
-compiled_model <- stan_model(file = "NAIRU_baseline.stan")
+compiled_model <- stan_model(file = file.path("stan", "NAIRU_baseline.stan"))
+         
 sampled_model_baseline <- sampling(compiled_model, data = data_list, chains=10,iter = 200, control = list(max_treedepth = 15))
 
 
