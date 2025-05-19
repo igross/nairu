@@ -332,8 +332,25 @@ write.csv(summarised_state_baseline,
           file = "output/NAIRU_baseline.csv",
           row.names = FALSE)
 
-print(sampled_model_baseline, pars = c("tau","alpha_pt","xi_pt","eps_pu", "gamma_pu", "beta1_pt", "beta2_pt", "beta3_pt", "delta_pu", "lambda_pu", "eps_pt", "gamma_pt", "beta_pu", "delta_pt", "lambda_pt","constant_pt","constant_pu","phi_pt"))
-# print(sampled_model_nodummy, pars = c("tau","alpha_pt","eps_pu", "gamma_pu", "beta1_pt", "beta2_pt", "beta3_pt", "delta_pu", "lambda_pu", "eps_pt", "gamma_pt", "beta_pu", "delta_pt", "lambda_pt","constant_pt","constant_pu","phi_pt"))
+pars_show <- c(
+  "tau",
+  "alpha_pt",
+  "xi_pt[1]", "xi_pt[2]",
+  "sigma_pu",           # <- was eps_pu
+  "gamma_pu",
+  "beta1_pt", "beta2_pt", "beta3_pt",
+  "lambda_pu",
+  "sigma_pt",           # <- was eps_pt
+  "gamma_pt",
+  "beta_pu[1]", "beta_pu[2]",
+  "lambda_pt",
+  "phi_pt"
+)
+
+print(sampled_model_baseline,
+      pars   = pars_show,
+      digits = 2,
+      probs  = c(0.1, 0.9))
 
 
 
