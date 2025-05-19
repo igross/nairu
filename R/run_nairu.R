@@ -162,11 +162,9 @@ est_data <- est_data %>%
 
 print(out_dir)
          
-write.csv(est_data,
-          file = file.path(out_dir, "est_data.csv"),
-          row.names = FALSE)
-
-
+csv_path <- file.path(out_dir, "est_data.csv")
+readr::write_csv(est_data, csv_path)
+         
 # Subset Data for Stan
 stan_data <- as.matrix(est_data[ , -1])   # drop the yearqtr column
 
@@ -203,6 +201,17 @@ print(summarised_state_baseline)
          
 csv_path <- file.path(out_dir, "NAIRU_baseline.csv")
 readr::write_csv(summarised_state_baseline, csv_path)
+
+         # ---- sanity check ---------------------------------------------------------
+if (file.exists(csv_path)) {
+  message("✔  File written: ", csv_path)
+} else {
+  stop("✖  Failed to write: ", csv_path)
+}
+
+# optional: list everything so the workflow log shows it
+message("Contents of output/ after write:")
+print(list.files(out_dir, full.names = TRUE))
 
 
 
