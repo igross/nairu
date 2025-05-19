@@ -37,7 +37,7 @@ jobs:
         run: Rscript -e 'install.packages(c("vctrs"))'
 
       - name: Install packages
-        run: Rscript -e 'install.packages(c("tidyverse", "here", "jsonlite", "ggrepel", "conflicted","tidyr","scales","readabs","readrba","plotly","purrr","ggtheme","reshape2","zoo","rstan","readr","lubridate"))'
+        run: Rscript -e 'install.packages(c("tidyverse", "here", "jsonlite", "ggrepel", "conflicted","tidyr","scales","readabs","readrba","plotly","purrr","ggthemes","reshape2","zoo","rstan","readr","lubridate"))'
 
       - name: Get data
 #        if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
