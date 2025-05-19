@@ -37,20 +37,20 @@ jobs:
         run: Rscript -e 'install.packages(c("vctrs"))'
 
       - name: Install packages
-        run: Rscript -e 'install.packages(c("tidyverse", "here", "jsonlite", "ggrepel", "conflicted","tidyr","scales","readabs","readrba","plotly","purrr","ggthemes","reshape2","zoo","rstan","readr","lubridate"))'
+        run: Rscript -e 'install.packages(c("tidyverse", "here", "jsonlite", "ggrepel", "conflicted","tidyr","scales","readabs","readrba","plotly","purrr","ggthemes","reshape2","zoo","rstan","readr","lubridate","here"))'
 
       - name: Get data
 #        if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
         run: Rscript -e 'source(here::here("R", "run_nairu.R"), echo = TRUE)'
 
       - name: Make visuals
-        run: Rscript -e 'source(here::here("R", "viz_cash_rate.R"), echo = TRUE)'  
+        run: Rscript -e 'source(here::here("R", "plot_nairu.R"), echo = TRUE)'  
 
       - name: Render README
         run: Rscript -e 'rmarkdown::render(here::here("README.Rmd"))'
 
-      - name: Generate index.html from charts
-        run: Rscript R/write_index_html.R
+#      - name: Generate index.html from charts
+#        run: Rscript R/write_index_html.R
 
       - name: Commit
         run: |
