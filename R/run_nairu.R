@@ -1,16 +1,16 @@
-library(ggthemes)
-library(reshape2)
-library(readabs)
-library(dplyr)
-library(ggplot2)
-library(zoo)
-library(rstan)
-library(readrba)
-library(lubridate)
-library(readr)
+# ---- libraries ------------------------------------------------------------
+library(ggthemes); library(reshape2); library(readabs);  library(dplyr)
+library(ggplot2);   library(zoo);      library(rstan);   library(readrba)
+library(lubridate); library(readr);    library(here)
 
+options(mc.cores = parallel::detectCores())
+Sys.setenv(MAKEFLAGS = "-j4")          # speed up C++ build
 
-setwd(Sys.getenv("GITHUB_WORKSPACE", unset = here::here()))
+# ---- paths ----------------------------------------------------------------
+root    <- Sys.getenv("GITHUB_WORKSPACE", unset = here::here())
+out_dir <- file.path(root, "output")
+dir.create(out_dir, showWarnings = FALSE)
+setwd(root)
 
 
 #---------------------------------------------------------------------------------------------------------
