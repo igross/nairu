@@ -12,6 +12,9 @@ out_dir <- file.path(root, "output")
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 setwd(root)
 
+vintage_dir <- file.path(out_dir, "vintages")
+dir.create(vintage_dir, showWarnings = FALSE, recursive = TRUE)
+
 
 #---------------------------------------------------------------------------------------------------------
 #Download Most Recent ABS and RBA Data
@@ -215,6 +218,17 @@ if (file.exists(csv_path)) {
 # optional: list everything so the workflow log shows it
 message("Contents of output/ after write:")
 print(list.files(out_dir, full.names = TRUE))
+
+         # ---- save vintage -------------------------------------------------
+run_stamp   <- format(Sys.Date(), "%Y-%m-%d")      # e.g. "2025-05-20"
+vintage_out <- file.path(vintage_dir, paste0(run_stamp, ".csv"))
+
+if (!file.exists(vintage_out)) {
+  file.copy(csv_path, vintage_out)
+  message("✔  Vintage saved: ", vintage_out)
+} else {
+  message("ℹ︎  Vintage for ", run_stamp, " already exists; not overwritten.")
+}
 
 
 
