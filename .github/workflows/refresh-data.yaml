@@ -69,7 +69,14 @@ jobs:
           git config --global user.name  "igross"
           git config --global user.email "igross@users.noreply.github.com"
 
-          # stage only the artefacts you expect
-          git add output/* || true
-          git commit -m "Refreshing data $(date -u +'%Y-%m-%d')" || exit 0  # no-changes guard
+          # ── Stage everything that might change ───────────────────────────
+          git add -A output docs || true   # add other paths if your scripts write elsewhere
+
+          # ── Skip commit if nothing is staged ─────────────────────────────
+          if git diff --cached --quiet; then
+            echo "🟢 No changes to commit"
+            exit 0
+          fi
+
+          git commit -m "Refreshing data $(date -u +'%Y-%m-%d')"
           git push
