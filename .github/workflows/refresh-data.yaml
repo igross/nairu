@@ -65,7 +65,6 @@ jobs:
           echo "::endgroup::"
 
       - name: Commit refreshed files
-        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         run: |
           git config --global user.name  "igross"
           git config --global user.email "igross@users.noreply.github.com"
