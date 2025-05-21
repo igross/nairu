@@ -3,6 +3,32 @@ library(ggthemes); library(reshape2); library(readabs);  library(dplyr)
 library(ggplot2);   library(zoo);      library(rstan);   library(readrba)
 library(lubridate); library(readr);    library(here)
 
+
+# ---- ABS quarterly release timetable -------------------------------------------------
+cpi_dates <- as.Date(c(           # CPI  – last Wed of Jan/Apr/Jul/Oct
+  "2025-01-29","2025-04-30","2025-07-30","2025-10-29",
+  "2026-01-28","2026-04-29","2026-07-29","2026-10-28",
+  "2027-01-27","2027-04-28","2027-07-28","2027-10-27"
+))
+
+na_dates  <- as.Date(c(           # Nat. Accounts – first Wed of Mar/Jun/Sep/Dec
+  "2025-03-05","2025-06-04","2025-09-03","2025-12-03",
+  "2026-03-04","2026-06-03","2026-09-02","2026-12-02",
+  "2027-03-03","2027-06-02","2027-09-01","2027-12-01"
+))
+
+release_calendar <- c(cpi_dates, na_dates)
+
+# ---- Short-circuit if today isn’t a release day --------------------------------------
+if (!Sys.Date() %in% release_calendar) {
+  message(
+    glue::glue("⏩ {Sys.Date()} is not an ABS CPI/National-Accounts release day – skipping refresh.")
+  )
+  quit(save = "no")   # graceful, zero-exit termination
+}
+
+
+
 options(mc.cores = parallel::detectCores())
 Sys.setenv(MAKEFLAGS = "-j4")          # speed up C++ build
 
