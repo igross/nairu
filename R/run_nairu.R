@@ -155,7 +155,7 @@ data_set$pie_bondq <- replace(data_set$pie_bondq,is.na(data_set$pie_bondq),2.5/4
 
 #Pick Sample
 est_data <- data_set %>%
-  filter(date>"1997q3" & date<"2025q1")
+  filter(date>"1997q3")
 
 est_data <- est_data %>%
   mutate(dummy1 = ifelse(date >= "2021Q3" & date <= "2023Q1", 1, 0)) %>%
