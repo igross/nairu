@@ -145,6 +145,25 @@ pie_rbaq <- pie_rbaq %>%
 }
 
 
+# ── Extend pie_rbaq forward to latest_date_df2 ────────────────────────────────
+latest_pie_date <- max(pie_rbaq$date)
+
+if (latest_date_df2 > latest_pie_date) {
+  
+  # Quarters we still need (as yearqtr objects)
+  new_dates <- seq(from = latest_pie_date + 0.25,  # next quarter
+                   to   = latest_date_df2,
+                   by   = 0.25)
+  
+  # Grab the last observed row (all columns) and duplicate for each new date
+  last_row  <- pie_rbaq %>% filter(date == latest_pie_date)
+  new_rows  <- purrr::map_dfr(new_dates, ~ last_row %>% mutate(date = .x))
+  
+  # Append and keep chronological order
+  pie_rbaq  <- bind_rows(pie_rbaq, new_rows) %>% arrange(date)
+}
+
+
 data_set <- list(R_6345, R_6457, R_6202, R_g1, R_g3, pie_rbaq, R_g1T,R_g1NT) %>%
   Reduce(function(dtf1,dtf2) left_join(dtf1,dtf2,by="date"), .)
 
