@@ -5,10 +5,40 @@ name: refresh-data
 # ──────────────────────────────────────────────────────────────
 on:
   schedule:
-    # ── AEST months ──  (Apr–Sep)  UTC = local −10 h  → 11 : 40 am AEST = 01 : 40 UTC
-     - cron: '40 1 * 4-9 1-5'
-    # ── AEDT months ──  (Oct–Mar)  UTC = local −11 h  → 11 : 40 am AEDT = 00 : 40 UTC
-     - cron: '40 0 * 10-12,1-3 1-5'
+    # ───────────── 2025 ─────────────
+    # CPI (AEDT)             National Accounts (AEDT)
+    - cron: '40 0 29 1 *'   # 29 Jan 2025 – CPI Q4-2024
+    - cron: '40 0  5 3 *'   # 05 Mar 2025 – Nat Acct Q4-2024
+    # CPI (AEST)             National Accounts (AEST)
+    - cron: '40 1 30 4 *'   # 30 Apr 2025 – CPI Q1-2025
+    - cron: '40 1  4 6 *'   # 04 Jun 2025 – Nat Acct Q1-2025
+    - cron: '40 1 30 7 *'   # 30 Jul 2025 – CPI Q2-2025
+    - cron: '40 1  3 9 *'   # 03 Sep 2025 – Nat Acct Q2-2025
+    # CPI (AEDT)             National Accounts (AEDT)
+    - cron: '40 0 29 10 *'  # 29 Oct 2025 – CPI Q3-2025
+    - cron: '40 0  3 12 *'  # 03 Dec 2025 – Nat Acct Q3-2025
+
+    # ───────────── 2026 ─────────────
+    - cron: '40 0 28 1 *'   # 28 Jan 2026 – CPI Q4-2025
+    - cron: '40 0  4 3 *'   # 04 Mar 2026 – Nat Acct Q4-2025
+    - cron: '40 1 29 4 *'   # 29 Apr 2026 – CPI Q1-2026
+    - cron: '40 1  3 6 *'   # 03 Jun 2026 – Nat Acct Q1-2026
+    - cron: '40 1 29 7 *'   # 29 Jul 2026 – CPI Q2-2026
+    - cron: '40 1  2 9 *'   # 02 Sep 2026 – Nat Acct Q2-2026
+    - cron: '40 0 28 10 *'  # 28 Oct 2026 – CPI Q3-2026
+    - cron: '40 0  2 12 *'  # 02 Dec 2026 – Nat Acct Q3-2026
+
+    # ───────────── 2027 ─────────────
+    - cron: '40 0 27 1 *'   # 27 Jan 2027 – CPI Q4-2026
+    - cron: '40 0  3 3 *'   # 03 Mar 2027 – Nat Acct Q4-2026
+    - cron: '40 1 28 4 *'   # 28 Apr 2027 – CPI Q1-2027
+    - cron: '40 1  2 6 *'   # 02 Jun 2027 – Nat Acct Q1-2027
+    - cron: '40 1 28 7 *'   # 28 Jul 2027 – CPI Q2-2027
+    - cron: '40 1  1 9 *'   # 01 Sep 2027 – Nat Acct Q2-2027
+    - cron: '40 0 27 10 *'  # 27 Oct 2027 – CPI Q3-2027
+    - cron: '40 0  1 12 *'  # 01 Dec 2027 – Nat Acct Q3-2027
+
+  # manual & PR triggers (unchanged)
   push:
     branches: [main, master]
   pull_request:
