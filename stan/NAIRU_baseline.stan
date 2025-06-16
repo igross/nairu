@@ -44,7 +44,7 @@ transformed parameters {
 }
 model {
   /* --- Priors (tune to taste) --- */
-  tau       ~ normal(0.1, 0.05);          // half-N since tau>0
+  tau       ~ normal(0.2, 0.1);          // half-N since tau>0
   eta       ~ std_normal();               // non-centred innovations
   nhat_init ~ normal(5.5, 0.2);
 
