@@ -14,16 +14,32 @@ csv_in    <- file.path(root, "output", "NAIRU_baseline.csv")
 png_out   <- file.path(root, "output", "nairu_history.png")
 
 # ---- data ---------------------------------------------------
-nairu_df <- read_csv(csv_in, show_col_types = FALSE) %>%
-  mutate(date = as.yearqtr(date)) %>%
-  arrange(date)
+read_vintage <- function(path, label, start_qtr = "1997 Q3") {
+  df <- readr::read_csv(path, show_col_types = FALSE)
+  names(df) <- tolower(names(df))              # normalise names
+  
+  if (!"date" %in% names(df)) {
+    # --- fabricate a quarterly date sequence -----------------------------
+    start <- zoo::as.yearqtr(start_qtr)        # 1997 Q3
+    df$date <- start + (seq_len(nrow(df)) - 1) / 4
+  }
+  
+  df %>% 
+    mutate(
+      date    = zoo::as.yearqtr(.data[["date"]]),
+      vintage = label
+    ) %>% 
+    select(date, median, vintage)
+}
+
+
 
 # ---- plot ---------------------------------------------------
 p <- ggplot(nairu_df, aes(x = date)) +
   geom_ribbon(aes(ymin = lowera, ymax = uppera),
               fill = "orange", alpha = 0.30) +
-  geom_line(aes(y = median), colour = "red",  size = 1) +
-  geom_line(aes(y = LUR),    colour = "blue", size = 0.8) +
+  geom_line(aes(y = median), colour = "red",  linewidth = 1) +
+  geom_line(aes(y = LUR),    colour = "blue", linewidth = 0.8) +
   geom_point(data = slice_tail(nairu_df, n = 1),
              aes(y = median), colour = "black", size = 3) +
   scale_x_continuous(breaks = pretty(nairu_df$date, n = 10)) +
