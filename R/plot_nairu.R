@@ -14,22 +14,22 @@ csv_in    <- file.path(root, "output", "NAIRU_baseline.csv")
 png_out   <- file.path(root, "output", "nairu_history.png")
 
 # ---- data ---------------------------------------------------
-read_vintage <- function(path, label, start_qtr = "1997 Q3") {
-  df <- readr::read_csv(path, show_col_types = FALSE)
-  names(df) <- tolower(names(df))              # normalise names
-  
-  if (!"date" %in% names(df)) {
-    # --- fabricate a quarterly date sequence -----------------------------
-    start <- zoo::as.yearqtr(start_qtr)        # 1997 Q3
+ensure_dates <- function(df, start_qtr = "1997 Q3") {
+  # Add dates if the file doesn’t have any (case-insensitive test)
+  if (!any(tolower(names(df)) == "date")) {
+    start <- as.yearqtr(start_qtr)              # e.g. 1997 Q3
     df$date <- start + (seq_len(nrow(df)) - 1) / 4
   }
-  
-  df %>% 
-    mutate(
-      date    = zoo::as.yearqtr(.data[["date"]]),
-      vintage = label
-    ) %>% 
-    select(date, median, vintage)
+  # Make sure it’s a yearqtr object for ggplot & dplyr to play nicely
+  df %>% mutate(date = as.yearqtr(.data[["date"]]))
+}
+
+# ── 2. Handy reader for vintage files (uses ensure_dates) ──
+read_vintage <- function(path, label, start_qtr = "1997 Q3") {
+  read_csv(path, show_col_types = FALSE) %>%
+    ensure_dates(start_qtr) %>%                 # add/standardise dates
+    mutate(vintage = label) %>%                 # tag the vintage
+    select(date, median, vintage)               # keep what you need
 }
 
 
