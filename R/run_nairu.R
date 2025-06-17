@@ -113,30 +113,49 @@ R_g3 <- rba_g3 %>%
   select(date, pie_bondq)
 
 
-#RBA inflation expectations
-myfile <- "/Users/igro0002/Downloads/NAIRU-master/PIE_RBAQ.CSV"
+#RBA inflation expectationsMore actions
+myfile <- file.path("inputs", "PIE_RBAQ.CSV")
 pie_rbaq <- read_csv(myfile)
 pie_rbaq <- pie_rbaq %>%
   rename(date=OBS) %>%
   mutate(date = zoo::as.yearqtr(date))
 
 
+  latest_date_df1 <- max(R_5206$date)
+  latest_date_df2 <- max(R_g1$date)
 
-latest_date_df1 <- max(R_5206$date)
-latest_date_df2 <- max(R_g1$date)
+  # Check if the latest date in df2 is one day less than in df1
+  if (latest_date_df2 > latest_date_df1) {
+    # Get the most recent point from df2
+    recent_date <- R_g1 %>% filter(date == latest_date_df2) %>% select(date) 
+    recent_point <- R_5206 %>% filter(date == latest_date_df1) %>% select(DLNULC) 
 
-# Check if the latest date in df2 is one day less than in df1
-if (latest_date_df2 > latest_date_df1) {
-  # Get the most recent point from df2
-  recent_date <- R_g1 %>% filter(date == latest_date_df2) %>% select(date) 
-  recent_point <- R_5206 %>% filter(date == latest_date_df1) %>% select(DLNULC) 
-  
-  combined_df <- merge(recent_date, recent_point, all = TRUE)
-  
-  # Append the recent point to df2
-  R_5206 <- bind_rows(R_5206, combined_df)
-  
+    combined_df <- merge(recent_date, recent_point, all = TRUE)
+
+    # Append the recent point to df2
+    R_5206 <- bind_rows(R_5206, combined_df)
+
 }
+
+
+# ── Extend pie_rbaq forward to latest_date_df2 ────────────────────────────────
+latest_pie_date <- max(pie_rbaq$date)
+
+if (latest_date_df2 > latest_pie_date) {
+
+  # Quarters we still need (as yearqtr objects)
+  new_dates <- seq(from = latest_pie_date + 0.25,  # next quarter
+                   to   = latest_date_df2,
+                   by   = 0.25)
+
+  # Grab the last observed row (all columns) and duplicate for each new date
+  last_row  <- pie_rbaq %>% filter(date == latest_pie_date)
+  new_rows  <- purrr::map_dfr(new_dates, ~ last_row %>% mutate(date = .x))
+
+  # Append and keep chronological order
+  pie_rbaq  <- bind_rows(pie_rbaq, new_rows) %>% arrange(date)
+}
+
 
 
 
