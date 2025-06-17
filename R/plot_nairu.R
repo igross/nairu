@@ -13,26 +13,11 @@ root      <- Sys.getenv("GITHUB_WORKSPACE", unset = here::here())
 csv_in    <- file.path(root, "output", "NAIRU_baseline.csv")
 png_out   <- file.path(root, "output", "nairu_history.png")
 
-# ---- data ---------------------------------------------------
-ensure_dates <- function(df, start_qtr = "1997 Q3") {
-  # Add dates if the file doesn’t have any (case-insensitive test)
-  if (!any(tolower(names(df)) == "date")) {
-    start <- as.yearqtr(start_qtr)              # e.g. 1997 Q3
-    df$date <- start + (seq_len(nrow(df)) - 1) / 4
-  }
-  # Make sure it’s a yearqtr object for ggplot & dplyr to play nicely
-  df %>% mutate(date = as.yearqtr(.data[["date"]]))
-}
 
-# ── 2. Handy reader for vintage files (uses ensure_dates) ──
-read_vintage <- function(path, label, start_qtr = "1997 Q3") {
-  read_csv(path, show_col_types = FALSE) %>%
-    ensure_dates(start_qtr) %>%                 # add/standardise dates
-    mutate(vintage = label) %>%                 # tag the vintage
-    select(date, median, vintage)               # keep what you need
-}
-
-
+nairu_df <- read_csv(csv_in, show_col_types = FALSE) |>
+  mutate(date = as.yearqtr(date)) |>
+  filter(date >= as.yearqtr("2010 Q1")) |>
+  arrange(date)
 
 # ---- plot ---------------------------------------------------
 p <- ggplot(nairu_df, aes(x = date)) +
@@ -123,12 +108,25 @@ vintage_dir <- file.path(root, "output", "vintages")
 png_out     <- file.path(root, "output", "nairu_vintages.png")
 
 # helper to read a csv and tag its vintage
-read_vintage <- function(path, label) {
-  read_csv(path, show_col_types = FALSE) |>
-    mutate(date = as.yearqtr(date),
-           vintage = label) |>
-    select(date, median, vintage)
+# ---- data ---------------------------------------------------
+ensure_dates <- function(df, start_qtr = "1997 Q3") {
+  # Add dates if the file doesn’t have any (case-insensitive test)
+  if (!any(tolower(names(df)) == "date")) {
+    start <- as.yearqtr(start_qtr)              # e.g. 1997 Q3
+    df$date <- start + (seq_len(nrow(df)) - 1) / 4
+  }
+  # Make sure it’s a yearqtr object for ggplot & dplyr to play nicely
+  df %>% mutate(date = as.yearqtr(.data[["date"]]))
 }
+
+# ── 2. Handy reader for vintage files (uses ensure_dates) ──
+read_vintage <- function(path, label, start_qtr = "1997 Q3") {
+  read_csv(path, show_col_types = FALSE) %>%
+    ensure_dates(start_qtr) %>%                 # add/standardise dates
+    mutate(vintage = label) %>%                 # tag the vintage
+    select(date, median, vintage)               # keep what you need
+}
+
 
 # collect all csvs (latest + vintages)
 files <- c(latest_csv, list.files(vintage_dir, pattern = "\\.csv$", full.names = TRUE))
