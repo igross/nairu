@@ -28,6 +28,8 @@ dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
 # CPI in Jan/Apr/Jul/Oct; NA in Mar/Jun/Sep/Dec
 table_month <- list(
   CPI = c(1,4,7,10),
+  NA_month = c(3,6,9,12)  # renamed to avoid reserved NA
+),
   NA  = c(3,6,9,12)
 )
 
