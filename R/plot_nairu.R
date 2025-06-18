@@ -4,8 +4,9 @@
 # ------------------------------------------------------------
 library(ggplot2)
 library(readr)
-library(zoo)     # for as.yearqtr
 library(dplyr)
+library(zoo)
+library(purrr)
 library(here)
 
 # ---- paths --------------------------------------------------
