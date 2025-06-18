@@ -173,6 +173,19 @@ vintages_df <- map2_dfr(files, labels, function(path, label) {
 # Debug: inspect vintages_df
 print(str(vintages_df)); print(head(vintages_df))
 
+# 1. Identify all vintages, and pick out "Baseline" if it's there:
+all_vints  <- unique(vintages_df$vintage)
+old_labels <- setdiff(all_vints, "Baseline")
+
+# 2. Build a palette with exactly one colour per old vintage:
+palette    <- rainbow(length(old_labels))
+
+# 3. Now map those colours plus a final black for Baseline:
+color_map  <- setNames(
+  c(palette, "black"),
+  c(old_labels, "Baseline")
+)
+                           
 total <- length(unique(vintages_df$vintage))
 palette <- rainbow(total - 1)
 color_map <- setNames(c(palette, "black"), c(setdiff(unique(vintages_df$vintage), "Baseline"), "Baseline"))
