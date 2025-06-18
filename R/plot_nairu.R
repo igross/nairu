@@ -116,26 +116,30 @@ saveWidget(as_widget(ggplotly(p3)), file.path(output_dir, "nairu_vintages.html")
 message("Figure 3 saved: nairu_vintages.png and .html")
 
 # ---- 9. Figure 4: Most-recent NAIRU estimates across vintages ------------
-latest_vintages <- list.files(vintage_dir, pattern = "\\.csv$", full.names = TRUE)
+latest_vintages <- list.files(vintage_dir, pattern = "\.csv$", full.names = TRUE)
 last8           <- head(latest_vintages[order(file.info(latest_vintages)$mtime, decreasing = TRUE)], 8)
 
 tmp_df <- map_dfr(last8, read_vintage_safe)
+# Use rowwise to ensure scalar operations for each vintage
 summary_df <- tmp_df %>%
   arrange(max_date) %>%
+  mutate(prev_max = lag(max_date)) %>%
+  rowwise() %>%
   mutate(
-    prev_max     = lag(max_date),
-    new_qtrs     = case_when(
+    new_qtrs    = case_when(
       is.na(prev_max)       ~ fmt_yq(max_date),
       max_date <= prev_max  ~ fmt_yq(max_date),
-      TRUE                   ~ paste(seq(prev_max + 0.25, max_date, 0.25) %>% fmt_yq(), collapse = ", ")
+      TRUE                  ~ paste(seq(prev_max + 0.25, max_date, 0.25) %>% fmt_yq(), collapse = ", ")
     ),
-    release_type  = case_when(
+    release_type = case_when(
       month(max_date) %in% c(1,4,7,10)  ~ "CPI",
       month(max_date) %in% c(3,6,9,12)   ~ "NA",
       TRUE                               ~ "Other"
     )
-  )
+  ) %>%
+  ungroup()
 
+# Plot bars with distinct x positions and release labels
 gg_x <- factor(summary_df$new_qtrs, levels = summary_df$new_qtrs)
 p4   <- ggplot(summary_df, aes(x = gg_x, y = nairu_latest, fill = release_type)) +
   geom_col(width = 0.7) +
