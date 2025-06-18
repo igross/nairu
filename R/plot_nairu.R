@@ -169,15 +169,15 @@ read_vintage_safe <- function(path) {
 }
 
 # ---- paths --------------------------------------------------
-root        <- Sys.getenv("GITHUB_WORKSPACE", unset = here::here())
-vintage_dir <- file.path(root, "output", "vintages")
 png_out     <- file.path(root, "output", "nairu_last_8_vintages.png")
 
 # ---- collect last-8 vintages -------------------------------
 all_files <- list.files(vintage_dir, pattern = "\\.csv$", full.names = TRUE)
 
-# order by modification time (newest first) and take 8
-last8 <- all_files[order(file.info(all_files)$mtime, decreasing = TRUE)][1:8]
+# order newest → oldest, drop NAs, then take at most eight
+ordered  <- all_files[order(file.info(all_files)$mtime, decreasing = TRUE)]
+ordered  <- ordered[!is.na(ordered)]             # just in case
+last8    <- head(ordered, 8)                     # <=8 files, never NA
 
 summary_df <- purrr::map_dfr(last8, read_vintage_safe)
 
@@ -190,7 +190,7 @@ p <- ggplot(summary_df,
   geom_col(fill = "steelblue") +
   coord_flip() +
   labs(title = "Most-recent NAIRU estimate in each of the last 8 vintages",
-       x = "Vintage file", y = "NAIRU (percent)") +
+       x = "Vintage file", y = "NAIRU") +
   theme_minimal(base_size = 12)
 
 ggsave(png_out, p, width = 8, height = 4.5, dpi = 300, bg = "white")
