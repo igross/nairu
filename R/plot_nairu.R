@@ -84,7 +84,7 @@ nairu_df <- read_csv(csv_in, show_col_types = FALSE) %>%
   arrange(date)
 
 # ---- 6. Figure 1: NAIRU history ------------------------------------------
-p1 <- ggplot(nairu_df, aes(x = date)) +
+p1 <- ggplot(nairu_df, aes(x = date, text = paste0("Date: ", date, "<br>Median NAIRU: ", median))) +
   geom_ribbon(aes(ymin = lowera, ymax = uppera), fill = "orange", alpha = 0.3) +
   geom_line(aes(y = median), colour = "red", linewidth = 1) +
   geom_line(aes(y = LUR), colour = "blue", linewidth = 0.8) +
@@ -94,11 +94,11 @@ p1 <- ggplot(nairu_df, aes(x = date)) +
   my_theme
 
 ggsave(file.path(output_dir, "nairu_history.png"), p1, width = 8, height = 5, dpi = 300)
-saveWidget(as_widget(ggplotly(p1)), file.path(output_dir, "nairu_history.html"))
+saveWidget(as_widget(ggplotly(p1, tooltip = "text")), file.path(output_dir, "nairu_history.html"))
 message("Figure 1 saved")
 
 # ---- 7. Figure 2: Zoom-in (2010-present) ----------------------------------
-p2 <- ggplot(nairu_df, aes(x = date)) +
+p2 <- ggplot(nairu_df, aes(x = date, text = paste0("Date: ", date, "<br>Median NAIRU: ", median))) +
   geom_ribbon(aes(ymin = lowera, ymax = uppera), fill = "orange", alpha = 0.3) +
   geom_line(aes(y = median), colour = "red", linewidth = 1) +
   geom_line(aes(y = LUR), colour = "blue", linewidth = 0.8) +
@@ -106,7 +106,7 @@ p2 <- ggplot(nairu_df, aes(x = date)) +
   my_theme
 
 ggsave(file.path(output_dir, "nairu_zoom_2010.png"), p2, width = 8, height = 5, dpi = 300)
-saveWidget(as_widget(ggplotly(p2)), file.path(output_dir, "nairu_zoom_2010.html"))
+saveWidget(as_widget(ggplotly(p2, tooltip = "text")), file.path(output_dir, "nairu_zoom_2010.html"))
 message("Figure 2 saved")
 
 # ---- 8. Figure 3: Vintage comparison ------------------------------------
@@ -163,7 +163,7 @@ summary_df <- summary_df %>%
 summary_df <- summary_df %>% mutate(idx = row_number())
 
 # Plot using index for x-axis to separate duplicate quarters
-p3 <- ggplot(summary_df, aes(x = factor(idx), y = nairu_latest, fill = release_type)) +
+p3 <- ggplot(summary_df, aes(x = factor(idx), y = nairu_latest, fill = release_type, text = paste0("Release: ", new_qtrs, "<br>NAIRU: ", nairu_latest))) +
   geom_col(width = 0.7) +
   scale_x_discrete(labels = paste0(summary_df$release_type, "\n", summary_df$new_qtrs))  # show release type and quarter +  # show release type and quarter
   labs(
@@ -175,7 +175,7 @@ p3 <- ggplot(summary_df, aes(x = factor(idx), y = nairu_latest, fill = release_t
   my_theme
 
 ggsave(file.path(output_dir, "nairu_last8_bar.png"), p3, width = 9, height = 5, dpi = 300)
-saveWidget(as_widget(ggplotly(p3)), file.path(output_dir, "nairu_last8_bar.html"))
+saveWidget(as_widget(ggplotly(p3, tooltip = "text")), file.path(output_dir, "nairu_last8_bar.html"))
 message("Figure 3 saved")
 
 # ---- 9. Figure 4: All vintages series colored by vintage ----
@@ -192,7 +192,7 @@ total <- length(unique(vintages_df$vintage))
 palette <- rainbow(total - 1)
 color_map <- setNames(c(palette, "black"), c(sort(unique(vintages_df$vintage))[unique(vintages_df$vintage) != "Baseline"], "Baseline"))
 
-p4 <- ggplot(vintages_df, aes(x = date, y = median, color = vintage)) +
+p4 <- ggplot(vintages_df, aes(x = date, y = median, color = vintage, text = paste0("Date: ", date, "<br>NAIRU: ", median))) +
   geom_line(linewidth = 0.8) +
   scale_color_manual(values = color_map) +
   labs(title = "NAIRU estimates across all vintages",
@@ -200,5 +200,5 @@ p4 <- ggplot(vintages_df, aes(x = date, y = median, color = vintage)) +
   my_theme
 
 ggsave(file.path(output_dir, "nairu_all_vintages.png"), p4, width = 8, height = 5, dpi = 300)
-saveWidget(as_widget(ggplotly(p4)), file.path(output_dir, "nairu_all_vintages.html"))
+saveWidget(as_widget(ggplotly(p4, tooltip = "text")), file.path(output_dir, "nairu_all_vintages.html"))
 message("Figure 4 saved: all vintages.png and .html")
