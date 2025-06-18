@@ -115,11 +115,15 @@ summary_df <- tmp_df %>%
                    else "Other"
   ) %>%
   ungroup()
+# ---- Debug: print summary_df to console ----
+print(summary_df)
+
 
 gg_x <- factor(summary_df$new_qtrs, levels = unique(summary_df$new_qtrs))  # avoid duplicated factor levels
 p3 <- ggplot(summary_df, aes(x = gg_x, y = nairu_latest, fill = release_type)) +
   geom_col(width = 0.7) +
-  scale_x_discrete(labels = summary_df$release_type) +
+  scale_x_discrete(labels = paste0(summary_df$release_type, "
+", summary_df$new_qtrs))  # add year-quarter below release type +
   labs(title = "Most-recent NAIRU estimates by data release type",
        x = "Release Type", y = "NAIRU (%)", fill = "Release") +
   my_theme
