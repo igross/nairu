@@ -41,30 +41,23 @@ ensure_dates <- function(df, start_qtr = "1997 Q3") {
 }
 
 read_vintage_safe <- function(path) {
-  # Extract the vintage quarter directly from the file name
-  fname     <- basename(path)
-  quarter_label <- tools::file_path_sans_ext(fname)
-  # Parse as yearqtr (expects format "YYYY Qq")
-  file_date <- as.yearqtr(quarter_label)
-  
-  # Read the file to get NAIRU values
-  df <- suppressMessages(
-    read_csv(path, comment = "#", show_col_types = FALSE)
-  )
-  if (nrow(df) == 0 || !"median" %in% names(df)) return(tibble())
-  
-  # Ensure the 'date' column exists and is standardized
-  df <- ensure_dates(df)
-  
-  # Get the NAIRU value corresponding to the vintage quarter
-  latest_index <- which(df$date == file_date)
-  if (length(latest_index) == 0) {
-    # Fallback to last observation if exact match not found
-    latest_index <- which.max(df$date)
-  }
-  nairu_val <- df$median[latest_index]
+  # Extract file date from filename (expect YYYY-MM-DD.csv)
+  fname      <- basename(path)
+  date_str   <- tools::file_path_sans_ext(fname)
+  file_date_d<- as.Date(date_str)
+  # Convert to year-quarter
+  file_date  <- as.yearqtr(file_date_d)
 
-  # Return a tibble with file-derived max_date and corresponding NAIRU
+  # Read NAIRU data
+  df <- suppressMessages(read_csv(path, comment = "#", show_col_types = FALSE))
+  if (nrow(df) == 0 || !"median" %in% names(df)) return(tibble())
+  df <- ensure_dates(df)
+
+  # Find matching quarter in data
+  idx <- which(df$date == file_date)
+  if (length(idx) == 0) idx <- which.max(df$date)
+  nairu_val <- df$median[idx]
+
   tibble(
     max_date     = file_date,
     nairu_latest = nairu_val
@@ -72,6 +65,7 @@ read_vintage_safe <- function(path) {
 }
 
 fmt_yq <- function(yq) format(yq, "%Y Q%q")
+ function(yq) format(yq, "%Y Q%q")
 
 # Custom theme for all plots -----------------------------------------------
 my_theme <- theme_bw() +
@@ -145,10 +139,8 @@ summary_df <- tmp_df %>%
       m <- lubridate::month(as.Date(d))
       if (m %in% table_month$CPI) {
         "CPI"
-      } else if (m %in% table_month$NA_month) {
-        "GDP"
       } else {
-        "Other"
+        "GDP"
       }
     })
   ) %>%
@@ -156,6 +148,10 @@ summary_df <- tmp_df %>%
 
 # ---- Debug: print summary_df to console ----
 print(summary_df)
+
+# Remove any duplicate quarters (e.g. two Q3 runs) to prevent stacked bars
+summary_df <- summary_df %>% distinct(new_qtrs, .keep_all = TRUE)
+
 
 print(summary_df)
 
