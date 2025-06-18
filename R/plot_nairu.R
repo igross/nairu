@@ -164,7 +164,7 @@ message("Figure 3 saved")
 
 # ---- 9. Figure 4: All vintages series colored ---------------------------
 # Use map2_dfr to attach vintage label clearly from filename
-files      <- list.files(vintage_dir, pattern = "\.csv$", full.names = TRUE)
+files      <- list.files(vintage_dir, pattern = "\\.csv$", full.names = TRUE)
 labels     <- tools::file_path_sans_ext(basename(files))
 vintages_df <- map2_dfr(files, labels, function(path, label) {
   df <- suppressMessages(read_csv(path, show_col_types = FALSE)) %>% ensure_dates()
