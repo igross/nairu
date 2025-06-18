@@ -41,16 +41,34 @@ ensure_dates <- function(df, start_qtr = "1997 Q3") {
 }
 
 read_vintage_safe <- function(path) {
-  if (is.na(path) || !nzchar(path)) return(tibble())
-  df <- suppressMessages(read_csv(path, comment = "#", show_col_types = FALSE))
+  # Extract the vintage quarter directly from the file name
+  fname     <- basename(path)
+  quarter_label <- tools::file_path_sans_ext(fname)
+  # Parse as yearqtr (expects format "YYYY Qq")
+  file_date <- as.yearqtr(quarter_label)
+  
+  # Read the file to get NAIRU values
+  df <- suppressMessages(
+    read_csv(path, comment = "#", show_col_types = FALSE)
+  )
   if (nrow(df) == 0 || !"median" %in% names(df)) return(tibble())
-  df %>%
-    ensure_dates() %>%
-    arrange(date) %>%
-    summarise(
-      max_date     = max(date),
-      nairu_latest = median[which.max(date)]
-    )
+  
+  # Ensure the 'date' column exists and is standardized
+  df <- ensure_dates(df)
+  
+  # Get the NAIRU value corresponding to the vintage quarter
+  latest_index <- which(df$date == file_date)
+  if (length(latest_index) == 0) {
+    # Fallback to last observation if exact match not found
+    latest_index <- which.max(df$date)
+  }
+  nairu_val <- df$median[latest_index]
+
+  # Return a tibble with file-derived max_date and corresponding NAIRU
+  tibble(
+    max_date     = file_date,
+    nairu_latest = nairu_val
+  )
 }
 
 fmt_yq <- function(yq) format(yq, "%Y Q%q")
