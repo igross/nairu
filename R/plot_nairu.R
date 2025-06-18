@@ -25,12 +25,10 @@ output_dir  <- file.path(target_dir, "output")
 dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
 
 # ---- 3. ABS release timetable (approximate) -------------------------------
-# CPI in Jan/Apr/Jul/Oct; NA in Mar/Jun/Sep/Dec
+# CPI in Jan/Apr/Jul/Oct; National Accounts in Mar/Jun/Sep/Dec
 table_month <- list(
-  CPI = c(1,4,7,10),
-  NA_month = c(3,6,9,12)  # renamed to avoid reserved NA
-),
-  NA  = c(3,6,9,12)
+  CPI      = c(1, 4, 7, 10),
+  NA_month = c(3, 6, 9, 12)
 )
 
 # ---- 4. Helper functions ------------------------------------------------
@@ -41,25 +39,30 @@ ensure_dates <- function(df, start_qtr = "1997 Q3") {
   }
   df %>% mutate(date = as.yearqtr(.data[["date"]]))
 }
+
 read_vintage_safe <- function(path) {
   if (is.na(path) || !nzchar(path)) return(tibble())
   df <- suppressMessages(read_csv(path, comment = "#", show_col_types = FALSE))
   if (nrow(df) == 0 || !"median" %in% names(df)) return(tibble())
-  df %>% ensure_dates() %>% arrange(date) %>% summarise(
-    max_date     = max(date),
-    nairu_latest = median[which.max(date)]
-  )
+  df %>%
+    ensure_dates() %>%
+    arrange(date) %>%
+    summarise(
+      max_date     = max(date),
+      nairu_latest = median[which.max(date)]
+    )
 }
+
 fmt_yq <- function(yq) format(yq, "%Y Q%q")
 
-# Custom theme ------------------------------------------------------------
+# Custom theme for all plots -----------------------------------------------
 my_theme <- theme_bw() +
   theme(
-    axis.text.x             = element_text(angle = 45, hjust = 1, size = 12),
-    axis.text.y             = element_text(size = 12),
-    axis.title.x            = element_text(size = 14),
-    axis.title.y            = element_text(size = 14),
-    legend.position.inside  = c(1.02, 0.5)
+    axis.text.x            = element_text(angle = 45, hjust = 1, size = 12),
+    axis.text.y            = element_text(size = 12),
+    axis.title.x           = element_text(size = 14),
+    axis.title.y           = element_text(size = 14),
+    legend.position.inside = c(1.02, 0.5)
   )
 
 # ---- 5. Load baseline NAIRU data -----------------------------------------
@@ -69,7 +72,7 @@ nairu_df <- read_csv(csv_in, show_col_types = FALSE) %>%
   arrange(date)
 
 # ---- 6. Figure 1: NAIRU history ------------------------------------------
-p1 <- ggplot(nairu_df, aes(date)) +
+p1 <- ggplot(nairu_df, aes(x = date)) +
   geom_ribbon(aes(ymin = lowera, ymax = uppera), fill = "orange", alpha = 0.3) +
   geom_line(aes(y = median), colour = "red", linewidth = 1) +
   geom_line(aes(y = LUR), colour = "blue", linewidth = 0.8) +
@@ -83,7 +86,7 @@ saveWidget(as_widget(ggplotly(p1)), file.path(output_dir, "nairu_history.html"))
 message("Figure 1 saved")
 
 # ---- 7. Figure 2: Zoom-in (2010-present) ----------------------------------
-p2 <- ggplot(nairu_df, aes(date)) +
+p2 <- ggplot(nairu_df, aes(x = date)) +
   geom_ribbon(aes(ymin = lowera, ymax = uppera), fill = "orange", alpha = 0.3) +
   geom_line(aes(y = median), colour = "red", linewidth = 1) +
   geom_line(aes(y = LUR), colour = "blue", linewidth = 0.8) +
@@ -95,7 +98,7 @@ saveWidget(as_widget(ggplotly(p2)), file.path(output_dir, "nairu_zoom_2010.html"
 message("Figure 2 saved")
 
 # ---- 8. Figure 3: Vintage comparison ------------------------------------
-types <- list.files(vintage_dir, pattern = '\\.csv$', full.names = TRUE)
+types <- list.files(vintage_dir, pattern = "\\.csv$", full.names = TRUE)
 last8 <- head(types[order(file.info(types)$mtime, decreasing = TRUE)], 8)
 
 tmp_df <- map_dfr(last8, read_vintage_safe)
@@ -104,21 +107,12 @@ summary_df <- tmp_df %>%
   mutate(prev_max = lag(max_date)) %>%
   rowwise() %>%
   mutate(
-    new_qtrs = if (is.na(prev_max)) {
-      fmt_yq(max_date)
-    } else if (max_date <= prev_max) {
-      fmt_yq(max_date)
-    } else {
-      paste(seq(prev_max + 0.25, max_date, 0.25) %>% fmt_yq(), collapse = ", ")
-    },
-    # classify by month into release type without exact dates
-    release_type = if (month(max_date) %in% table_month$CPI) {
-      "CPI"
-    } else if (month(max_date) %in% table_month$NA) {
-      "NA"
-    } else {
-      "Other"
-    }
+    new_qtrs = if (is.na(prev_max)) fmt_yq(max_date)
+              else if (max_date <= prev_max) fmt_yq(max_date)
+              else paste(seq(prev_max + 0.25, max_date, 0.25) %>% fmt_yq(), collapse = ", "),
+    release_type = if (month(max_date) %in% table_month$CPI)       "CPI"
+                   else if (month(max_date) %in% table_month$NA_month) "NA"
+                   else "Other"
   ) %>%
   ungroup()
 
