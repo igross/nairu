@@ -144,7 +144,7 @@ p <- ggplot(vintages_df, aes(x = date, y = median, colour = vintage)) +
 ggsave(png_out, p, width = 8, height = 5, dpi = 300, bg = "white")
 message("Plot written to: ", png_out)
 
-# ---- helper -------------------------------------------------
+# ── helpers ────────────────────────────────────────────────────────
 ensure_dates <- function(df, start_qtr = "1997 Q3") {
   if (!any(tolower(names(df)) == "date")) {
     start <- as.yearqtr(start_qtr)
@@ -154,44 +154,61 @@ ensure_dates <- function(df, start_qtr = "1997 Q3") {
 }
 
 read_vintage_safe <- function(path) {
+  if (is.na(path) || !nzchar(path)) return(tibble())      # skip empties
+  
   df <- suppressMessages(
           read_csv(path, comment = "#", show_col_types = FALSE)
         )
-
-  # skip Stan diagnostic files (no 'median' column or zero rows)
-  if (nrow(df) == 0 || !"median" %in% names(df)) return(NULL)
-
+  if (nrow(df) == 0 || !"median" %in% names(df)) return(tibble())
+  
   df %>% 
     ensure_dates() %>% 
-    slice_tail(n = 1) %>%          # keep most-recent obs only
-    transmute(vintage = basename(path),
-              nairu   = median)
+    arrange(date) %>% 
+    summarise(
+      vintage_file = basename(path),
+      max_date     = max(date),
+      nairu_latest = median[which.max(date)]
+    )
 }
 
-# ---- paths --------------------------------------------------
-png_out     <- file.path(root, "output", "nairu_last_8_vintages.png")
+fmt_yq <- function(yq) format(yq, "%Y Q%q")               # 1999 Q4 → "1999 Q4"
 
-# ---- collect last-8 vintages -------------------------------
-all_files <- list.files(vintage_dir, pattern = "\\.csv$", full.names = TRUE)
+# ── locate files ──────────────────────────────────────────────────
+root        <- Sys.getenv("GITHUB_WORKSPACE", unset = here::here())
+vintage_dir <- file.path(root, "output", "vintages")
+png_out     <- file.path(root, "output", "nairu_last8_bar.png")
 
-# order newest → oldest, drop NAs, then take at most eight
-ordered  <- all_files[order(file.info(all_files)$mtime, decreasing = TRUE)]
-ordered  <- ordered[!is.na(ordered)]             # just in case
-last8    <- head(ordered, 8)                     # <=8 files, never NA
+all_csv <- list.files(vintage_dir, pattern = "\\.csv$", full.names = TRUE)
+ordered <- all_csv[order(file.info(all_csv)$mtime, decreasing = TRUE)]
+last8   <- head(ordered, 8)
 
-summary_df <- purrr::map_dfr(last8, read_vintage_safe)
+# ── build summary table ───────────────────────────────────────────
+summary_df <- map_dfr(last8, read_vintage_safe) %>% 
+  arrange(max_date)                                       # oldest → newest
 
-# bail if we ended up with fewer than 2 usable vintages
+# work out the *new* quarter(s) each vintage adds
+summary_df <- summary_df %>% 
+  mutate(prev_max = lag(max_date)) %>% 
+  rowwise() %>% 
+  mutate(new_qtrs = if (is.na(prev_max)) "—" else {
+           seq(prev_max + 0.25, max_date, 0.25) |>
+             fmt_yq() |>
+             paste(collapse = ", ")
+         }) %>% 
+  ungroup() %>% 
+  mutate(vintage_lab = factor(vintage_file, levels = vintage_file)) # keep order
+
 stopifnot(nrow(summary_df) >= 2)
 
-# ---- bar chart ---------------------------------------------
-p <- ggplot(summary_df,
-            aes(x = reorder(vintage, nairu), y = nairu)) +
+# ── plot ──────────────────────────────────────────────────────────
+p <- ggplot(summary_df, aes(x = vintage_lab, y = nairu_latest)) +
   geom_col(fill = "steelblue") +
-  coord_flip() +
-  labs(title = "Most-recent NAIRU estimate in each of the last 8 vintages",
-       x = "Vintage file", y = "NAIRU") +
-  theme_minimal(base_size = 12)
+  geom_text(aes(label = new_qtrs), vjust = -0.4, size = 3) +
+  labs(title = "Most-recent NAIRU estimate across successive vintages",
+       subtitle = "Text labels show the quarter(s) newly incorporated\nsince the prior vintage",
+       x = "Vintage (ordered by data coverage)", y = "NAIRU (%)") +
+  theme_minimal(base_size = 12) +
+  theme(axis.text.x = element_text(angle = 25, hjust = 1))
 
-ggsave(png_out, p, width = 8, height = 4.5, dpi = 300, bg = "white")
+ggsave(png_out, p, width = 9, height = 5, dpi = 300, bg = "white")
 message("Bar chart written to: ", png_out)
