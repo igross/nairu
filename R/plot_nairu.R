@@ -15,6 +15,7 @@ library(tidyr)
 library(here)
 library(plotly)
 library(htmlwidgets)
+library(lubridate)  # for month() helper
 
 # ---- 2. Set up file paths and root directory -----------------------------
 root        <- Sys.getenv("GITHUB_WORKSPACE", unset = here::here())
@@ -68,7 +69,7 @@ my_theme <- theme_bw() +
     axis.text.y  = element_text(size = 12),
     axis.title.x = element_text(size = 14),
     axis.title.y = element_text(size = 14),
-    legend.position = c(1.02, 0.5)
+    legend.position.inside = c(1.02, 0.5)  # use inside for ggplot2 ≥3.5.0
   )
 
 # ---- 5. Load baseline NAIRU data -----------------------------------------
