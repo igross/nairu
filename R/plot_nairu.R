@@ -122,14 +122,24 @@ summary_df <- tmp_df %>%
 # ---- Debug: print summary_df to console ----
 print(summary_df)
 
+# Relabel any "NA" release_type to "GDP" for chart consistency
+summary_df <- summary_df %>%
+  mutate(release_type = ifelse(release_type == "NA", "GDP", release_type))
 
-gg_x <- factor(summary_df$new_qtrs, levels = unique(summary_df$new_qtrs))  # avoid duplicated factor levels
-p3 <- ggplot(summary_df, aes(x = gg_x, y = nairu_latest, fill = release_type)) +
+# Add an explicit index for each vintage to ensure discrete bar positions
+summary_df <- summary_df %>% mutate(idx = row_number())
+
+# Plot using index for x-axis to separate duplicate quarters
+p3 <- ggplot(summary_df, aes(x = factor(idx), y = nairu_latest, fill = release_type)) +
   geom_col(width = 0.7) +
   scale_x_discrete(labels = paste0(summary_df$release_type, "
-", summary_df$new_qtrs))  # add year-quarter below release type +
-  labs(title = "Most-recent NAIRU estimates by data release type",
-       x = "Release Type", y = "NAIRU (%)", fill = "Release") +
+", summary_df$new_qtrs)) +  # show release type and quarter
+  labs(
+    title = "Most-recent NAIRU estimates by data release type",
+    x     = "Release (type and quarter)",
+    y     = "NAIRU (%)",
+    fill  = "Release"
+  ) +
   my_theme
 
 ggsave(file.path(output_dir, "nairu_last8_bar.png"), p3, width = 9, height = 5, dpi = 300)
