@@ -44,13 +44,27 @@ read_vintage_safe <- function(path) {
   # Extract file date from filename (expect YYYY-MM-DD.csv)
   fname      <- basename(path)
   date_str   <- tools::file_path_sans_ext(fname)
-  file_date_d<- as.Date(date_str)
-  # Convert to year-quarter
-  file_date  <- as.yearqtr(file_date_d)
+  pub_date   <- as.Date(date_str)  # publication date
+  # Convert to year-quarter for model date
+  file_date  <- as.yearqtr(pub_date)
 
   # Read NAIRU data
   df <- suppressMessages(read_csv(path, comment = "#", show_col_types = FALSE))
   if (nrow(df) == 0 || !"median" %in% names(df)) return(tibble())
+  df <- ensure_dates(df)
+
+  # Find matching quarter in data
+  idx <- which(df$date == file_date)
+  if (length(idx) == 0) idx <- which.max(df$date)
+  nairu_val <- df$median[idx]
+
+  # Return pub_date and model quarter date
+  tibble(
+    pub_date     = pub_date,
+    max_date     = file_date,
+    nairu_latest = nairu_val
+  )
+}))
   df <- ensure_dates(df)
 
   # Find matching quarter in data
@@ -127,7 +141,7 @@ tmp_df <- map_dfr(last8, read_vintage_safe)
 summary_df <- tmp_df %>%
   arrange(max_date) %>%
   mutate(prev_max = lag(max_date)) %>%
-  # Compute new_qtrs per row
+  # Compute new_qtrs and release_type per row
   mutate(
     new_qtrs = purrr::pmap_chr(
       list(prev_max, max_date),
@@ -143,7 +157,6 @@ summary_df <- tmp_df %>%
         }
       }
     ),
-    # Determine release type by quarter-month
     release_type = purrr::map_chr(max_date, function(d) {
       m <- lubridate::month(as.Date(d))
       if (m %in% table_month$CPI) {
@@ -153,7 +166,13 @@ summary_df <- tmp_df %>%
       }
     })
   ) %>%
-  ungroup()
+  ungroup() %>%
+  # Remove entries without a valid date (e.g., unparsed filenames)
+  filter(!is.na(max_date))
+
+# ---- Debug: print summary_df to console ----
+print(summary_df)
+
 
 # ---- Debug: print summary_df to console ----
 print(summary_df)
