@@ -116,7 +116,7 @@ summary_df <- tmp_df %>%
   ) %>%
   ungroup()
 
-gg_x <- factor(summary_df$new_qtrs, levels = summary_df$new_qtrs)
+gg_x <- factor(summary_df$new_qtrs, levels = unique(summary_df$new_qtrs))  # avoid duplicated factor levels
 p3 <- ggplot(summary_df, aes(x = gg_x, y = nairu_latest, fill = release_type)) +
   geom_col(width = 0.7) +
   scale_x_discrete(labels = summary_df$release_type) +
@@ -127,4 +127,3 @@ p3 <- ggplot(summary_df, aes(x = gg_x, y = nairu_latest, fill = release_type)) +
 ggsave(file.path(output_dir, "nairu_last8_bar.png"), p3, width = 9, height = 5, dpi = 300)
 saveWidget(as_widget(ggplotly(p3)), file.path(output_dir, "nairu_last8_bar.html"))
 message("Figure 3 saved")
-
