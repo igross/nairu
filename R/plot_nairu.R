@@ -116,35 +116,41 @@ saveWidget(as_widget(ggplotly(p3)), file.path(output_dir, "nairu_vintages.html")
 message("Figure 3 saved: nairu_vintages.png and .html")
 
 # ---- 9. Figure 4: Most-recent NAIRU estimates across vintages ------------
-latest_vintages <- list.files(vintage_dir, pattern = "\\.csv$", full.names = TRUE)
+latest_vintages <- list.files(vintage_dir, pattern = "\.csv$", full.names = TRUE)
 last8 <- head(latest_vintages[order(file.info(latest_vintages)$mtime, decreasing = TRUE)], 8)
 
-summary_df <- map_dfr(last8, read_vintage_safe) %>%
+# Read summary and compute quarters and release type
+tmp_df <- map_dfr(last8, read_vintage_safe)
+summary_df <- tmp_df %>%
   arrange(max_date) %>%
-  mutate(prev_max = lag(max_date)) %>%
-  rowwise() %>%
   mutate(
-    # classify by month to avoid reliance on exact dates
+    prev_max = lag(max_date),
+    new_qtrs = case_when(
+      is.na(prev_max)       ~ fmt_yq(max_date),
+      max_date <= prev_max  ~ fmt_yq(max_date),
+      TRUE                   ~ paste(seq(prev_max + 0.25, max_date, 0.25) %>% fmt_yq(), collapse = ", ")
+    ),
+    # classify by month bucket
     release_type = case_when(
       month(max_date) %in% c(1,4,7,10)  ~ "CPI",
-      month(max_date) %in% c(3,6,9,12)  ~ "NA",
+      month(max_date) %in% c(3,6,9,12)   ~ "NA",
       TRUE                               ~ "Other"
-    ),
-    new_qtrs = if (is.na(prev_max)) {
-      "—"
-    } else if (max_date <= prev_max) {
-      ""
-    } else {
-      paste(seq(prev_max + 0.25, max_date, 0.25) %>% fmt_yq(), collapse = ", ")
-    }
-  ) %>%
-  ungroup() %>%
-  mutate(vintage_label = factor(release_type, levels = c("CPI","NA","Other")))
+    )
+  )
 
-p4 <- ggplot(summary_df, aes(x = vintage_label, y = nairu_latest)) +
-  geom_col(fill = "steelblue") +
-  labs(title = "Most-recent NAIRU estimates by data release type", x = "Release Type", y = "NAIRU (%)") +
+# Plot using distinct positions for each vintage (new_qtrs) and label with release_type
+gg_x <- factor(summary_df$new_qtrs, levels = summary_df$new_qtrs)
+p4 <- ggplot(summary_df, aes(x = gg_x, y = nairu_latest, fill = release_type)) +
+  geom_col(width = 0.7) +
+  scale_x_discrete(labels = summary_df$release_type) +
+  labs(
+    title = "Most-recent NAIRU estimates by data release type",
+    x     = "Release Type", y = "NAIRU (%)",
+    fill  = "Release Type"
+  ) +
   my_theme
+
+# Save static and interactive versions
 ggsave(file.path(output_dir, "nairu_last8_bar.png"), p4, width = 9, height = 5, dpi = 300)
 saveWidget(as_widget(ggplotly(p4)), file.path(output_dir, "nairu_last8_bar.html"))
 message("Figure 4 saved: nairu_last8_bar.png and .html")
