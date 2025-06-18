@@ -84,6 +84,11 @@ nairu_df <- read_csv(csv_in, show_col_types = FALSE) %>%
   arrange(date)
 
 # ---- 6. Figure 1: NAIRU history ------------------------------------------
+# Debug: print first few rows of nairu_df
+print(head(nairu_df))
+print(summary(nairu_df))
+
+
 p1 <- ggplot(nairu_df, aes(x = date, text = paste0("Date: ", date, "<br>Median NAIRU: ", median))) +
   geom_ribbon(aes(ymin = lowera, ymax = uppera), fill = "orange", alpha = 0.3) +
   geom_line(aes(y = median), colour = "red", linewidth = 1) +
@@ -98,6 +103,10 @@ saveWidget(as_widget(ggplotly(p1, tooltip = "text")), file.path(output_dir, "nai
 message("Figure 1 saved")
 
 # ---- 7. Figure 2: Zoom-in (2010-present) ----------------------------------
+# Debug: print nairu_df subset for zoom
+print(head(nairu_df, 10))
+
+
 p2 <- ggplot(nairu_df, aes(x = date, text = paste0("Date: ", date, "<br>Median NAIRU: ", median))) +
   geom_ribbon(aes(ymin = lowera, ymax = uppera), fill = "orange", alpha = 0.3) +
   geom_line(aes(y = median), colour = "red", linewidth = 1) +
@@ -182,6 +191,10 @@ saveWidget(as_widget(ggplotly(p3, tooltip = "text")), file.path(output_dir, "nai
 message("Figure 3 saved")
 
 # ---- 9. Figure 4: All vintages series colored by vintage ----
+# Debug: print vintages_df structure and head
+print(str(vintages_df))
+print(head(vintages_df))
+
 # Read all vintage files including baseline
 all_files <- c(csv_in, list.files(vintage_dir, pattern = "\\.csv$", full.names = TRUE))  # properly escape backslash for regex
 labels    <- c("Baseline", tools::file_path_sans_ext(basename(list.files(vintage_dir, pattern = "\\.csv$", full.names = FALSE))))  # escape backslash in CSV pattern
