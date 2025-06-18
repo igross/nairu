@@ -42,43 +42,32 @@ ensure_dates <- function(df, start_qtr = "1997 Q3") {
 
 read_vintage_safe <- function(path) {
   # Extract file date from filename (expect YYYY-MM-DD.csv)
-  fname      <- basename(path)
-  date_str   <- tools::file_path_sans_ext(fname)
-  pub_date   <- as.Date(date_str)  # publication date
-  # Convert to year-quarter for model date
-  file_date  <- as.yearqtr(pub_date)
+  fname     <- basename(path)
+  date_str  <- tools::file_path_sans_ext(fname)
+  pub_date  <- as.Date(date_str)
+  # Convert to year-quarter
+  file_date <- as.yearqtr(pub_date)
 
   # Read NAIRU data
   df <- suppressMessages(read_csv(path, comment = "#", show_col_types = FALSE))
   if (nrow(df) == 0 || !"median" %in% names(df)) return(tibble())
   df <- ensure_dates(df)
 
-  # Find matching quarter in data
+  # Find matching quarter
   idx <- which(df$date == file_date)
   if (length(idx) == 0) idx <- which.max(df$date)
   nairu_val <- df$median[idx]
 
-  # Return pub_date and model quarter date
+  # Return publication date and NAIRU
   tibble(
     pub_date     = pub_date,
-    max_date     = file_date,
-    nairu_latest = nairu_val
-  )
-}))
-  df <- ensure_dates(df)
-
-  # Find matching quarter in data
-  idx <- which(df$date == file_date)
-  if (length(idx) == 0) idx <- which.max(df$date)
-  nairu_val <- df$median[idx]
-
-  tibble(
     max_date     = file_date,
     nairu_latest = nairu_val
   )
 }
 
 fmt_yq <- function(yq) format(yq, "%Y Q%q")
+(yq) format(yq, "%Y Q%q")
  function(yq) format(yq, "%Y Q%q")
 
 # Custom theme for all plots -----------------------------------------------
