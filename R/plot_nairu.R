@@ -12,19 +12,19 @@ library(dplyr)
 library(zoo)
 library(purrr)
 library(tidyr)
-library(here)
 library(plotly)
 library(htmlwidgets)
 library(lubridate)  # for month() helper
 
-# ---- 2. Set up file paths and root directory -----------------------------
-root        <- Sys.getenv("GITHUB_WORKSPACE", unset = here::here())
-csv_in      <- file.path(root, "output", "NAIRU_baseline.csv")
-vintage_dir <- file.path(root, "output", "vintages")
-output_dir  <- file.path(root, "output")
+# ---- 2. Set up file paths without using 'here' ---------------------------
+# Assume script is run from project root
+target_dir <- getwd()
+csv_in      <- file.path(target_dir, "output", "NAIRU_baseline.csv")
+vintage_dir <- file.path(target_dir, "output", "vintages")
+output_dir  <- file.path(target_dir, "output")
 dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
 
-# ---- 3. ABS quarterly release timetable ---------------------------------
+# ---- 3. ABS quarterly release timetable ----------------------------------
 # CPI releases in Jan/Apr/Jul/Oct, NA in Mar/Jun/Sep/Dec (approximate dates)
 cpi_dates <- as.Date(c(
   "2025-01-29","2025-04-30","2025-07-30","2025-10-29",
@@ -65,11 +65,11 @@ fmt_yq <- function(yq) format(yq, "%Y Q%q")
 # Custom theme for all plots -----------------------------------------------
 my_theme <- theme_bw() +
   theme(
-    axis.text.x  = element_text(angle = 45, hjust = 1, size = 12),
-    axis.text.y  = element_text(size = 12),
-    axis.title.x = element_text(size = 14),
-    axis.title.y = element_text(size = 14),
-    legend.position.inside = c(1.02, 0.5)  # use inside for ggplot2 ≥3.5.0
+    axis.text.x           = element_text(angle = 45, hjust = 1, size = 12),
+    axis.text.y           = element_text(size = 12),
+    axis.title.x          = element_text(size = 14),
+    axis.title.y          = element_text(size = 14),
+    legend.position.inside = c(1.02, 0.5)
   )
 
 # ---- 5. Load baseline NAIRU data -----------------------------------------
@@ -116,31 +116,28 @@ saveWidget(as_widget(ggplotly(p3)), file.path(output_dir, "nairu_vintages.html")
 message("Figure 3 saved: nairu_vintages.png and .html")
 
 # ---- 9. Figure 4: Most-recent NAIRU estimates across vintages ------------
-latest_vintages <- list.files(vintage_dir, pattern = "\.csv$", full.names = TRUE)  # list all CSVs
-last8 <- head(latest_vintages[order(file.info(latest_vintages)$mtime, decreasing = TRUE)], 8)
+latest_vintages <- list.files(vintage_dir, pattern = "\\.csv$", full.names = TRUE)
+last8           <- head(latest_vintages[order(file.info(latest_vintages)$mtime, decreasing = TRUE)], 8)
 
-# Read summary and compute quarters and release type
 tmp_df <- map_dfr(last8, read_vintage_safe)
 summary_df <- tmp_df %>%
   arrange(max_date) %>%
   mutate(
-    prev_max = lag(max_date),
-    new_qtrs = case_when(
+    prev_max     = lag(max_date),
+    new_qtrs     = case_when(
       is.na(prev_max)       ~ fmt_yq(max_date),
       max_date <= prev_max  ~ fmt_yq(max_date),
       TRUE                   ~ paste(seq(prev_max + 0.25, max_date, 0.25) %>% fmt_yq(), collapse = ", ")
     ),
-    # classify by month bucket
-    release_type = case_when(
+    release_type  = case_when(
       month(max_date) %in% c(1,4,7,10)  ~ "CPI",
       month(max_date) %in% c(3,6,9,12)   ~ "NA",
       TRUE                               ~ "Other"
     )
   )
 
-# Plot using distinct positions for each vintage (new_qtrs) and label with release_type
 gg_x <- factor(summary_df$new_qtrs, levels = summary_df$new_qtrs)
-p4 <- ggplot(summary_df, aes(x = gg_x, y = nairu_latest, fill = release_type)) +
+p4   <- ggplot(summary_df, aes(x = gg_x, y = nairu_latest, fill = release_type)) +
   geom_col(width = 0.7) +
   scale_x_discrete(labels = summary_df$release_type) +
   labs(
@@ -149,8 +146,6 @@ p4 <- ggplot(summary_df, aes(x = gg_x, y = nairu_latest, fill = release_type)) +
     fill  = "Release Type"
   ) +
   my_theme
-
-# Save static and interactive versions
 ggsave(file.path(output_dir, "nairu_last8_bar.png"), p4, width = 9, height = 5, dpi = 300)
 saveWidget(as_widget(ggplotly(p4)), file.path(output_dir, "nairu_last8_bar.html"))
 message("Figure 4 saved: nairu_last8_bar.png and .html")
