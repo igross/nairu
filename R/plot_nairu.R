@@ -144,4 +144,54 @@ p <- ggplot(vintages_df, aes(x = date, y = median, colour = vintage)) +
 ggsave(png_out, p, width = 8, height = 5, dpi = 300, bg = "white")
 message("Plot written to: ", png_out)
 
+# ---- helper -------------------------------------------------
+ensure_dates <- function(df, start_qtr = "1997 Q3") {
+  if (!any(tolower(names(df)) == "date")) {
+    start <- as.yearqtr(start_qtr)
+    df$date <- start + (seq_len(nrow(df)) - 1) / 4
+  }
+  mutate(df, date = as.yearqtr(.data[["date"]]))
+}
 
+read_vintage_safe <- function(path) {
+  df <- suppressMessages(
+          read_csv(path, comment = "#", show_col_types = FALSE)
+        )
+
+  # skip Stan diagnostic files (no 'median' column or zero rows)
+  if (nrow(df) == 0 || !"median" %in% names(df)) return(NULL)
+
+  df %>% 
+    ensure_dates() %>% 
+    slice_tail(n = 1) %>%          # keep most-recent obs only
+    transmute(vintage = basename(path),
+              nairu   = median)
+}
+
+# ---- paths --------------------------------------------------
+root        <- Sys.getenv("GITHUB_WORKSPACE", unset = here::here())
+vintage_dir <- file.path(root, "output", "vintages")
+png_out     <- file.path(root, "output", "nairu_last_8_vintages.png")
+
+# ---- collect last-8 vintages -------------------------------
+all_files <- list.files(vintage_dir, pattern = "\\.csv$", full.names = TRUE)
+
+# order by modification time (newest first) and take 8
+last8 <- all_files[order(file.info(all_files)$mtime, decreasing = TRUE)][1:8]
+
+summary_df <- purrr::map_dfr(last8, read_vintage_safe)
+
+# bail if we ended up with fewer than 2 usable vintages
+stopifnot(nrow(summary_df) >= 2)
+
+# ---- bar chart ---------------------------------------------
+p <- ggplot(summary_df,
+            aes(x = reorder(vintage, nairu), y = nairu)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Most-recent NAIRU estimate in each of the last 8 vintages",
+       x = "Vintage file", y = "NAIRU (percent)") +
+  theme_minimal(base_size = 12)
+
+ggsave(png_out, p, width = 8, height = 4.5, dpi = 300, bg = "white")
+message("Bar chart written to: ", png_out)
