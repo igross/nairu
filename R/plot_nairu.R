@@ -125,14 +125,16 @@ summary_df <- map_dfr(last8, read_vintage_safe) %>%
   arrange(max_date) %>%
   mutate(prev_max = lag(max_date)) %>%
   rowwise() %>%
-  mutate(new_qtrs = case_when(
-    is.na(prev_max)       ~ "—",
-    max_date <= prev_max  ~ "",
-    TRUE                  ~ paste(
-                              seq(prev_max + 0.25, max_date, 0.25) %>%
-                              fmt_yq(), collapse = ", "
-                            )
-  )) %>%
+  mutate(new_qtrs = if (is.na(prev_max)) {
+                      "—"
+                    } else if (max_date <= prev_max) {
+                      ""
+                    } else {
+                      paste(
+                        seq(prev_max + 0.25, max_date, 0.25) %>% fmt_yq(),
+                        collapse = ", "
+                      )
+                    }) %>%
   ungroup() %>%
   mutate(vintage_lab = factor(vintage_file, levels = vintage_file))
 
