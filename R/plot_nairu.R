@@ -76,7 +76,7 @@ p1 <- ggplot(nairu_df, aes(x = date)) +
   geom_ribbon(aes(ymin = lowera, ymax = uppera), fill = "orange", alpha = 0.3) +
   geom_line(aes(y = median), colour = "red", linewidth = 1) +
   geom_line(aes(y = LUR), colour = "blue", linewidth = 0.8) +
-  geom_point(data = slice_tail(nairu_df, 1), aes(y = median), colour = "black", size = 3) +
+  geom_point(data = slice_tail(nairu_df, n = 1), aes(y = median), colour = "black", size = 3) +
   scale_x_continuous(breaks = pretty(nairu_df$date, n = 10)) +
   labs(title = "NAIRU estimate with 90% credible interval", x = "Year", y = "Percent") +
   my_theme
@@ -127,3 +127,4 @@ p3 <- ggplot(summary_df, aes(x = gg_x, y = nairu_latest, fill = release_type)) +
 ggsave(file.path(output_dir, "nairu_last8_bar.png"), p3, width = 9, height = 5, dpi = 300)
 saveWidget(as_widget(ggplotly(p3)), file.path(output_dir, "nairu_last8_bar.html"))
 message("Figure 3 saved")
+
