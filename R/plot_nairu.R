@@ -120,24 +120,43 @@ types <- list.files(vintage_dir, pattern = "\\.csv$", full.names = TRUE)
 last8 <- head(types[order(file.info(types)$mtime, decreasing = TRUE)], 8)
 
 tmp_df <- map_dfr(last8, read_vintage_safe)
+# Build summary_df robustly using pmap to avoid NA condition issues
 summary_df <- tmp_df %>%
   arrange(max_date) %>%
   mutate(prev_max = lag(max_date)) %>%
-  rowwise() %>%
+  # Compute new_qtrs per row
   mutate(
-    new_qtrs = if (is.na(prev_max)) fmt_yq(max_date)
-              else if (max_date <= prev_max) fmt_yq(max_date)
-              else paste(seq(prev_max + 0.25, max_date, 0.25) %>% fmt_yq(), collapse = ", "),
-    release_type = if (month(max_date) %in% table_month$CPI) {
-      "CPI"
-    } else if (month(max_date) %in% table_month$NA_month) {
-      "GDP"  # relabeled NA to GDP
-    } else {
-      "Other"
-    }
+    new_qtrs = purrr::pmap_chr(
+      list(prev_max, max_date),
+      function(prev, curr) {
+        if (is.na(curr) || is.na(prev)) {
+          fmt_yq(curr)
+        } else if (curr <= prev) {
+          fmt_yq(curr)
+        } else {
+          seq(prev + 0.25, curr, 0.25) %>%
+            purrr::map_chr(fmt_yq) %>%
+            paste(collapse = ", ")
+        }
+      }
+    ),
+    # Determine release type by quarter-month
+    release_type = purrr::map_chr(max_date, function(d) {
+      m <- lubridate::month(as.Date(d))
+      if (m %in% table_month$CPI) {
+        "CPI"
+      } else if (m %in% table_month$NA_month) {
+        "GDP"
+      } else {
+        "Other"
+      }
+    })
   ) %>%
   ungroup()
+
 # ---- Debug: print summary_df to console ----
+print(summary_df)
+
 print(summary_df)
 
 # Relabel any "NA" release_type to "GDP" for chart consistency
@@ -163,3 +182,29 @@ p3 <- ggplot(summary_df, aes(x = factor(idx), y = nairu_latest, fill = release_t
 ggsave(file.path(output_dir, "nairu_last8_bar.png"), p3, width = 9, height = 5, dpi = 300)
 saveWidget(as_widget(ggplotly(p3)), file.path(output_dir, "nairu_last8_bar.html"))
 message("Figure 3 saved")
+
+# ---- 9. Figure 4: All vintages series colored by vintage ----
+# Read all vintage files including baseline
+all_files <- c(csv_in, list.files(vintage_dir, pattern = "\.csv$", full.names = TRUE))
+labels    <- c("Baseline", tools::file_path_sans_ext(basename(list.files(vintage_dir, "\.csv$"))))
+vintages_df <- map2_dfr(all_files, labels, function(path, label) {
+  df <- suppressMessages(read_csv(path, show_col_types = FALSE)) %>% ensure_dates()
+  df %>% mutate(vintage = label)
+})
+
+# Determine unique vintages and assign colors: rainbow for old, black for baseline
+total <- length(unique(vintages_df$vintage))
+palette <- rainbow(total - 1)
+color_map <- setNames(c(palette, "black"), c(sort(unique(vintages_df$vintage))[unique(vintages_df$vintage) != "Baseline"], "Baseline"))
+
+p4 <- ggplot(vintages_df, aes(x = date, y = median, color = vintage)) +
+  geom_line(linewidth = 0.8) +
+  scale_color_manual(values = color_map) +
+  labs(title = "NAIRU estimates across all vintages",
+       x = "Year", y = "NAIRU (%)", color = "Vintage") +
+  my_theme
+
+ggsave(file.path(output_dir, "nairu_all_vintages.png"), p4, width = 8, height = 5, dpi = 300)
+saveWidget(as_widget(ggplotly(p4)), file.path(output_dir, "nairu_all_vintages.html"))
+message("Figure 4 saved: all vintages.png and .html")
+
