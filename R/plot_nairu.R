@@ -24,13 +24,12 @@ output_dir  <- file.path(root, "output")
 dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
 
 # ---- 3. ABS quarterly release timetable ---------------------------------
-# CPI: last Wed of Jan/Apr/Jul/Oct => release of previous quarter CPI
+# CPI releases in Jan/Apr/Jul/Oct, NA in Mar/Jun/Sep/Dec (approximate dates)
 cpi_dates <- as.Date(c(
   "2025-01-29","2025-04-30","2025-07-30","2025-10-29",
   "2026-01-28","2026-04-29","2026-07-29","2026-10-28",
   "2027-01-27","2027-04-28","2027-07-28","2027-10-27"
 ))
-# National Accounts: first Wed of Mar/Jun/Sep/Dec => release of previous quarter NA
 na_dates <- as.Date(c(
   "2025-03-05","2025-06-04","2025-09-03","2025-12-03",
   "2026-03-04","2026-06-03","2026-09-02","2026-12-02",
@@ -56,7 +55,6 @@ read_vintage_safe <- function(path) {
   df <- suppressMessages(read_csv(path, comment = "#", show_col_types = FALSE))
   if (nrow(df) == 0 || !"median" %in% names(df)) return(tibble())
   df %>% ensure_dates() %>% arrange(date) %>% summarise(
-    vintage_file = basename(path),
     max_date     = max(date),
     nairu_latest = median[which.max(date)]
   )
@@ -105,9 +103,8 @@ message("Figure 2 saved: nairu_zoom_2010.png and .html")
 
 # ---- 8. Figure 3: NAIRU vintages comparison -------------------------------
 types <- list.files(vintage_dir, pattern = "\\.csv$", full.names = TRUE)
-files <- c(csv_in, types)
 labels <- c("Latest", tools::file_path_sans_ext(basename(types)))
-vintages_df <- map2_dfr(files, labels, read_vintage)
+vintages_df <- map2_dfr(c(csv_in, types), labels, read_vintage)
 
 p3 <- ggplot(vintages_df, aes(x = date, y = median, colour = vintage)) +
   geom_line(linewidth = 0.8) +
@@ -119,44 +116,33 @@ message("Figure 3 saved: nairu_vintages.png and .html")
 
 # ---- 9. Figure 4: Most-recent NAIRU estimates across vintages ------------
 latest_vintages <- list.files(vintage_dir, pattern = "\\.csv$", full.names = TRUE)
-ordered <- latest_vintages[order(file.info(latest_vintages)$mtime, decreasing = TRUE)]
-last8 <- head(ordered, 8)
+last8 <- head(latest_vintages[order(file.info(latest_vintages)$mtime, decreasing = TRUE)], 8)
+
 summary_df <- map_dfr(last8, read_vintage_safe) %>%
   arrange(max_date) %>%
   mutate(prev_max = lag(max_date)) %>%
   rowwise() %>%
   mutate(
-    # determine release type based on next ABS release after quarter-end
-    release_date = {
-      q_end <- as.Date(max_date, frac = 1)
-      next_rel <- min(c(cpi_dates, na_dates)[c(cpi_dates, na_dates) > q_end])
-      next_rel
+    # classify by month to avoid reliance on exact dates
+    release_type = case_when(
+      month(max_date) %in% c(1,4,7,10)  ~ "CPI",
+      month(max_date) %in% c(3,6,9,12)  ~ "NA",
+      TRUE                               ~ "Other"
+    ),
+    new_qtrs = if (is.na(prev_max)) {
+      "—"
+    } else if (max_date <= prev_max) {
+      ""
+    } else {
+      paste(seq(prev_max + 0.25, max_date, 0.25) %>% fmt_yq(), collapse = ", ")
     }
   ) %>%
   ungroup() %>%
-  mutate(
-    release_type = case_when(
-      release_date %in% cpi_dates  ~ "CPI",
-      release_date %in% na_dates   ~ "NA",
-      TRUE                          ~ "Other"
-    ),
-    new_qtrs = ifelse(is.na(prev_max),
-                      "—",
-                      ifelse(max_date <= prev_max,
-                             "",
-                             paste(seq(prev_max + 0.25, max_date, 0.25) %>% fmt_yq(), collapse = ", ")
-                      )
-    )
-  ) %>%
-  mutate(
-    # use release_type as x-axis label, ordered by data coverage
-    vintage_label = factor(new_qtrs, levels = new_qtrs, labels = release_type)
-  )
+  mutate(vintage_label = factor(release_type, levels = c("CPI","NA","Other")))
 
 p4 <- ggplot(summary_df, aes(x = vintage_label, y = nairu_latest)) +
   geom_col(fill = "steelblue") +
-  labs(title = "Most-recent NAIRU estimates by data release type",
-       x = "Release type", y = "NAIRU (%)") +
+  labs(title = "Most-recent NAIRU estimates by data release type", x = "Release Type", y = "NAIRU (%)") +
   my_theme
 ggsave(file.path(output_dir, "nairu_last8_bar.png"), p4, width = 9, height = 5, dpi = 300)
 saveWidget(as_widget(ggplotly(p4)), file.path(output_dir, "nairu_last8_bar.html"))
