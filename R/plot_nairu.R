@@ -116,7 +116,7 @@ saveWidget(as_widget(ggplotly(p3)), file.path(output_dir, "nairu_vintages.html")
 message("Figure 3 saved: nairu_vintages.png and .html")
 
 # ---- 9. Figure 4: Most-recent NAIRU estimates across vintages ------------
-latest_vintages <- list.files(vintage_dir, pattern = "\.csv$", full.names = TRUE)
+latest_vintages <- list.files(vintage_dir, pattern = "\\.csv$", full.names = TRUE)  # properly escape backslash full.names = TRUE)
 last8           <- head(latest_vintages[order(file.info(latest_vintages)$mtime, decreasing = TRUE)], 8)
 
 tmp_df <- map_dfr(last8, read_vintage_safe)
