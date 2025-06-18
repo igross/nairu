@@ -110,9 +110,13 @@ summary_df <- tmp_df %>%
     new_qtrs = if (is.na(prev_max)) fmt_yq(max_date)
               else if (max_date <= prev_max) fmt_yq(max_date)
               else paste(seq(prev_max + 0.25, max_date, 0.25) %>% fmt_yq(), collapse = ", "),
-    release_type = if (month(max_date) %in% table_month$CPI)       "CPI"
-                   else if (month(max_date) %in% table_month$NA_month) "NA"
-                   else "Other"
+    release_type = if (month(max_date) %in% table_month$CPI) {
+      "CPI"
+    } else if (month(max_date) %in% table_month$NA_month) {
+      "GDP"  # relabeled NA to GDP
+    } else {
+      "Other"
+    }
   ) %>%
   ungroup()
 # ---- Debug: print summary_df to console ----
