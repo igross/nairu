@@ -21,7 +21,7 @@ library(lubridate)  # for month() helper
 target_dir <- getwd()
 csv_in      <- file.path(target_dir, "output", "NAIRU_baseline.csv")
 vintage_dir <- file.path(target_dir, "output", "vintages")
-output_dir  <- file.path(target_dir, "output")
+output_dir  <- file.path(target_dir,````` "output")
 dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
 
 # ---- 3. ABS release timetable (approximate) -------------------------------
