@@ -185,8 +185,8 @@ message("Figure 3 saved")
 
 # ---- 9. Figure 4: All vintages series colored by vintage ----
 # Read all vintage files including baseline
-all_files <- c(csv_in, list.files(vintage_dir, pattern = "\.csv$", full.names = TRUE))
-labels    <- c("Baseline", tools::file_path_sans_ext(basename(list.files(vintage_dir, "\.csv$"))))
+all_files <- c(csv_in, list.files(vintage_dir, pattern = "\\.csv$", full.names = TRUE))  # properly escape backslash for regex
+labels    <- c("Baseline", tools::file_path_sans_ext(basename(list.files(vintage_dir, pattern = "\\.csv$", full.names = FALSE))))  # escape backslash in CSV pattern
 vintages_df <- map2_dfr(all_files, labels, function(path, label) {
   df <- suppressMessages(read_csv(path, show_col_types = FALSE)) %>% ensure_dates()
   df %>% mutate(vintage = label)
@@ -207,4 +207,3 @@ p4 <- ggplot(vintages_df, aes(x = date, y = median, color = vintage)) +
 ggsave(file.path(output_dir, "nairu_all_vintages.png"), p4, width = 8, height = 5, dpi = 300)
 saveWidget(as_widget(ggplotly(p4)), file.path(output_dir, "nairu_all_vintages.html"))
 message("Figure 4 saved: all vintages.png and .html")
-
