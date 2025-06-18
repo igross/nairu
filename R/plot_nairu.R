@@ -169,8 +169,7 @@ summary_df <- summary_df %>% mutate(idx = row_number())
 # Plot using index for x-axis to separate duplicate quarters
 p3 <- ggplot(summary_df, aes(x = factor(idx), y = nairu_latest, fill = release_type)) +
   geom_col(width = 0.7) +
-  scale_x_discrete(labels = paste0(summary_df$release_type, "
-", summary_df$new_qtrs)) +  # show release type and quarter
+  scale_x_discrete(labels = paste0(summary_df$release_type, "\n", summary_df$new_qtrs))  # show release type and quarter +  # show release type and quarter
   labs(
     title = "Most-recent NAIRU estimates by data release type",
     x     = "Release (type and quarter)",
