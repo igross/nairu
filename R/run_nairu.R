@@ -233,13 +233,15 @@ library(plotly)
 library(htmlwidgets)
 
 # ── 1.  Build GAP series (LUR − NAIRU) ─────────────────────────────────────
+# ── GAP = LUR – NAIRU (median) ─────────────────────────────────────────────
 gap_df <- summarised_state_baseline %>%
-  janitor::clean_names() %>%              # date_qtr, nairu, lur, …
-  select(date_qtr = date, nairu) %>%
-  left_join(janitor::clean_names(R_6202),
+  janitor::clean_names() %>%                 # date, median, lur, …
+  select(date_qtr = date, nairu = median) %>%  # <- rename here
+  left_join(janitor::clean_names(R_6202),     # brings in ‘lur’
             by = c("date_qtr" = "date")) %>%
-  mutate(gap = lur - nairu) %>%
+  mutate(gap = lur - nairu) %>%               # uses the renamed column
   select(date_qtr, gap)
+
 
 
 # ── 2.  CPI inflation (quarter-on-quarter, annualised)  ────────────────────
