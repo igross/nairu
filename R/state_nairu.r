@@ -40,7 +40,7 @@ release_calendar <- c(cpi_dates, wpi_dates)
 
 if (!Sys.Date() %in% release_calendar) {
   message(glue("⏩ {Sys.Date()} is not a CPI or WPI release day – skipping refresh."))
-#  quit(save = "no")   # graceful exit for CI pipelines
+  quit(save = "no")   # graceful exit for CI pipelines
 }
 
 # ---- 2. Constants: ABS series IDs ----------------------------------------
