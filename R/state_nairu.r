@@ -228,28 +228,32 @@ for (r in regions) {
 ## 3. extract the draws data.frame
   draws <- as.data.frame(fit)
 
-  ## 4. pull out all the NAIRU[t] columns, reshape & summarise by t
-  nairu_ts <- draws %>%
-    select(starts_with("NAIRU")) %>%
-    pivot_longer(
-      cols      = everything(),
-      names_to  = "param",
-      values_to = "value"
-    ) %>%
-    mutate(
-      period = as.integer(str_remove(param, "NAIRU\\[|\\]"))
-    ) %>%
-    group_by(period) %>%
-    summarise(
-      median   = median(value),
-      lower90  = quantile(value, 0.05),
-      upper90  = quantile(value, 0.95),
-      .groups  = "drop"
-    ) %>%
-    mutate(
-      date   = df_r$date[period],
-      region = r
-    )
+nairu_ts <- draws %>%
+  # 1. select only the time-indexed NAIRU parameters
+  select(matches("^NAIRU\\[\\d+\\]")) %>%
+  # 2. long form
+  pivot_longer(
+    cols      = everything(),
+    names_to  = "param",
+    values_to = "value"
+  ) %>%
+  # 3. extract the period number from "NAIRU[42]"
+  mutate(
+    period = as.integer(str_extract(param, "(?<=\\[)\\d+(?=\\])"))
+  ) %>%
+  # 4. summarise *per* period
+  group_by(period) %>%
+  summarise(
+    median   = median(value),
+    lower90  = quantile(value, 0.05),
+    upper90  = quantile(value, 0.95),
+    .groups  = "drop"
+  ) %>%
+  # 5. re-attach the date and region
+  mutate(
+    date   = df_r$date[period],
+    region = r
+  )
 
 print(nairu_ts)
   
