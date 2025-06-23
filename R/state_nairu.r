@@ -226,27 +226,41 @@ print(df_r)
     control = list(max_treedepth = 15)
   )
 
-  ## 5.  summarise NAIRU draws
-  summ <- as.data.frame(fit) %>%
-    select(contains("NAIRU")) %>%
-    pivot_longer(everything(), names_to = "draw", values_to = "value") %>%
-    summarise(median  = median(value),
-              lower90 = quantile(value, .05),
-              upper90 = quantile(value, .95)) %>%
-    mutate(region = r)
+## 3. extract the draws data.frame
+  draws <- as.data.frame(fit)
 
-  all_summ[[r]] <- summ
-  readr::write_csv(summ, file.path(out_dir, glue("NAIRU_{tolower(r)}.csv")))
+  ## 4. pull out all the NAIRU[t] columns, reshape & summarise by t
+  nairu_ts <- draws %>%
+    select(starts_with("NAIRU")) %>%
+    pivot_longer(
+      cols      = everything(),
+      names_to  = "param",
+      values_to = "value"
+    ) %>%
+    mutate(
+      period = as.integer(str_remove(param, "NAIRU\\[|\\]"))
+    ) %>%
+    group_by(period) %>%
+    summarise(
+      median   = median(value),
+      lower90  = quantile(value, 0.05),
+      upper90  = quantile(value, 0.95),
+      .groups  = "drop"
+    ) %>%
+    mutate(
+      date   = df_r$date[period],
+      region = r
+    )
+
+  ## 5. write out the T × 5 CSV (date, median, lower90, upper90, region)
+  readr::write_csv(
+    nairu_ts,
+    file.path(out_dir, glue::glue("NAIRU_{tolower(r)}.csv"))
+  )
+
+  all_summ[[r]] <- nairu_ts
 }
 
-
-# ---- 9. Combine & save vintage -------------------------------------------
+## 6. combine all regions
 nairu_all <- bind_rows(all_summ)
 readr::write_csv(nairu_all, file.path(out_dir, "NAIRU_all_regions.csv"))
-
-run_stamp   <- format(Sys.Date(), "%Y-%m-%d")
-vint_file   <- file.path(vintage_dir, glue("{run_stamp}.csv"))
-if (!file.exists(vint_file))
-  file.copy(file.path(out_dir, "NAIRU_all_regions.csv"), vint_file)
-
-message("✔  Finished – outputs written to: ", out_dir)
