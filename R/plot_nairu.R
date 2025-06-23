@@ -103,15 +103,15 @@ message("Loaded ", nrow(nairu_df), " rows – ",
         sum(!is.na(nairu_df$median)), " have a median value")
 
 # ---- 6. Figure 1: full history ------------------------------------------
-p1 <- ggplot(
-  nairu_df,
-  aes(x = date,
-      text = sprintf("Date: %s<br>NAIRU: %.2f",
-                     format(date_qtr, "%Y-Q%q"), median))
-) +
-  geom_ribbon(aes(ymin = lower, ymax = upper),  # <- use renamed cols
-              fill = "orange", alpha = 0.3) +
-  geom_line(aes(y = median, group = 1),         # <- force single group
+p1 <- ggplot(nairu_df, aes(x = date)) +
+  geom_ribbon(
+    data = nairu_df,
+    aes(ymin = lower, ymax = upper),
+    fill   = "orange",
+    alpha  = 0.3,
+    colour = NA          # border off; set to "black" if you want an outline
+  ) +
+  geom_line(aes(y = median, group = 1),
             colour = "red",  linewidth = 1) +
   geom_line(aes(y = lur,    group = 1),
             colour = "blue", linewidth = 0.8) +
@@ -121,11 +121,6 @@ p1 <- ggplot(
   labs(title = "NAIRU estimate with 90 % credible interval",
        x = "Year", y = "Percent") +
   my_theme
-ggsave(file.path(output_dir, "nairu_history.png"),
-       p1, width = 8, height = 5, dpi = 300)
-saveWidget(ggplotly(p1, tooltip = "text"),
-           file.path(output_dir, "nairu_history.html"))
-message("Figure 1 saved")
 
 # ---- 7. Figure 2: zoom 2010-present -------------------------------------
 p2 <- ggplot(
