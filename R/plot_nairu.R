@@ -77,8 +77,8 @@ library(janitor)
 nairu_df <- read_csv(csv_in, show_col_types = FALSE) %>% 
   clean_names() %>%                    # makes all names lower_snake_case
   rename(
-    lower = coalesce(lowera, lower5),  # works whichever one exists
-    upper = coalesce(uppera, upper95)
+    lower =lower5,  # works whichever one exists
+    upper = upper95
   ) %>% 
   mutate(
     date = as.yearqtr(date)
