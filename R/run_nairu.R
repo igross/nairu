@@ -284,7 +284,16 @@ plot_df <- bind_rows(infl_df, ulc_df) %>%
 # ---------------------------------------------------------------------------
 # 3.  Plot ------------------------------------------------------------------
 # ---------------------------------------------------------------------------
-p_decomp <- ggplot(plot_df,
+my_theme <- theme_bw() +
+  theme(
+    axis.text.x  = element_text(angle = 45, hjust = 1, size = 11),
+    axis.text.y  = element_text(size = 11),
+    axis.title   = element_text(size = 13),
+    legend.position = "bottom"
+  )
+         
+         
+         p_decomp <- ggplot(plot_df,
                    aes(x = as.Date(date_qtr),
                        y = value,
                        fill = component,
