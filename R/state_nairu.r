@@ -193,6 +193,8 @@ compiled <- stan_model(file.path("stan", "NAIRU_baseline.stan"))
 
 all_summ <- vector("list", length(regions)); names(all_summ) <- regions
 
+print(panel)
+
 for (r in regions) {
 
  col_order <- c(
@@ -212,6 +214,8 @@ for (r in regions) {
     select(date, all_of(col_order)) %>%
     drop_na()           # only drop rows with missing in these eight
 
+print(df_r)
+  
   Y <- as.matrix(df_r %>% select(-date))  # now a clean T×8 matrix
 
   ## 4.  feed Stan
