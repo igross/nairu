@@ -79,7 +79,7 @@ jobs:
         run: Rscript -e 'install.packages(c(
           "tidyverse","here","jsonlite","ggrepel","conflicted","tidyr","scales",
           "readabs","readrba","plotly","purrr","ggthemes","reshape2","zoo",
-          "rstan","readr","lubridate"))'
+          "rstan","readr","lubridate","janitor"))'
 
       - name: Get data
         run: Rscript -e 'source(here::here("R", "run_nairu.R"), echo = TRUE)'
