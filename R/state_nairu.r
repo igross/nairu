@@ -170,7 +170,7 @@ panel <- list(
   mutate(dummy1 = ifelse(date >= "2021Q3" & date <= "2023Q1", 1, 0),
          dummy2 = ifelse(date >= "2022Q1" & date <= "2022Q4", 1, 0),
          dummy3 = ifelse(cycle(date) == 3, 1, 0),   # 3 = the Sep-quarter each year
-         dummy4 = ifelse(cycle(date) == 1, 1, 0)   # 3 = the Sep-quarter each year)
+         dummy4 = ifelse(cycle(date) == 1, 1, 0)   )
 
 
 
