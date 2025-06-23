@@ -192,10 +192,6 @@ if ("Baseline" %in% vints) {
   color_map <- setNames(palette, vints)
 }
 
-                           
-total <- length(unique(vintages_df$vintage))
-palette <- rainbow(total - 1)
-color_map <- setNames(c(palette, "black"), c(setdiff(unique(vintages_df$vintage), "Baseline"), "Baseline"))
 
 p4 <- ggplot(
   vintages_df,
