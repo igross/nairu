@@ -92,53 +92,54 @@ nairu_df <- read_csv(csv_in, show_col_types = FALSE) %>%
 message("Loaded ", nrow(nairu_df), " rows – ",
         sum(!is.na(nairu_df$median)), " have a median value")
 
-# ---- 6. Figure 1: NAIRU history -----------------------------------------
+# ---- 6. Figure 1: full history ------------------------------------------
 p1 <- ggplot(
   nairu_df,
   aes(x = date,
       text = sprintf("Date: %s<br>NAIRU: %.2f",
                      format(date_qtr, "%Y-Q%q"), median))
 ) +
-  geom_ribbon(aes(ymin = lower, ymax = upper),
+  geom_ribbon(aes(ymin = lower, ymax = upper),  # <- use renamed cols
               fill = "orange", alpha = 0.3) +
-  geom_line(aes(y = median), colour = "red",  linewidth = 1) +
-  geom_line(aes(y = lur),    colour = "blue", linewidth = 0.8) +
+  geom_line(aes(y = median, group = 1),         # <- force single group
+            colour = "red",  linewidth = 1) +
+  geom_line(aes(y = lur,    group = 1),
+            colour = "blue", linewidth = 0.8) +
   geom_point(data = slice_tail(nairu_df, n = 1),
              aes(y = median), colour = "black", size = 3) +
   scale_x_date(date_breaks = "2 years", date_labels = "%Y") +
   labs(title = "NAIRU estimate with 90 % credible interval",
        x = "Year", y = "Percent") +
   my_theme
-
 ggsave(file.path(output_dir, "nairu_history.png"),
        p1, width = 8, height = 5, dpi = 300)
-
 saveWidget(ggplotly(p1, tooltip = "text"),
            file.path(output_dir, "nairu_history.html"))
-
 message("Figure 1 saved")
 
-
-# ---- 7. Figure 2: Zoom-in (2010-present) ---------------------------------
-# Debug: inspect subset
-print(head(nairu_df, 10))
-
+# ---- 7. Figure 2: zoom 2010-present -------------------------------------
 p2 <- ggplot(
-  nairu_df,
+  nairu_df |> filter(date_qtr >= as.yearqtr("2010 Q1")),
   aes(x = date,
-      text = paste0("Date: ", date, "<br>NAIRU: ", median))
+      text = sprintf("Date: %s<br>NAIRU: %.2f",
+                     format(date_qtr, "%Y-Q%q"), median))
 ) +
-  geom_ribbon(aes(ymin = lowera, ymax = uppera), fill = "orange", alpha = 0.3) +
-  geom_line(aes(y = median), colour = "red", linewidth = 1) +
-  geom_line(aes(y = LUR), colour = "blue", linewidth = 0.8) +
-  labs(title = "NAIRU estimate (post-GFC)",
-       subtitle = "90% credible interval",
+  geom_ribbon(aes(ymin = lower, ymax = upper),  # <- renamed cols
+              fill = "orange", alpha = 0.3) +
+  geom_line(aes(y = median, group = 1),
+            colour = "red",  linewidth = 1) +
+  geom_line(aes(y = lur,    group = 1),
+            colour = "blue", linewidth = 0.8) +
+  labs(title    = "NAIRU estimate (post-GFC)",
+       subtitle = "90 % credible interval",
        x = "Quarter", y = "Percent") +
   my_theme
-
-ggsave(file.path(output_dir, "nairu_zoom_2010.png"), p2, width = 8, height = 5, dpi = 300)
-saveWidget(ggplotly(p2, tooltip = "text"), file.path(output_dir, "nairu_zoom_2010.html"))
+ggsave(file.path(output_dir, "nairu_zoom_2010.png"),
+       p2, width = 8, height = 5, dpi = 300)
+saveWidget(ggplotly(p2, tooltip = "text"),
+           file.path(output_dir, "nairu_zoom_2010.html"))
 message("Figure 2 saved")
+
 
 # ---- 8. Figure 3: Most-recent by release type ---------------------------
 types <- list.files(vintage_dir, pattern = "\\.csv$", full.names = TRUE)
