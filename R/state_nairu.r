@@ -195,21 +195,7 @@ all_summ <- vector("list", length(regions)); names(all_summ) <- regions
 
 for (r in regions) {
 
-  ## 1.  column names in panel order
-  col_order <- c(
-    paste0("DLPI_",  r),   # from cpi_dln
-    paste0("UR_",    r),   # from ur_sa
-    paste0("DLWPI_", r),   # from wpi_dln
-    "dl4pmcg",             # import-price growth
-    "PIE_BONDQ",           # bond expectations
-    "PIE_RBAQ",            # survey expectations
-    "dummy1",
-    "dummy2"
-  )
-
-  ## 2.  build data-frame in the same order
-  df_r <- panel %>%
-    select(date, all_of(col_order)) %>%
+  df_r <- panel  %>%
     drop_na()
 
   ## 3.  matrix Y keeps that ordering
