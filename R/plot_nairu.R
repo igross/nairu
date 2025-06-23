@@ -72,32 +72,47 @@ my_theme <- theme_bw() +
     legend.position.inside = c(1.02, 0.5)
   )
 
-# ---- 5. Load baseline NAIRU data ----------------------------------------
-nairu_df <- read_csv(csv_in, show_col_types = FALSE) %>%
-  mutate(date = as.yearqtr(date)) %>%
-  filter(date >= as.yearqtr("2010 Q1")) %>%
-  arrange(date)
+library(janitor)
+
+nairu_df <- read_csv(csv_in, show_col_types = FALSE) %>% 
+  clean_names() %>%                    # makes all names lower_snake_case
+  rename(
+    lower = coalesce(lowera, lower5),  # works whichever one exists
+    upper = coalesce(uppera, upper95)
+  ) %>% 
+  mutate(
+    date = as.yearqtr(date)
+  ) %>% 
+  filter(date >= as.yearqtr("2010 Q1")) %>% 
+  arrange(date) %>% 
+  filter(!is.na(median))               # keep only rows we can plot
+
+# convert to Date for Plotly, leave as yearqtr for static plot if you prefer
+nairu_df_plot <- mutate(nairu_df, date = as.Date(date))
 
 # ---- 6. Figure 1: NAIRU history -----------------------------------------
-# Debug: inspect data
-print(head(nairu_df)); print(summary(nairu_df))
-
 p1 <- ggplot(
-  nairu_df,
+  nairu_df_plot,
   aes(x = date,
-      text = paste0("Date: ", date, "<br>NAIRU: ", median))
+      text = sprintf("Date: %s<br>NAIRU: %.2f", format(date, "%Y-Q%q"), median))
 ) +
-  geom_ribbon(aes(ymin = lowera, ymax = uppera), fill = "orange", alpha = 0.3) +
+  geom_ribbon(aes(ymin = lower, ymax = upper),
+              fill = "orange", alpha = 0.3) +
   geom_line(aes(y = median), colour = "red", linewidth = 1) +
-  geom_line(aes(y = LUR), colour = "blue", linewidth = 0.8) +
-  geom_point(data = slice_tail(nairu_df, n = 1), aes(y = median), colour = "black", size = 3) +
-  scale_x_continuous(breaks = pretty(nairu_df$date, n = 10)) +
+  geom_line(aes(y = lur),    colour = "blue", linewidth = 0.8) +
+  geom_point(data = slice_tail(nairu_df_plot, n = 1),
+             aes(y = median), colour = "black", size = 3) +
+  scale_x_date(date_breaks = "2 years", date_labels = "%Y") +
   labs(title = "NAIRU estimate with 90% credible interval",
        x = "Year", y = "Percent") +
   my_theme
 
-ggsave(file.path(output_dir, "nairu_history.png"), p1, width = 8, height = 5, dpi = 300)
-saveWidget(ggplotly(p1, tooltip = "text"), file.path(output_dir, "nairu_history.html"))
+ggsave(file.path(output_dir, "nairu_history.png"),
+       p1, width = 8, height = 5, dpi = 300)
+
+saveWidget(ggplotly(p1, tooltip = "text"),
+           file.path(output_dir, "nairu_history.html"))
+
 message("Figure 1 saved")
 
 # ---- 7. Figure 2: Zoom-in (2010-present) ---------------------------------
