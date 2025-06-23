@@ -74,36 +74,39 @@ my_theme <- theme_bw() +
 
 library(janitor)
 
-nairu_df <- read_csv(csv_in, show_col_types = FALSE) %>% 
-  clean_names() %>%                    # makes all names lower_snake_case
+# ---- 5. Load baseline NAIRU data -----------------------------------------
+nairu_df <- read_csv(csv_in, show_col_types = FALSE) %>%
+  clean_names() %>%                       # variable, median, lowera, ...
   rename(
-    lower =lower5,  # works whichever one exists
-    upper = upper95
-  ) %>% 
+    lower = lowera,                      # use the 'a' interval
+    upper = uppera
+  ) %>%
   mutate(
-    date = as.yearqtr(date)
-  ) %>% 
-  filter(date >= as.yearqtr("2010 Q1")) %>% 
-  arrange(date) %>% 
-  filter(!is.na(median))               # keep only rows we can plot
+    date_qtr = as.yearqtr(date),         # keep as yearqtr for pretty ticks
+    date     = as.Date(date_qtr)         # Plotly likes Date objects
+  ) %>%
+  filter(date_qtr >= as.yearqtr("2010 Q1")) %>%   # post-GFC sample
+  arrange(date_qtr)
 
-# convert to Date for Plotly, leave as yearqtr for static plot if you prefer
-nairu_df_plot <- mutate(nairu_df, date = as.Date(date))
+# quick sanity check in the CI log
+message("Loaded ", nrow(nairu_df), " rows – ",
+        sum(!is.na(nairu_df$median)), " have a median value")
 
 # ---- 6. Figure 1: NAIRU history -----------------------------------------
 p1 <- ggplot(
-  nairu_df_plot,
+  nairu_df,
   aes(x = date,
-      text = sprintf("Date: %s<br>NAIRU: %.2f", format(date, "%Y-Q%q"), median))
+      text = sprintf("Date: %s<br>NAIRU: %.2f",
+                     format(date_qtr, "%Y-Q%q"), median))
 ) +
   geom_ribbon(aes(ymin = lower, ymax = upper),
               fill = "orange", alpha = 0.3) +
-  geom_line(aes(y = median), colour = "red", linewidth = 1) +
+  geom_line(aes(y = median), colour = "red",  linewidth = 1) +
   geom_line(aes(y = lur),    colour = "blue", linewidth = 0.8) +
-  geom_point(data = slice_tail(nairu_df_plot, n = 1),
+  geom_point(data = slice_tail(nairu_df, n = 1),
              aes(y = median), colour = "black", size = 3) +
   scale_x_date(date_breaks = "2 years", date_labels = "%Y") +
-  labs(title = "NAIRU estimate with 90% credible interval",
+  labs(title = "NAIRU estimate with 90 % credible interval",
        x = "Year", y = "Percent") +
   my_theme
 
@@ -114,6 +117,7 @@ saveWidget(ggplotly(p1, tooltip = "text"),
            file.path(output_dir, "nairu_history.html"))
 
 message("Figure 1 saved")
+
 
 # ---- 7. Figure 2: Zoom-in (2010-present) ---------------------------------
 # Debug: inspect subset
