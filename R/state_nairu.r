@@ -160,7 +160,7 @@ wpi_dln <- make_wide(wpi_raw, wpi_ids, "DLWPI", diff = TRUE)  # wage growth
 # ---- 6. Merge & sample window --------------------------------------------
 panel <- list(
   wpi_dln,
-  dl4pcmg,
+  dl4pmcg,
   ur_sa,
   cpi_dln,
   pie_rbaq
