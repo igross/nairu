@@ -123,27 +123,41 @@ p1 <- ggplot(nairu_df, aes(x = date)) +
   my_theme
 
 # ---- 7. Figure 2: zoom 2010-present -------------------------------------
-p2 <- ggplot(
-  nairu_df |> filter(date_qtr >= as.yearqtr("2010 Q1")),
-  aes(x = date,
-      text = sprintf("Date: %s<br>NAIRU: %.2f",
-                     format(date_qtr, "%Y-Q%q"), median))
-) +
-  geom_ribbon(aes(ymin = lower, ymax = upper),  # <- renamed cols
-              fill = "orange", alpha = 0.3) +
+# ---- Figure 2 : NAIRU zoom-in (2010 – present) ----------------------------
+nairu_zoom <- nairu_df |>
+  filter(date_qtr >= as.yearqtr("2010 Q1"))
+
+p2 <- ggplot(nairu_zoom, aes(x = date)) +
+  # 90 % credible-interval “fan”
+  geom_ribbon(
+    aes(ymin = lower, ymax = upper),
+    fill  = "orange",
+    alpha = 0.3
+  ) +
+  # NAIRU median and unemployment rate
   geom_line(aes(y = median, group = 1),
             colour = "red",  linewidth = 1) +
   geom_line(aes(y = lur,    group = 1),
             colour = "blue", linewidth = 0.8) +
+  # Highlight the latest NAIRU point
+  geom_point(data = slice_tail(nairu_zoom, n = 1),
+             aes(y = median),
+             colour = "black", size = 3) +
+  scale_x_date(date_breaks = "1 year", date_labels = "%Y") +
   labs(title    = "NAIRU estimate (post-GFC)",
        subtitle = "90 % credible interval",
        x = "Quarter", y = "Percent") +
   my_theme
+
+# save static & interactive versions
 ggsave(file.path(output_dir, "nairu_zoom_2010.png"),
        p2, width = 8, height = 5, dpi = 300)
+
 saveWidget(ggplotly(p2, tooltip = "text"),
            file.path(output_dir, "nairu_zoom_2010.html"))
+
 message("Figure 2 saved")
+
 
 
 # ---- 8. Figure 3: Most-recent by release type ---------------------------
