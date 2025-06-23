@@ -79,6 +79,16 @@ cpi_raw <- read_abs(series_id = cpi_ids)
 ur_raw  <- read_abs(series_id = ur_ids)
 wpi_raw <- read_abs(series_id = wpi_ids)
 
+
+## ---- 4a.  EXTRA: PMCG import-price index ---------------------------------
+pmcg_id  <- "A2298279F"                          # ABS 6457.0, Table 8
+pmcg_raw <- read_abs(series_id = pmcg_id)
+
+dl4pmcg <- pmcg_raw %>% 
+  mutate(date = zoo::as.yearqtr(date),
+         dl4pmcg = 100 * (log(value) - log(lag(value, 4)))) %>%
+  select(date, dl4pmcg)
+
 # ---- 5. Helper to reshape -------------------------------------------------
 make_wide <- function(df, id_vec, stub, diff = FALSE) {
 
@@ -106,12 +116,15 @@ ur_sa   <- make_wide(ur_raw , ur_ids , "UR",   diff = FALSE)
 wpi_dln <- make_wide(wpi_raw, wpi_ids, "DLWPI", diff = TRUE)  # wage growth
 
 # ---- 6. Merge & sample window --------------------------------------------
-panel <- reduce(list(cpi_dln, ur_sa, wpi_dln), left_join, by = "date") %>% 
-  filter(date >= "1997 Q3", date <= "2025 Q1") %>%      # WPI window
-  mutate(                                                # ← dummies for Stan
+panel <- reduce(
+           list(cpi_dln, ur_sa, wpi_dln, dl4pmcg),   # ← added here
+           left_join, by = "date") %>%
+  filter(date >= "1997 Q3", date <= "2025 Q1") %>%
+  mutate(
     dummy1 = ifelse(date >= as.yearqtr("2021 Q3") & date <= as.yearqtr("2023 Q1"), 1, 0),
     dummy2 = ifelse(date >= as.yearqtr("2022 Q1") & date <= as.yearqtr("2022 Q4"), 1, 0)
   )
+
 
 
 
@@ -135,19 +148,19 @@ all_summ <- vector("list", length(regions)); names(all_summ) <- regions
 
 for (r in regions) {
 
-  # --- pick the five variables for region r --------------------------------
   df_r <- panel %>% 
     transmute(
       date,
-      DLPI  = .[[paste0("DLPI_",  r)]],
-      UR    = .[[paste0("UR_",    r)]],
-      DLWPI = .[[paste0("DLWPI_", r)]],
+      DLPI   = .[[paste0("DLPI_",  r)]],
+      UR     = .[[paste0("UR_",    r)]],
+      DLWPI  = .[[paste0("DLWPI_", r)]],
+      DL4PMCG = dl4pmcg,           # ← NEW (col 4)
       dummy1,
       dummy2
     ) %>% 
     drop_na()
 
-  ymat <- as.matrix(df_r %>% select(-date))   # 5-column matrix
+  ymat <- as.matrix(df_r %>% select(-date))   # 6-column matrix
 
   # --- sanity print --------------------------------------------------------
   message(glue::glue("\n──── DATA CHECK: {r} ────"))
@@ -155,15 +168,18 @@ for (r in regions) {
   print(head(df_r, 10)); cat("…\n\n")
   # ------------------------------------------------------------------------
 
+  
   fit <- sampling(
     compiled,
     data = list(T = nrow(ymat),
-                J = ncol(ymat),   # = 5
+                J = ncol(ymat),   # = 6
                 Y = ymat),
-    chains   = 4,                # keep it lighter for CI
-    iter     = 800,
-    control  = list(max_treedepth = 15)
+    chains = 4, iter = 800,
+    control = list(max_treedepth = 15)
   )
+
+
+ 
 
   # summarise draws ---------------------------------------------------------
   summ <- as.data.frame(fit) %>% 
