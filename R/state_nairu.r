@@ -80,24 +80,25 @@ ur_raw  <- read_abs(series_id = ur_ids)
 wpi_raw <- read_abs(series_id = wpi_ids)
 
 # ---- 5. Helper to reshape -------------------------------------------------
-# ---- 5. Helper to reshape -------------------------------------------------
 make_wide <- function(df, id_vec, stub, diff = FALSE) {
 
-  out <- df %>%                                  # <-- build a wide table
+  out <- df %>%
     filter(series_id %in% id_vec) %>%
     mutate(region = names(id_vec)[match(series_id, id_vec)],
            date   = zoo::as.yearqtr(date)) %>%
-    distinct(date, region, value) %>%
+    group_by(date, region) %>%                 # ← NEW: collapse duplicates
+    summarise(value = mean(value, na.rm = TRUE), .groups = "drop") %>%
     pivot_wider(names_from = region, values_from = value) %>%
     arrange(date)
 
-  if (diff) {                                    # <-- take log-diffs if asked
+  if (diff) {
     out <- out %>%
       mutate(across(-date, ~ 100 * (log(.x) - log(lag(.x)))))
   }
 
   out %>% rename_with(~ paste0(stub, "_", .x), -date)
 }
+
 
 
 cpi_dln <- make_wide(cpi_raw, cpi_ids, "DLPI", diff = TRUE)   # inflation
