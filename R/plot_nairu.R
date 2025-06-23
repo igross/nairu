@@ -177,14 +177,21 @@ print(str(vintages_df)); print(head(vintages_df))
 all_vints  <- unique(vintages_df$vintage)
 old_labels <- setdiff(all_vints, "Baseline")
 
-# 2. Build a palette with exactly one colour per old vintage:
-palette    <- rainbow(length(old_labels))
+vints <- unique(vintages_df$vintage)
 
-# 3. Now map those colours plus a final black for Baseline:
-color_map  <- setNames(
-  c(palette, "black"),
-  c(old_labels, "Baseline")
-)
+if ("Baseline" %in% vints) {
+  # one extra colour for Baseline
+  palette   <- rainbow(length(vints) - 1)
+  color_map <- setNames(
+    c(palette, "black"),
+    c(setdiff(vints, "Baseline"), "Baseline")
+  )
+} else {
+  # no Baseline; one-for-one mapping
+  palette   <- rainbow(length(vints))
+  color_map <- setNames(palette, vints)
+}
+
                            
 total <- length(unique(vintages_df$vintage))
 palette <- rainbow(total - 1)
