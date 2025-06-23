@@ -195,45 +195,47 @@ all_summ <- vector("list", length(regions)); names(all_summ) <- regions
 
 for (r in regions) {
 
-  df_r <- panel %>% 
-    transmute(
-      date,
-      DLPI      = .[[paste0("DLPI_",  r)]],
-      UR        = .[[paste0("UR_",    r)]],
-      DLWPI     = .[[paste0("DLWPI_", r)]],
-      DL4PMCG   = dl4pmcg,        # ← use lower-case column, rename here
-      PIE_BONDQ = PIE_BONDQ,      # ← keep consistent
-      dummy1,
-      dummy2
-    ) %>% 
+  ## 1.  column names in panel order
+  col_order <- c(
+    paste0("DLPI_",  r),   # from cpi_dln
+    paste0("UR_",    r),   # from ur_sa
+    paste0("DLWPI_", r),   # from wpi_dln
+    "dl4pmcg",             # import-price growth
+    "PIE_BONDQ",           # bond expectations
+    "PIE_RBAQ",            # survey expectations
+    "dummy1",
+    "dummy2"
+  )
+
+  ## 2.  build data-frame in the same order
+  df_r <- panel %>%
+    select(date, all_of(col_order)) %>%
     drop_na()
 
+  ## 3.  matrix Y keeps that ordering
+  Y <- as.matrix(df_r %>% select(-date))   # 8 columns
 
-  ymat <- as.matrix(df_r %>% select(-date))   # 7-column matrix
-
+  ## 4.  feed Stan
   fit <- sampling(
     compiled,
-    data = list(T = nrow(ymat),
-                J = ncol(ymat),   # = 7
-                Y = ymat),
+    data = list(T = nrow(Y), J = ncol(Y), Y = Y),
     chains = 4, iter = 100,
     control = list(max_treedepth = 15)
   )
 
- 
-
-  # summarise draws ---------------------------------------------------------
-  summ <- as.data.frame(fit) %>% 
-    select(contains("NAIRU")) %>% 
-    pivot_longer(everything(), names_to = "draw", values_to = "value") %>% 
+  ## 5.  summarise NAIRU draws
+  summ <- as.data.frame(fit) %>%
+    select(contains("NAIRU")) %>%
+    pivot_longer(everything(), names_to = "draw", values_to = "value") %>%
     summarise(median  = median(value),
               lower90 = quantile(value, .05),
-              upper90 = quantile(value, .95)) %>% 
+              upper90 = quantile(value, .95)) %>%
     mutate(region = r)
 
   all_summ[[r]] <- summ
   readr::write_csv(summ, file.path(out_dir, glue("NAIRU_{tolower(r)}.csv")))
 }
+
 
 # ---- 9. Combine & save vintage -------------------------------------------
 nairu_all <- bind_rows(all_summ)
