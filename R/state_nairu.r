@@ -54,9 +54,9 @@ cpi_ids <- c(
 
 ## Unemployment rate, persons, SA
 ur_ids  <- c(
-  AUS = "A84423567K",
-  NSW = "A84423943K", VIC = "A84424141A", QLD = "A84423917F",
-  SA  = "A84424021J", WA  = "A84424029A", TAS = "A84424037C"
+  AUS = "A84423050A",
+  NSW = "A84423270C", VIC = "A84423354L", QLD = "A84423284T",
+  SA  = "A84423368A", WA  = "A84423326C", TAS = "A84423298F"
 )
 
 ## WPI index, hourly rates excl. bonuses (original)
