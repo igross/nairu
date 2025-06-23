@@ -16,7 +16,7 @@ suppressPackageStartupMessages({
   library(readabs); library(readrba)
   library(dplyr);   library(tidyr);  library(purrr)
   library(zoo);     library(lubridate); library(readr); library(here)
-  library(rstan);   library(glue)
+  library(rstan);   library(glue); library(stringr)    
 })
 
 # ---- 1. ABS quarterly release calendars ----------------------------------
