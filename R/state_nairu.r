@@ -122,6 +122,14 @@ for (r in regions) {
   df_r <- panel_long %>% filter(region == r) %>% drop_na()
   ymat <- as.matrix(df_r %>% select(DLPI, UR, DLWPI))  # 3 vars
 
+  ## -------- sanity-print: what’s going into Stan -------------------------
+  message(glue::glue("\n──── DATA CHECK: {r} ────"))
+  message(glue::glue("Obs: {nrow(df_r)}    Date range: {min(df_r$date)} → {max(df_r$date)}"))
+  print(head(df_r, 10))                 # first 10 rows (date, DLPI, UR, DLWPI)
+  cat("…\n\n")                          # spacer so the log is readable
+  ## ----------------------------------------------------------------------
+
+  
   fit <- sampling(compiled,
                   data = list(T = nrow(ymat), J = ncol(ymat), Y = ymat),
                   chains = 8, iter = 200,
