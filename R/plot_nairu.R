@@ -123,9 +123,9 @@ p1 <- ggplot(nairu_df, aes(x = date)) +
   my_theme
 
 ggsave(file.path(output_dir, "nairu_history.png"),
-       p2, width = 8, height = 5, dpi = 300)
+       p1, width = 8, height = 5, dpi = 300)
 
-saveWidget(ggplotly(p2, tooltip = "text"),
+saveWidget(ggplotly(p1, tooltip = "text"),
            file.path(output_dir, "nairu_history.html"))
 
 
