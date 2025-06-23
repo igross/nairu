@@ -80,8 +80,8 @@ abs_6457 <- read_abs(series_id = "A2298279F",
 abs_6345 <- read_abs(series_id = "A2713849C",
                      check_local = FALSE)
 
-rba_g3   <- read_rba(series_id = "GBONYLD",      # daily indexed-bond yield
-                     check_local = FALSE)
+rba_g3 <- read_rba(series_id = "GBONYLD", refresh = TRUE)
+
 
 
 # ---- 3. Paths -------------------------------------------------------------
