@@ -234,13 +234,16 @@ library(htmlwidgets)
 
 # ── 1.  Build GAP series (LUR − NAIRU) ─────────────────────────────────────
 # ── GAP = LUR – NAIRU (median) ─────────────────────────────────────────────
-gap_df <- summarised_state_baseline %>%
-  janitor::clean_names() %>%                 # date, median, lur, …
-  select(date_qtr = date, nairu = median) %>%  # <- rename here
-  left_join(janitor::clean_names(R_6202),     # brings in ‘lur’
+gap_df <- summarised_state_baseline %>%          # NAIRU output
+  janitor::clean_names() %>%                     # date, median, lur, …
+  transmute(date_qtr = date,                     # keep date
+            nairu    = median) %>%               # rename here
+  left_join(janitor::clean_names(R_6202) %>%     # LUR series
+              select(date, lur),
             by = c("date_qtr" = "date")) %>%
-  mutate(gap = lur - nairu) %>%               # uses the renamed column
+  mutate(gap = lur - nairu) %>%                  # GAP = LUR − NAIRU
   select(date_qtr, gap)
+
 
 
 
