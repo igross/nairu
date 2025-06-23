@@ -24,7 +24,7 @@ if (!Sys.Date() %in% release_calendar) {
   message(
     glue::glue("⏩ {Sys.Date()} is not an ABS CPI/National-Accounts release day – skipping refresh.")
   )
-  quit(save = "no")   # graceful, zero-exit termination
+  # quit(save = "no")   # graceful, zero-exit termination
 }
 
 
@@ -234,10 +234,13 @@ library(htmlwidgets)
 
 # ── 1.  Build GAP series (LUR − NAIRU) ─────────────────────────────────────
 gap_df <- summarised_state_baseline %>%
-  select(date_qtr = date, nairu = median) %>%           # NAIRU median
-  left_join(R_6202,  by = c("date_qtr" = "date")) %>%   # LUR
+  janitor::clean_names() %>%              # date_qtr, nairu, lur, …
+  select(date_qtr = date, nairu) %>%
+  left_join(janitor::clean_names(R_6202),
+            by = c("date_qtr" = "date")) %>%
   mutate(gap = lur - nairu) %>%
   select(date_qtr, gap)
+
 
 # ── 2.  CPI inflation (quarter-on-quarter, annualised)  ────────────────────
 # □ Example uses ABS series A2330530C = CPI All Groups, Seasonally Adjusted
