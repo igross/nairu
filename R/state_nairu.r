@@ -61,9 +61,9 @@ ur_ids  <- c(
 
 ## WPI index, hourly rates excl. bonuses (original)
 wpi_ids <- c(
-  AUS = "A2713849C",
-  NSW = "A2599049K", VIC = "A2608359V", QLD = "A2600379J",
-  SA  = "A2609689C", WA  = "A2607029K", TAS = "A2601709F"
+  AUS = "A2603609J",
+  NSW = "A2599619A", VIC = "A2608929K", QLD = "A2600949X",
+  SA  = "A2610259A", WA  = "A2607599L", TAS = "A2602279K"
 )
 
 regions <- names(cpi_ids)   # "AUS" "NSW" … "TAS"
