@@ -88,6 +88,16 @@ nairu_df <- read_csv(csv_in, show_col_types = FALSE) %>%
   filter(date_qtr >= as.yearqtr("2010 Q1")) %>%   # post-GFC sample
   arrange(date_qtr)
 
+nairu_df %>%
+  summarise(
+    n_rows   = n(),
+    n_lower  = sum(!is.na(lower)),
+    n_upper  = sum(!is.na(upper)),
+    min_gap  = min(upper - lower, na.rm = TRUE),
+    any_reversed = any(lower >= upper, na.rm = TRUE)
+  )
+
+
 # quick sanity check in the CI log
 message("Loaded ", nrow(nairu_df), " rows – ",
         sum(!is.na(nairu_df$median)), " have a median value")
