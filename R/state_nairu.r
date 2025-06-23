@@ -222,7 +222,7 @@ print(df_r)
   fit <- sampling(
     compiled,
     data = list(T = nrow(Y), J = ncol(Y), Y = Y),
-    chains = 4, iter = 100,
+    chains = 4, iter = 200,
     control = list(max_treedepth = 15)
   )
 
