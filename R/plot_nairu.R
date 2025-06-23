@@ -122,8 +122,14 @@ p1 <- ggplot(nairu_df, aes(x = date)) +
        x = "Year", y = "Percent") +
   my_theme
 
+ggsave(file.path(output_dir, "nairu_history.png"),
+       p2, width = 8, height = 5, dpi = 300)
+
+saveWidget(ggplotly(p2, tooltip = "text"),
+           file.path(output_dir, "nairu_history.html"))
+
+
 # ---- 7. Figure 2: zoom 2010-present -------------------------------------
-# ---- Figure 2 : NAIRU zoom-in (2010 – present) ----------------------------
 nairu_zoom <- nairu_df |>
   filter(date_qtr >= as.yearqtr("2010 Q1"))
 
