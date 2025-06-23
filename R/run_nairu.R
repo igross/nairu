@@ -232,88 +232,58 @@ library(ggplot2)
 library(plotly)
 library(htmlwidgets)
 
-# ── 1.  Build GAP series (LUR − NAIRU) ─────────────────────────────────────
-# ── GAP = LUR – NAIRU (median) ─────────────────────────────────────────────
-gap_df <- summarised_state_baseline %>%          # NAIRU output
-  janitor::clean_names() %>%                     # date, median, lur, …
-  transmute(date_qtr = date,                     # keep date
-            nairu    = median) %>%               # rename here
-  left_join(janitor::clean_names(R_6202) %>%     # LUR series
-              select(date, lur),
-            by = c("date_qtr" = "date")) %>%
-  mutate(gap = lur - nairu) %>%                  # GAP = LUR − NAIRU
-  select(date_qtr, gap)
-
-
-
-
-# ── 2.  CPI inflation (quarter-on-quarter, annualised)  ────────────────────
-# □ Example uses ABS series A2330530C = CPI All Groups, Seasonally Adjusted
-cpi_q <- rba_g1 %>%                                     # already loaded
-  filter(series_id == "A2330530C") %>%
-  transmute(date_qtr = zoo::as.yearqtr(date),
-            infl     = 100 * 4 * (log(value) - log(lag(value))))
-
-# ── 3.  Merge everything you need  ─────────────────────────────────────────
-base_df <- est_data %>%                       # DLNULC, DLWPI, DLPTM, etc.
-  select(date_qtr = date,
-         d_ulc   = DLNULC,                    # rename for clarity
-         d_pmcg  = dl4pmcg) %>%
-  left_join(gap_df, by = "date_qtr") %>%
-  left_join(cpi_q,  by = "date_qtr") %>%
-  drop_na()
-
-# ── 4.  Pick *median* coefficients from your Stan fit  ─────────────────────
-#    (replace these names with your Stan parameter names)
-pars <- as.data.frame(sampled_model_baseline) %>% summarise(
-  a_pi    = median(a_pi),     # intercept in inflation eq.
-  b_gap   = median(b_gap),    # gap coefficient
-  b_ulc   = median(b_ulc),    # passthrough from ΔULC
-  a_ulc   = median(a_ulc),    # intercept in ULC eq.
-  c_gap   = median(c_gap),    # gap coefficient in ULC eq.
-  c_pmcg  = median(c_pmcg)    # import-price shock coefficient
+# ---------------------------------------------------------------------------
+# 1.  Extract generated quantities (medians across posterior draws) ---------
+# ---------------------------------------------------------------------------
+contrib_names <- c(
+  # Inflation pieces
+  "pt_lags", "pt_dummies", "pt_unemploymentgap", "pt_momentum",
+  "pt_expectations", "pt_import_prices", "pt_residuals",
+  # ULC pieces
+  "pu_lags", "pu_dummies", "pu_unemploymentgap", "pu_momentum",
+  "pu_expectations", "pu_residuals"
 )
 
-coef_infl <- c(const = pars$a_pi,
-               gap   = pars$b_gap,
-               d_ulc = pars$b_ulc)
+contrib_array <- rstan::extract(sampled_model_baseline, pars = contrib_names)
 
-coef_ulc  <- c(const = pars$a_ulc,
-               gap   = pars$c_gap,
-               d_pmcg = pars$c_pmcg)
+# helper to take median across the 1st dimension (= draws)
+med_from_array <- function(a) apply(a, 2, median)
 
-# ── 5.  Decomposition helper  ──────────────────────────────────────────────
-decompose <- function(df, lhs, coefs) {
-  const <- coefs["const"]
-  betas <- coefs[names(coefs) != "const"]
+infl_df <- tibble(
+  date_qtr          = summarised_state_baseline$date,
+  lags              = med_from_array(contrib_array$pt_lags),
+  dummies           = med_from_array(contrib_array$pt_dummies),
+  gap               = med_from_array(contrib_array$pt_unemploymentgap),
+  momentum          = med_from_array(contrib_array$pt_momentum),
+  expectations      = med_from_array(contrib_array$pt_expectations),
+  import_prices     = med_from_array(contrib_array$pt_import_prices),
+  residual          = med_from_array(contrib_array$pt_residuals),
+  series            = "Inflation"
+)
 
-  contribs <- map_dfc(names(betas),
-                      ~ df[[.x]] * betas[.x]) %>%
-              setNames(names(betas))
+ulc_df <- tibble(
+  date_qtr          = summarised_state_baseline$date,
+  lags              = med_from_array(contrib_array$pu_lags),
+  dummies           = med_from_array(contrib_array$pu_dummies),
+  gap               = med_from_array(contrib_array$pu_unemploymentgap),
+  momentum          = med_from_array(contrib_array$pu_momentum),
+  expectations      = med_from_array(contrib_array$pu_expectations),
+  import_prices     = 0,                                   # none in ULC eq.
+  residual          = med_from_array(contrib_array$pu_residuals),
+  series            = "ΔULC"
+)
 
-  fitted  <- const + rowSums(contribs)
-  resid   <- df[[lhs]] - fitted
+# ---------------------------------------------------------------------------
+# 2.  Combine & pivot longer -----------------------------------------------
+# ---------------------------------------------------------------------------
+plot_df <- bind_rows(infl_df, ulc_df) %>%
+  pivot_longer(-c(date_qtr, series),
+               names_to = "component",
+               values_to = "value")
 
-  bind_cols(df["date_qtr"], contribs) %>%
-    mutate(const = const,
-           resid  = resid,
-           actual = df[[lhs]])
-}
-
-d_pi  <- decompose(base_df, "infl",  coef_infl)
-d_ulc <- decompose(base_df, "d_ulc", coef_ulc)
-
-# ── 6.  Long format for plotting  ──────────────────────────────────────────
-to_long <- function(dc, label) {
-  dc %>%
-    pivot_longer(-date_qtr, names_to = "component", values_to = "value") %>%
-    mutate(series = label)
-}
-
-plot_df <- bind_rows(to_long(d_pi,  "Inflation"),
-                     to_long(d_ulc, "ΔULC"))
-
-# ── 7.  Plot & save  ───────────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
+# 3.  Plot ------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 p_decomp <- ggplot(plot_df,
                    aes(x = as.Date(date_qtr),
                        y = value,
@@ -323,9 +293,9 @@ p_decomp <- ggplot(plot_df,
                                       component, value))) +
   geom_col(width = 90, position = "stack") +
   facet_wrap(~ series, ncol = 1, scales = "free_y") +
-  labs(title = "Model-based decomposition of Inflation and ΔULC",
+  labs(title = "NAIRU-model decomposition of Inflation and ΔULC",
        x = "Year",
-       y = "Percentage-point contribution (q/q, annualised)") +
+       y = "Percentage-point contribution (q/q)") +
   scale_fill_brewer(palette = "Set2", name = "Component") +
   my_theme +
   theme(legend.position = "bottom")
@@ -333,22 +303,10 @@ p_decomp <- ggplot(plot_df,
 ggsave(file.path(out_dir, "infl_ulc_decomp.png"),
        p_decomp, width = 9, height = 6, dpi = 300)
 
-saveWidget(ggplotly(p_decomp, tooltip = "text"),
+saveWidget(plotly::ggplotly(p_decomp, tooltip = "text"),
            file.path(out_dir, "infl_ulc_decomp.html"))
 
 message("✔  Figure saved: inflation & ULC decomposition")
-
-
-         # ---- save vintage -------------------------------------------------
-run_stamp   <- format(Sys.Date(), "%Y-%m-%d")      # e.g. "2025-05-20"
-vintage_out <- file.path(vintage_dir, paste0(run_stamp, ".csv"))
-
-if (!file.exists(vintage_out)) {
-  file.copy(csv_path, vintage_out)
-  message("✔  Vintage saved: ", vintage_out)
-} else {
-  message("ℹ︎  Vintage for ", run_stamp, " already exists; not overwritten.")
-}
 
 
 
