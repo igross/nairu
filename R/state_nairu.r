@@ -221,7 +221,7 @@ for (r in regions) {
   fit <- sampling(
     compiled,
     data = list(T = nrow(Y), J = ncol(Y), Y = Y),
-    chains = 4, iter = 200,
+    chains = 4, iter = 10000,
     control = list(max_treedepth = 15)
   )
 
