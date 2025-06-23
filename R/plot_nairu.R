@@ -197,6 +197,7 @@ p3 <- ggplot(
       text = paste0("Release: ", new_qtrs, "<br>NAIRU: ", nairu_latest))
 ) +
   geom_col(width = 0.7) +
+  scale_y_continuous(limits = c(4, 5)) +                         
   scale_x_discrete(labels = paste0(summary_df$release_type, "\n", summary_df$new_qtrs)) +
   labs(title = "Most-recent NAIRU estimates by release type",
        x = "Release (type and quarter)", y = "NAIRU (%)",
