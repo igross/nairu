@@ -106,14 +106,13 @@ ur_sa   <- make_wide(ur_raw , ur_ids , "UR",   diff = FALSE)
 wpi_dln <- make_wide(wpi_raw, wpi_ids, "DLWPI", diff = TRUE)  # wage growth
 
 # ---- 6. Merge & sample window --------------------------------------------
-panel <- reduce(list(cpi_dln, ur_sa, wpi_dln), left_join, by = "date") %>%
-  filter(date >= "1997 Q3", date <= "2025 Q1") %>%      # WPI availability
-  mutate(                           # ← NEW: Stan needs these two dummies
-    dummy1 = ifelse(date >= as.yearqtr("2021 Q3") &
-                    date <= as.yearqtr("2023 Q1"), 1, 0),
-    dummy2 = ifelse(date >= as.yearqtr("2022 Q1") &
-                    date <= as.yearqtr("2022 Q4"), 1, 0)
+panel <- reduce(list(cpi_dln, ur_sa, wpi_dln), left_join, by = "date") %>% 
+  filter(date >= "1997 Q3", date <= "2025 Q1") %>%      # WPI window
+  mutate(                                                # ← dummies for Stan
+    dummy1 = ifelse(date >= as.yearqtr("2021 Q3") & date <= as.yearqtr("2023 Q1"), 1, 0),
+    dummy2 = ifelse(date >= as.yearqtr("2022 Q1") & date <= as.yearqtr("2022 Q4"), 1, 0)
   )
+
 
 
 # ---- 7. Long format for looping ------------------------------------------
@@ -135,28 +134,44 @@ compiled <- stan_model(file.path("stan", "NAIRU_baseline.stan"))
 all_summ <- vector("list", length(regions)); names(all_summ) <- regions
 
 for (r in regions) {
-  df_r <- panel_long %>% filter(region == r) %>% drop_na()
-  ymat <- as.matrix(df_r %>% select(DLPI, UR, DLWPI))  # 3 vars
 
-  ## -------- sanity-print: what’s going into Stan -------------------------
+  # --- pick the five variables for region r --------------------------------
+  df_r <- panel %>% 
+    transmute(
+      date,
+      DLPI  = .[[paste0("DLPI_",  r)]],
+      UR    = .[[paste0("UR_",    r)]],
+      DLWPI = .[[paste0("DLWPI_", r)]],
+      dummy1,
+      dummy2
+    ) %>% 
+    drop_na()
+
+  ymat <- as.matrix(df_r %>% select(-date))   # 5-column matrix
+
+  # --- sanity print --------------------------------------------------------
   message(glue::glue("\n──── DATA CHECK: {r} ────"))
   message(glue::glue("Obs: {nrow(df_r)}    Date range: {min(df_r$date)} → {max(df_r$date)}"))
-  print(head(df_r, 10))                 # first 10 rows (date, DLPI, UR, DLWPI)
-  cat("…\n\n")                          # spacer so the log is readable
-  ## ----------------------------------------------------------------------
+  print(head(df_r, 10)); cat("…\n\n")
+  # ------------------------------------------------------------------------
 
-  
-  fit <- sampling(compiled,
-                  data = list(T = nrow(ymat), J = ncol(ymat), Y = ymat),
-                  chains = 8, iter = 200,
-                  control = list(max_treedepth = 15))
+  fit <- sampling(
+    compiled,
+    data = list(T = nrow(ymat),
+                J = ncol(ymat),   # = 5
+                Y = ymat),
+    chains   = 4,                # keep it lighter for CI
+    iter     = 800,
+    control  = list(max_treedepth = 15)
+  )
 
+  # summarise draws ---------------------------------------------------------
   summ <- as.data.frame(fit) %>% 
-    select(contains("NAIRU")) %>%
-    pivot_longer(everything(), names_to = "draw", values_to = "value") %>%
-    summarise(median = median(value),
+    select(contains("NAIRU")) %>% 
+    pivot_longer(everything(), names_to = "draw", values_to = "value") %>% 
+    summarise(median  = median(value),
               lower90 = quantile(value, .05),
-              upper90 = quantile(value, .95)) %>%
+              upper90 = quantile(value, .95)) %>% 
     mutate(region = r)
 
   all_summ[[r]] <- summ
