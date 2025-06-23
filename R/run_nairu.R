@@ -222,15 +222,114 @@ csv_path <- file.path(out_dir, "NAIRU_baseline.csv")
 readr::write_csv(summarised_state_baseline, csv_path)
 
          # ---- sanity check ---------------------------------------------------------
-if (file.exists(csv_path)) {
-  message("✔  File written: ", csv_path)
-} else {
-  stop("✖  Failed to write: ", csv_path)
+# ---------------------------------------------------------------------------
+# ---- Inflation & ULC decomposition ----------------------------------------
+# ---------------------------------------------------------------------------
+library(tidyr)
+library(purrr)
+library(ggplot2)
+library(ggplot2)
+library(plotly)
+library(htmlwidgets)
+
+# ── 1.  Build GAP series (LUR − NAIRU) ─────────────────────────────────────
+gap_df <- summarised_state_baseline %>%
+  select(date_qtr = date, nairu = median) %>%           # NAIRU median
+  left_join(R_6202,  by = c("date_qtr" = "date")) %>%   # LUR
+  mutate(gap = lur - nairu) %>%
+  select(date_qtr, gap)
+
+# ── 2.  CPI inflation (quarter-on-quarter, annualised)  ────────────────────
+# □ Example uses ABS series A2330530C = CPI All Groups, Seasonally Adjusted
+cpi_q <- rba_g1 %>%                                     # already loaded
+  filter(series_id == "A2330530C") %>%
+  transmute(date_qtr = zoo::as.yearqtr(date),
+            infl     = 100 * 4 * (log(value) - log(lag(value))))
+
+# ── 3.  Merge everything you need  ─────────────────────────────────────────
+base_df <- est_data %>%                       # DLNULC, DLWPI, DLPTM, etc.
+  select(date_qtr = date,
+         d_ulc   = DLNULC,                    # rename for clarity
+         d_pmcg  = dl4pmcg) %>%
+  left_join(gap_df, by = "date_qtr") %>%
+  left_join(cpi_q,  by = "date_qtr") %>%
+  drop_na()
+
+# ── 4.  Pick *median* coefficients from your Stan fit  ─────────────────────
+#    (replace these names with your Stan parameter names)
+pars <- as.data.frame(sampled_model_baseline) %>% summarise(
+  a_pi    = median(a_pi),     # intercept in inflation eq.
+  b_gap   = median(b_gap),    # gap coefficient
+  b_ulc   = median(b_ulc),    # passthrough from ΔULC
+  a_ulc   = median(a_ulc),    # intercept in ULC eq.
+  c_gap   = median(c_gap),    # gap coefficient in ULC eq.
+  c_pmcg  = median(c_pmcg)    # import-price shock coefficient
+)
+
+coef_infl <- c(const = pars$a_pi,
+               gap   = pars$b_gap,
+               d_ulc = pars$b_ulc)
+
+coef_ulc  <- c(const = pars$a_ulc,
+               gap   = pars$c_gap,
+               d_pmcg = pars$c_pmcg)
+
+# ── 5.  Decomposition helper  ──────────────────────────────────────────────
+decompose <- function(df, lhs, coefs) {
+  const <- coefs["const"]
+  betas <- coefs[names(coefs) != "const"]
+
+  contribs <- map_dfc(names(betas),
+                      ~ df[[.x]] * betas[.x]) %>%
+              setNames(names(betas))
+
+  fitted  <- const + rowSums(contribs)
+  resid   <- df[[lhs]] - fitted
+
+  bind_cols(df["date_qtr"], contribs) %>%
+    mutate(const = const,
+           resid  = resid,
+           actual = df[[lhs]])
 }
 
-# optional: list everything so the workflow log shows it
-message("Contents of output/ after write:")
-print(list.files(out_dir, full.names = TRUE))
+d_pi  <- decompose(base_df, "infl",  coef_infl)
+d_ulc <- decompose(base_df, "d_ulc", coef_ulc)
+
+# ── 6.  Long format for plotting  ──────────────────────────────────────────
+to_long <- function(dc, label) {
+  dc %>%
+    pivot_longer(-date_qtr, names_to = "component", values_to = "value") %>%
+    mutate(series = label)
+}
+
+plot_df <- bind_rows(to_long(d_pi,  "Inflation"),
+                     to_long(d_ulc, "ΔULC"))
+
+# ── 7.  Plot & save  ───────────────────────────────────────────────────────
+p_decomp <- ggplot(plot_df,
+                   aes(x = as.Date(date_qtr),
+                       y = value,
+                       fill = component,
+                       text = sprintf("%s<br>%s: %.2f pp",
+                                      format(date_qtr, "%Y-Q%q"),
+                                      component, value))) +
+  geom_col(width = 90, position = "stack") +
+  facet_wrap(~ series, ncol = 1, scales = "free_y") +
+  labs(title = "Model-based decomposition of Inflation and ΔULC",
+       x = "Year",
+       y = "Percentage-point contribution (q/q, annualised)") +
+  scale_fill_brewer(palette = "Set2", name = "Component") +
+  my_theme +
+  theme(legend.position = "bottom")
+
+ggsave(file.path(out_dir, "infl_ulc_decomp.png"),
+       p_decomp, width = 9, height = 6, dpi = 300)
+
+saveWidget(ggplotly(p_decomp, tooltip = "text"),
+           file.path(out_dir, "infl_ulc_decomp.html"))
+
+message("✔  Figure saved: inflation & ULC decomposition")
+
 
          # ---- save vintage -------------------------------------------------
 run_stamp   <- format(Sys.Date(), "%Y-%m-%d")      # e.g. "2025-05-20"
