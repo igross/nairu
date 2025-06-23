@@ -153,7 +153,7 @@ make_wide <- function(df, id_vec, stub, diff = FALSE) {
 
 
 
-cpi_dln <- make_wide(cpi_raw, cpi_ids, "DLPI", diff = TRUE)   # inflation
+cpi_dln <- make_wide(cpi_raw, cpi_ids, "DLCPI", diff = TRUE)   # inflation
 ur_sa   <- make_wide(ur_raw , ur_ids , "UR",   diff = FALSE)
 wpi_dln <- make_wide(wpi_raw, wpi_ids, "DLWPI", diff = TRUE)  # wage growth
 
@@ -195,11 +195,24 @@ all_summ <- vector("list", length(regions)); names(all_summ) <- regions
 
 for (r in regions) {
 
-  df_r <- panel  %>%
-    drop_na()
+ col_order <- c(
+    paste0("DLWPI_",   r),
+       "dl4pmcg",
+    paste0("UR_",     r),
+    paste0("DLCPI_",  r),
 
-  ## 3.  matrix Y keeps that ordering
-  Y <- as.matrix(df_r %>% select(-date))   # 8 columns
+    "PIE_BONDQ",
+    "dummy1",
+    "dummy2",
+    "dummy3",
+    "dummy4"
+  )
+
+  df_r <- panel %>%
+    select(date, all_of(col_order)) %>%
+    drop_na()           # only drop rows with missing in these eight
+
+  Y <- as.matrix(df_r %>% select(-date))  # now a clean T×8 matrix
 
   ## 4.  feed Stan
   fit <- sampling(
