@@ -164,12 +164,13 @@ for (r in regions) {
       DLPI      = .[[paste0("DLPI_",  r)]],
       UR        = .[[paste0("UR_",    r)]],
       DLWPI     = .[[paste0("DLWPI_", r)]],
-      DL4PMCG,                        # ← col 4
-      PIE_BONDQ,                      # ← col 5  (new)
-      dummy1,                         # ← col 6
-      dummy2                          # ← col 7
+      DL4PMCG   = dl4pmcg,        # ← use lower-case column, rename here
+      PIE_BONDQ = PIE_BONDQ,      # ← keep consistent
+      dummy1,
+      dummy2
     ) %>% 
     drop_na()
+
 
   ymat <- as.matrix(df_r %>% select(-date))   # 7-column matrix
 
