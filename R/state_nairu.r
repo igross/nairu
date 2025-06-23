@@ -159,19 +159,18 @@ wpi_dln <- make_wide(wpi_raw, wpi_ids, "DLWPI", diff = TRUE)  # wage growth
 
 # ---- 6. Merge & sample window --------------------------------------------
 panel <- list(
-  cpi_dln,
-  ur_sa,
   wpi_dln,
-  dl4pmcg,    # ← was R_6457
-  pie_bondq,  # ← was R_g3
+  dl4pcmg,
+  ur_sa,
+  cpi_dln,
   pie_rbaq
 ) %>%
   purrr::reduce(dplyr::left_join, by = "date") %>%
-  filter(date >= "1997 Q3", date <= "2025 Q1") %>%
-  mutate(
-    dummy1 = ifelse(date >= as.yearqtr("2021 Q3") & date <= as.yearqtr("2023 Q1"), 1, 0),
-    dummy2 = ifelse(date >= as.yearqtr("2022 Q1") & date <= as.yearqtr("2022 Q4"), 1, 0)
-  )
+  filter(date >= "1997 Q3") %>%
+  mutate(dummy1 = ifelse(date >= "2021Q3" & date <= "2023Q1", 1, 0),
+         dummy2 = ifelse(date >= "2022Q1" & date <= "2022Q4", 1, 0),
+         dummy3 = ifelse(date == "2020Q2", 1, 0),
+         dummy4 = ifelse(date == "2020Q3", 1, 0))
 
 
 
