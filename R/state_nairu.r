@@ -68,6 +68,22 @@ wpi_ids <- c(
 
 regions <- names(cpi_ids)   # "AUS" "NSW" … "TAS"
 
+abs_5206 <- read_abs(series_id = c("A2304402X", "A2302915V"),
+                     check_local = FALSE)
+
+abs_6202 <- read_abs(series_id = c("A84423043C", "A84423047L"),
+                     check_local = FALSE)
+
+abs_6457 <- read_abs(series_id = "A2298279F",
+                     check_local = FALSE)
+
+abs_6345 <- read_abs(series_id = "A2713849C",
+                     check_local = FALSE)
+
+rba_g3   <- read_rba(series_id = "GBONYLD",      # daily indexed-bond yield
+                     check_local = FALSE)
+
+
 # ---- 3. Paths -------------------------------------------------------------
 root        <- Sys.getenv("GITHUB_WORKSPACE", unset = here::here())
 out_dir     <- file.path(root, "output");      dir.create(out_dir, TRUE)
@@ -97,6 +113,23 @@ pie_bondq <- bond_raw %>%
   group_by(date) %>%                                            # average within qtr
   summarise(PIE_BONDQ = mean(PIE_BONDQ, na.rm = TRUE), .groups = "drop")
 
+# ---- 4c.  RBA survey inflation expectations ------------------------------
+pie_rbaq <- read_csv("inputs/PIE_RBAQ.CSV") %>%      # same path you used before
+  rename(date = OBS) %>%
+  mutate(date = zoo::as.yearqtr(date))
+
+# forward-fill to 2025 Q1 (same logic you used earlier)
+latest_q   <- max(pie_rbaq$date)
+latest_end <- as.yearqtr("2025 Q1")
+
+if (latest_q < latest_end) {
+  new_dates <- seq(from = latest_q + 0.25, to = latest_end, by = 0.25)
+  last_row  <- pie_rbaq %>% filter(date == latest_q)
+  pie_rbaq  <- bind_rows(
+                 pie_rbaq,
+                 map_dfr(new_dates, ~ last_row %>% mutate(date = .x))
+               )
+}
 
 # ---- 5. Helper to reshape -------------------------------------------------
 make_wide <- function(df, id_vec, stub, diff = FALSE) {
@@ -125,15 +158,14 @@ ur_sa   <- make_wide(ur_raw , ur_ids , "UR",   diff = FALSE)
 wpi_dln <- make_wide(wpi_raw, wpi_ids, "DLWPI", diff = TRUE)  # wage growth
 
 # ---- 6. Merge & sample window --------------------------------------------
-panel <- reduce(
-           list(cpi_dln, ur_sa, wpi_dln, dl4pmcg, pie_bondq),   # + bond qtrs
-           left_join, by = "date") %>%
+panel <- list(cpi_dln, ur_sa, wpi_dln,
+              R_6457,        # dl4pmcg
+              R_g3,          # pie_bondq
+              pie_rbaq) %>%  # PIE_RBAQ
+  purrr::reduce(dplyr::left_join, by = "date") %>%
   filter(date >= "1997 Q3", date <= "2025 Q1") %>%
-  mutate(
-    dummy1 = ifelse(date >= as.yearqtr("2021 Q3") & date <= as.yearqtr("2023 Q1"), 1, 0),
-    dummy2 = ifelse(date >= as.yearqtr("2022 Q1") & date <= as.yearqtr("2022 Q4"), 1, 0)
-  )
-
+  mutate(dummy1 = ifelse(date >= as.yearqtr("2021 Q3") & date <= as.yearqtr("2023 Q1"), 1, 0),
+         dummy2 = ifelse(date >= as.yearqtr("2022 Q1") & date <= as.yearqtr("2022 Q4"), 1, 0))
 
 
 
