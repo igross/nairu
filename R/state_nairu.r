@@ -214,7 +214,6 @@ for (r in regions) {
     select(date, all_of(col_order)) %>%
     drop_na()           # only drop rows with missing in these eight
 
-print(df_r)
   
   Y <- as.matrix(df_r %>% select(-date))  # now a clean T×8 matrix
 
@@ -252,12 +251,13 @@ print(df_r)
       region = r
     )
 
+print(nairu_ts)
+  
   ## 5. write out the T × 5 CSV (date, median, lower90, upper90, region)
   readr::write_csv(
     nairu_ts,
     file.path(out_dir, glue::glue("NAIRU_{tolower(r)}.csv"))
   )
-
   all_summ[[r]] <- nairu_ts
 }
 
