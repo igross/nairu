@@ -206,6 +206,6 @@ p4 <- ggplot(
 
 ggsave(file.path(output_dir, "nairu_all_vintages.png"), p4, width = 8, height = 5, dpi = 300)
 saveWidget(ggplotly(p4, tooltip = "text"), file.path(output_dir, "nairu_all_vintages.html"))
-message("Figure 4 saved: all vintages")("Figure 4 saved: all vintages")
+message("Figure 4 saved: all vintages")
 
                            
