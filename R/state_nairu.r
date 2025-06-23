@@ -107,7 +107,14 @@ wpi_dln <- make_wide(wpi_raw, wpi_ids, "DLWPI", diff = TRUE)  # wage growth
 
 # ---- 6. Merge & sample window --------------------------------------------
 panel <- reduce(list(cpi_dln, ur_sa, wpi_dln), left_join, by = "date") %>%
-  filter(date >= "1997 Q3", date <= "2025 Q1")          # WPI availability
+  filter(date >= "1997 Q3", date <= "2025 Q1") %>%      # WPI availability
+  mutate(                           # ← NEW: Stan needs these two dummies
+    dummy1 = ifelse(date >= as.yearqtr("2021 Q3") &
+                    date <= as.yearqtr("2023 Q1"), 1, 0),
+    dummy2 = ifelse(date >= as.yearqtr("2022 Q1") &
+                    date <= as.yearqtr("2022 Q4"), 1, 0)
+  )
+
 
 # ---- 7. Long format for looping ------------------------------------------
 panel_long <- panel %>%
