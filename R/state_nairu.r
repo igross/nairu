@@ -47,7 +47,7 @@ if (!Sys.Date() %in% release_calendar) {
 
 ## CPI headline index (original)
 cpi_ids <- c(
-  AUS = "A2325801A",        # Weighted-average 8 capitals
+  AUS = "A2325846C",        # Weighted-average 8 capitals
   NSW = "A2325806K", VIC = "A2325811C", QLD = "A2325816R",
   SA  = "A2325821J", WA  = "A2325826V", TAS = "A2325831L"
 )
