@@ -89,6 +89,15 @@ dl4pmcg <- pmcg_raw %>%
          dl4pmcg = 100 * (log(value) - log(lag(value, 4)))) %>%
   select(date, dl4pmcg)
 
+## ---- 4b.  Bond-market inflation expectations -----------------------------
+bond_raw <- read_rba(series_id = "GBONYLD")          # 10-year indexed, daily
+pie_bondq <- bond_raw %>%
+  mutate(date = zoo::as.yearqtr(date),
+         PIE_BONDQ = ( (1 + value/100)^(1/4) - 1 ) * 100 ) %>%   # quarterly %
+  group_by(date) %>%                                            # average within qtr
+  summarise(PIE_BONDQ = mean(PIE_BONDQ, na.rm = TRUE), .groups = "drop")
+
+
 # ---- 5. Helper to reshape -------------------------------------------------
 make_wide <- function(df, id_vec, stub, diff = FALSE) {
 
@@ -117,13 +126,14 @@ wpi_dln <- make_wide(wpi_raw, wpi_ids, "DLWPI", diff = TRUE)  # wage growth
 
 # ---- 6. Merge & sample window --------------------------------------------
 panel <- reduce(
-           list(cpi_dln, ur_sa, wpi_dln, dl4pmcg),   # ← added here
+           list(cpi_dln, ur_sa, wpi_dln, dl4pmcg, pie_bondq),   # + bond qtrs
            left_join, by = "date") %>%
   filter(date >= "1997 Q3", date <= "2025 Q1") %>%
   mutate(
     dummy1 = ifelse(date >= as.yearqtr("2021 Q3") & date <= as.yearqtr("2023 Q1"), 1, 0),
     dummy2 = ifelse(date >= as.yearqtr("2022 Q1") & date <= as.yearqtr("2022 Q4"), 1, 0)
   )
+
 
 
 
@@ -151,33 +161,26 @@ for (r in regions) {
   df_r <- panel %>% 
     transmute(
       date,
-      DLPI   = .[[paste0("DLPI_",  r)]],
-      UR     = .[[paste0("UR_",    r)]],
-      DLWPI  = .[[paste0("DLWPI_", r)]],
-      DL4PMCG = dl4pmcg,           # ← NEW (col 4)
-      dummy1,
-      dummy2
+      DLPI      = .[[paste0("DLPI_",  r)]],
+      UR        = .[[paste0("UR_",    r)]],
+      DLWPI     = .[[paste0("DLWPI_", r)]],
+      DL4PMCG,                        # ← col 4
+      PIE_BONDQ,                      # ← col 5  (new)
+      dummy1,                         # ← col 6
+      dummy2                          # ← col 7
     ) %>% 
     drop_na()
 
-  ymat <- as.matrix(df_r %>% select(-date))   # 6-column matrix
+  ymat <- as.matrix(df_r %>% select(-date))   # 7-column matrix
 
-  # --- sanity print --------------------------------------------------------
-  message(glue::glue("\n──── DATA CHECK: {r} ────"))
-  message(glue::glue("Obs: {nrow(df_r)}    Date range: {min(df_r$date)} → {max(df_r$date)}"))
-  print(head(df_r, 10)); cat("…\n\n")
-  # ------------------------------------------------------------------------
-
-  
   fit <- sampling(
     compiled,
     data = list(T = nrow(ymat),
-                J = ncol(ymat),   # = 6
+                J = ncol(ymat),   # = 7
                 Y = ymat),
-    chains = 4, iter = 800,
+    chains = 4, iter = 100,
     control = list(max_treedepth = 15)
   )
-
 
  
 
