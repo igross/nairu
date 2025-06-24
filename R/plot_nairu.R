@@ -244,3 +244,49 @@ saveWidget(ggplotly(p5, tooltip = "text"),
            file.path(output_dir, "nairu_regions.html"))
 message("Figure 5 saved: regions")
 
+
+# 1. read back the decomposition
+decomp_df <- readr::read_csv(
+  file.path(output_dir, "infl_ulc_decomp.csv"),
+  show_col_types = FALSE
+) %>%
+  mutate(
+    # parse the year-quarter string back into a yearqtr
+    date_qtr = as.yearqtr(date_qtr, format = "%Y Q%q"),
+    date     = as.Date(date_qtr)     # for ggplot’s x‐axis
+  )
+
+# 2. plot
+p_decomp <- ggplot(
+  decomp_df,
+  aes(
+    x    = date,
+    y    = value,
+    fill = component,
+    text = sprintf("%s<br>%s: %.2f pp",
+                   format(date_qtr, "%Y-Q%q"),
+                   component, value)
+  )
+) +
+  geom_col(width = 90, position = "stack") +
+  facet_wrap(~ series, ncol = 1, scales = "free_y") +
+  labs(
+    title = "NAIRU-model decomposition of Inflation and ΔULC",
+    x     = "Year",
+    y     = "Percentage-point contribution (q/q)"
+  ) +
+  scale_fill_brewer(palette = "Set2", name = "Component") +
+  my_theme +
+  theme(legend.position = "bottom")
+
+# 3. save static & interactive
+ggsave(
+  file.path(output_dir, "infl_ulc_decomp.png"),
+  p_decomp, width = 9, height = 6, dpi = 300
+)
+saveWidget(
+  ggplotly(p_decomp, tooltip = "text"),
+  file.path(output_dir, "infl_ulc_decomp.html")
+)
+message("✔  Figure saved: inflation & ULC decomposition")
+                           
