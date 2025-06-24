@@ -264,7 +264,7 @@ lag_weights <- lag_weights %>%
 
 # (2) Read the decomposition CSV and pull out only the “lags” row
 decomp <- read_csv(
-  file.path(output_dir, "infl_ulc_decomp.csv"),
+  file.path(out_dir, "infl_ulc_decomp.csv"),
   show_col_types = FALSE
 ) %>%
   filter(component == "lags") %>%
@@ -280,7 +280,7 @@ final_df <- lag_weights %>%
   select(date_qtr, component, contrib, total, weight, pp_contrib, value)
 
 # (4) Write it out
-out_file <- file.path(output_dir, "pt_lag_weights.csv")
+out_file <- file.path(out_dir, "pt_lag_weights.csv")
 write_csv(final_df, out_file)
 message("✔  Saved per‐lag PP contributions to ", out_file)
 
