@@ -260,48 +260,43 @@ htmlwidgets::saveWidget(
 message("✔  Figure 5 saved: regions")
 
 
-# 1. read back the decomposition
-decomp_df <- readr::read_csv(
+
+decomp_df <- read_csv(
   file.path(output_dir, "pt_lag_weights.csv"),
   show_col_types = FALSE
 ) %>%
   mutate(
-    # parse the year-quarter string back into a yearqtr
+    # parse the quarter string
     date_qtr = as.yearqtr(date_qtr, format = "%Y Q%q"),
-    date     = as.Date(date_qtr)     # for ggplot’s x‐axis
+    date     = as.Date(date_qtr),
+    series   = "Inflation"      # <- add this
   )
 
-# ---- 11. Figure 6: NAIRU Decomposition ------------------------------
-p_decomp <- ggplot(
-  decomp_df,
-  aes(
-    x    = date,
-    y    = value,
-    fill = component,
-    text = sprintf("%s<br>%s: %.2f pp",
-                   format(date_qtr, "%Y-Q%q"),
-                   component, value)
-  )
-) +
+# ---- re‐draw the decomposition bar chart --------------------------
+p_decomp <- ggplot(decomp_df, aes(
+    x = date,
+    y = value,
+    fill     = component,
+    text     = sprintf("%s<br>%s: %.2f pp", format(date_qtr, "%Y-Q%q"), component, value)
+  )) +
   geom_col(width = 90, position = "stack") +
   facet_wrap(~ series, ncol = 1, scales = "free_y") +
   labs(
-    title = "NAIRU-model decomposition of Inflation and ΔULC",
+    title = "NAIRU‐model decomposition of Inflation lags",
     x     = "Year",
-    y     = "Percentage-point contribution (q/q)"
+    y     = "Percentage‐point contribution (q/q)"
   ) +
-  scale_fill_brewer(palette = "Set2", name = "Component") +
+  scale_fill_brewer(palette = "Set2", name = "Lag") +
   my_theme +
   theme(legend.position = "bottom")
 
-# 3. save static & interactive
-ggsave(
-  file.path(output_dir, "infl_ulc_decomp.png"),
-  p_decomp, width = 9, height = 6, dpi = 300
-)
-saveWidget(
-  ggplotly(p_decomp, tooltip = "text"),
+# ---- save it ---------------------------------------------
+ggsave(file.path(output_dir, "infl_ulc_decomp.png"),
+       p_decomp, width = 9, height = 6, dpi = 300)
+htmlwidgets::saveWidget(
+  plotly::ggplotly(p_decomp, tooltip = "text"),
   file.path(output_dir, "infl_ulc_decomp.html")
 )
-message("✔  Figure saved: inflation & ULC decomposition")
+message("✔  Figure saved: inflation‐lags decomposition")
+                           
                            
