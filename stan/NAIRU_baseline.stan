@@ -137,12 +137,21 @@ generated quantities {
   vector[T] n_residuals;
   vector[T] pt_residuals;
   vector[T] pu_residuals;
+
+  vector[T] pt_lags;
+  vector[T] pt_lag1;
+  vector[T] pt_lag2;
+  vector[T] pt_lag3;
  
 
   for (t in 4:T) {
     pt_lags[t] = beta1_pt * Y[t - 1, 4]
                + beta2_pt * Y[t - 2, 4]
                + beta3_pt * Y[t - 3, 4];
+
+  pt_lag1[t] = beta1_pt * Y[t - 1, 4];
+    pt_lag2[t] = beta2_pt * Y[t - 2, 4];
+    pt_lag3[t] = beta3_pt * Y[t - 3, 4];
 
     pt_dummies[t] = xi_pt[1] * Y[t, 6]
                   + xi_pt[2] * Y[t, 7];
