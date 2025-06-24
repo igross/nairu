@@ -24,7 +24,7 @@ if (!Sys.Date() %in% release_calendar) {
   message(
     glue::glue("⏩ {Sys.Date()} is not an ABS CPI/National-Accounts release day – skipping refresh.")
   )
-   quit(save = "no")   # graceful, zero-exit termination
+  # quit(save = "no")   # graceful, zero-exit termination
 }
 
 
@@ -281,42 +281,9 @@ plot_df <- bind_rows(infl_df, ulc_df) %>%
                names_to = "component",
                values_to = "value")
 
-# ---------------------------------------------------------------------------
-# 3.  Plot ------------------------------------------------------------------
-# ---------------------------------------------------------------------------
-my_theme <- theme_bw() +
-  theme(
-    axis.text.x  = element_text(angle = 45, hjust = 1, size = 11),
-    axis.text.y  = element_text(size = 11),
-    axis.title   = element_text(size = 13),
-    legend.position = "bottom"
-  )
-         
-         
-         p_decomp <- ggplot(plot_df,
-                   aes(x = as.Date(date_qtr),
-                       y = value,
-                       fill = component,
-                       text = sprintf("%s<br>%s: %.2f pp",
-                                      format(date_qtr, "%Y-Q%q"),
-                                      component, value))) +
-  geom_col(width = 90, position = "stack") +
-  facet_wrap(~ series, ncol = 1, scales = "free_y") +
-  labs(title = "NAIRU-model decomposition of Inflation and ΔULC",
-       x = "Year",
-       y = "Percentage-point contribution (q/q)") +
-  scale_fill_brewer(palette = "Set2", name = "Component") +
-  my_theme +
-  theme(legend.position = "bottom")
-
-ggsave(file.path(out_dir, "infl_ulc_decomp.png"),
-       p_decomp, width = 9, height = 6, dpi = 300)
-
-saveWidget(plotly::ggplotly(p_decomp, tooltip = "text"),
-           file.path(out_dir, "infl_ulc_decomp.html"))
-
-message("✔  Figure saved: inflation & ULC decomposition")
-
+decomp_file <- file.path(out_dir, "infl_ulc_decomp.csv")
+readr::write_csv(plot_df, decomp_file)
+message("✔  Saved decomposition data to ", decomp_file)
 
 
 
