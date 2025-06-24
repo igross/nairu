@@ -254,37 +254,35 @@ lag_weights <- lag_df %>%
   mutate(weight = contrib / total) %>%
   ungroup()
 
-# 4b. carry forward the YYYY Qq label in lag_weights
+# (1) Ensure pp_contrib exists
 lag_weights <- lag_weights %>%
-  mutate(date_qtr = format(date, "%Y Q%q"))
+  mutate(
+    # weight = contrib / total  already exists
+    pp_contrib = total * weight,
+    date_qtr   = format(date, "%Y Q%q")   # match your decomp CSV key
+  )
 
-# 5. read back the raw decomposition
-decomp <- readr::read_csv(
-  file.path(out_dir, "infl_ulc_decomp.csv"),
+# (2) Read the decomposition CSV and pull out only the “lags” row
+decomp <- read_csv(
+  file.path(output_dir, "infl_ulc_decomp.csv"),
   show_col_types = FALSE
 ) %>%
   filter(component == "lags") %>%
   select(date_qtr, total_lags = value)
 
-# 6. build the final per‐lag decomposition
+# (3) Join and assemble final table
 final_df <- lag_weights %>%
   left_join(decomp, by = "date_qtr") %>%
   mutate(
-    component = lag,            # rename lag → component
-    value     = pp_contrib      # percent‐point contribution
+    component = lag,        # e.g. "lag1", "lag2", "lag3"
+    value     = pp_contrib  # what you’ll plot
   ) %>%
-  select
+  select(date_qtr, component, contrib, total, weight, pp_contrib, value)
 
-
-# 5. save to CSV
-out_file <- file.path(out_dir, "pt_lag_weights.csv")
-readr::write_csv(lag_weights, out_file)
-
-message("✔  pt lag weights saved to ", out_file)
-
-
-
-
+# (4) Write it out
+out_file <- file.path(output_dir, "pt_lag_weights.csv")
+write_csv(final_df, out_file)
+message("✔  Saved per‐lag PP contributions to ", out_file)
 
 
 
