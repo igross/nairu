@@ -262,7 +262,7 @@ message("✔  Figure 5 saved: regions")
 
 # 1. read back the decomposition
 decomp_df <- readr::read_csv(
-  file.path(output_dir, "infl_ulc_decomp.csv"),
+  file.path(output_dir, "pt_lag_weights.csv"),
   show_col_types = FALSE
 ) %>%
   mutate(
