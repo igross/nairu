@@ -24,7 +24,7 @@ if (!Sys.Date() %in% release_calendar) {
   message(
     glue::glue("⏩ {Sys.Date()} is not an ABS CPI/National-Accounts release day – skipping refresh.")
   )
-  # quit(save = "no")   # graceful, zero-exit termination
+   quit(save = "no")   # graceful, zero-exit termination
 }
 
 
@@ -221,69 +221,55 @@ print(summarised_state_baseline)
 csv_path <- file.path(out_dir, "NAIRU_baseline.csv")
 readr::write_csv(summarised_state_baseline, csv_path)
 
-         # ---- sanity check ---------------------------------------------------------
-# ---------------------------------------------------------------------------
-# ---- Inflation & ULC decomposition ----------------------------------------
-# ---------------------------------------------------------------------------
-library(tidyr)
+# 1. extract your lag‐by‐lag arrays plus the total
+draws <- rstan::extract(sampled_model_baseline,
+                        pars = c("pt_lags","pt_lag1","pt_lag2","pt_lag3"))
+
+n_periods <- dim(draws$pt_lag1)[2]
+dates     <- est_data$date             # your vector of yearqtr dates
+
+# 2. build a tibble of medians for each lag
+library(dplyr)
 library(purrr)
-library(ggplot2)
-library(ggplot2)
-library(plotly)
-library(htmlwidgets)
+lag_df <- map_dfr(1:3, function(j) {
+  arr_j <- draws[[paste0("pt_lag", j)]]      # draws × periods
+  med_j <- apply(arr_j, 2, median)           # length = n_periods
+  tibble(
+    date   = dates,
+    lag    = paste0("lag", j),
+    contrib = med_j
+  )
+})
 
-# ---------------------------------------------------------------------------
-# 1.  Extract generated quantities (medians across posterior draws) ---------
-# ---------------------------------------------------------------------------
-contrib_names <- c(
-  # Inflation pieces
-  "pt_lags", "pt_dummies", "pt_unemploymentgap", "pt_momentum",
-  "pt_expectations", "pt_import_prices", "pt_residuals",
-  # ULC pieces
-  "pu_lags", "pu_dummies", "pu_unemploymentgap", "pu_momentum",
-  "pu_expectations", "pu_residuals"
-)
+# 3. compute weight of each lag in the total
+#    first get medians of the total
+total_med <- apply(draws$pt_lags, 2, median)
+total_df  <- tibble(date = dates, total = total_med)
 
-contrib_array <- rstan::extract(sampled_model_baseline, pars = contrib_names)
+lag_weights <- lag_df %>%
+  left_join(total_df, by = "date") %>%
+  group_by(date) %>%
+  mutate(weight = contrib / total) %>%
+  ungroup()
 
-# helper to take median across the 1st dimension (= draws)
-med_from_array <- function(a) apply(a, 2, median)
+# 4. now you can assign each original factor its share:
+#    e.g. if you want its contribution in pp:
+lag_weights <- lag_weights %>%
+  mutate(pp_contrib = total * weight)
 
-infl_df <- tibble(
-  date_qtr          = summarised_state_baseline$date,
-  lags              = med_from_array(contrib_array$pt_lags),
-  dummies           = med_from_array(contrib_array$pt_dummies),
-  gap               = med_from_array(contrib_array$pt_unemploymentgap),
-  momentum          = med_from_array(contrib_array$pt_momentum),
-  expectations      = med_from_array(contrib_array$pt_expectations),
-  import_prices     = med_from_array(contrib_array$pt_import_prices),
-  residual          = med_from_array(contrib_array$pt_residuals),
-  series            = "Inflation"
-)
+# 5. bind back into your decomposition data
+decomp <- readr::read_csv("output/infl_ulc_decomp.csv") %>%
+  filter(component == "lags") %>%
+  select(date_qtr, total_lags = value) %>%
+  mutate(date = as.Date(date_qtr))        # or as.yearqtr→Date
 
-ulc_df <- tibble(
-  date_qtr          = summarised_state_baseline$date,
-  lags              = med_from_array(contrib_array$pu_lags),
-  dummies           = med_from_array(contrib_array$pu_dummies),
-  gap               = med_from_array(contrib_array$pu_unemploymentgap),
-  momentum          = med_from_array(contrib_array$pu_momentum),
-  expectations      = med_from_array(contrib_array$pu_expectations),
-  import_prices     = 0,                                   # none in ULC eq.
-  residual          = med_from_array(contrib_array$pu_residuals),
-  series            = "ΔULC"
-)
+final_df <- lag_weights %>%
+  left_join(decomp, by = "date") %>%
+  mutate(component = lag, value = pp_contrib) %>%
+  select(date_qtr = date, component, value)
 
-# ---------------------------------------------------------------------------
-# 2.  Combine & pivot longer -----------------------------------------------
-# ---------------------------------------------------------------------------
-plot_df <- bind_rows(infl_df, ulc_df) %>%
-  pivot_longer(-c(date_qtr, series),
-               names_to = "component",
-               values_to = "value")
+# now `final_df` has each lag’s pp contribution for plotting
 
-decomp_file <- file.path(out_dir, "infl_ulc_decomp.csv")
-readr::write_csv(plot_df, decomp_file)
-message("✔  Saved decomposition data to ", decomp_file)
 
 
 
