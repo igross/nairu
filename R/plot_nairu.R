@@ -208,24 +208,37 @@ saveWidget(ggplotly(p4, tooltip = "text"), file.path(output_dir, "nairu_all_vint
 message("Figure 4 saved: all vintages")
 
 # ---- 10. Figure 5: NAIRU across all regions ------------------------------
+
 regions_file <- file.path(output_dir, "NAIRU_all_regions.csv")
 
-nairu_regions <- read_csv(regions_file, show_col_types = FALSE) %>%
-  # cope with either "YYYY-MM-DD" or "YYYY Qq" strings
+# 10.1 Read raw CSV
+nairu_regions_raw <- read_csv(regions_file, show_col_types = FALSE)
+
+# 10.2 Parse mixed‐format dates
+#    - “YYYY Qq” → as.yearqtr() → as.Date()
+#    - “YYYY-MM-DD” → as.Date()
+is_q      <- grepl("Q", nairu_regions_raw$date)
+parsed_dt <- as.Date(rep(NA, nrow(nairu_regions_raw)))
+
+parsed_dt[is_q]      <- as.Date(
+  as.yearqtr(nairu_regions_raw$date[is_q], format = "%Y Q%q")
+)
+parsed_dt[!is_q]     <- as.Date(nairu_regions_raw$date[!is_q])
+
+# 10.3 Build final data frame
+nairu_regions <- nairu_regions_raw %>%
   mutate(
-    date = case_when(
-      grepl("Q", date) ~ as.Date(as.yearqtr(date, format = "%Y Q%q")),
-      TRUE             ~ as.Date(date)
-    ),
+    date   = parsed_dt,
     region = factor(region)
   )
 
+# 10.4 Plot
 p5 <- ggplot(nairu_regions, aes(x = date, y = median, group = region)) +
   geom_ribbon(aes(ymin = lower90, ymax = upper90, fill = region),
               alpha = 0.25, colour = NA) +
   geom_line(aes(colour = region), linewidth = 0.8) +
   scale_x_date(date_breaks = "2 years", date_labels = "%Y") +
-  scale_y_continuous(labels = number_format(accuracy = 0.1)) +
+  scale_y_continuous(labels = scales::number_format(accuracy = 0.1)) +
   labs(
     title    = "Estimated NAIRU by Region",
     subtitle = "Median (solid lines) and 90% credible intervals",
@@ -237,12 +250,14 @@ p5 <- ggplot(nairu_regions, aes(x = date, y = median, group = region)) +
   theme_minimal(base_size = 12) +
   theme(legend.position = "bottom")
 
-# save static & interactive
+# 10.5 Save
 ggsave(file.path(output_dir, "nairu_regions.png"),
        p5, width = 8, height = 5, dpi = 300)
-saveWidget(ggplotly(p5, tooltip = "text"),
-           file.path(output_dir, "nairu_regions.html"))
-message("Figure 5 saved: regions")
+htmlwidgets::saveWidget(
+  plotly::ggplotly(p5, tooltip = "text"),
+  file.path(output_dir, "nairu_regions.html")
+)
+message("✔  Figure 5 saved: regions")
 
 
 # 1. read back the decomposition
@@ -256,7 +271,7 @@ decomp_df <- readr::read_csv(
     date     = as.Date(date_qtr)     # for ggplot’s x‐axis
   )
 
-# 2. plot
+# ---- 11. Figure 6: NAIRU Decomposition ------------------------------
 p_decomp <- ggplot(
   decomp_df,
   aes(
