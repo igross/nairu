@@ -231,6 +231,8 @@ dates     <- est_data$date             # your vector of yearqtr dates
 # 2. build a tibble of medians for each lag
 library(dplyr)
 library(purrr)
+
+         
 lag_df <- map_dfr(1:3, function(j) {
   arr_j <- draws[[paste0("pt_lag", j)]]      # draws × periods
   med_j <- apply(arr_j, 2, median)           # length = n_periods
@@ -258,7 +260,7 @@ lag_weights <- lag_weights %>%
 
 # 5. read back the raw decomposition
 decomp <- readr::read_csv(
-  file.path(output_dir, "infl_ulc_decomp.csv"),
+  file.path(out_dir, "infl_ulc_decomp.csv"),
   show_col_types = FALSE
 ) %>%
   filter(component == "lags") %>%
@@ -275,7 +277,7 @@ final_df <- lag_weights %>%
 
 
 # 5. save to CSV
-out_file <- file.path(output_dir, "pt_lag_weights.csv")
+out_file <- file.path(out_dir, "pt_lag_weights.csv")
 readr::write_csv(lag_weights, out_file)
 
 message("✔  pt lag weights saved to ", out_file)
