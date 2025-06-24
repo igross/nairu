@@ -15,6 +15,8 @@ library(tidyr)
 library(plotly)
 library(htmlwidgets)
 library(lubridate)
+library(scales)      # added for date_breaks & number_format
+library(janitor)
 
 # ---- 2. Set up file paths -----------------------------------------------
 target_dir  <- getwd()
@@ -39,7 +41,6 @@ ensure_dates <- function(df, start_qtr = "1997 Q3") {
 }
 
 read_vintage_safe <- function(path) {
-  # filename "YYYY-MM-DD.csv"
   fname     <- basename(path)
   date_str  <- tools::file_path_sans_ext(fname)
   pub_date  <- as.Date(date_str)
@@ -72,47 +73,29 @@ my_theme <- theme_bw() +
     legend.position.inside = c(1.02, 0.5)
   )
 
-library(janitor)
-
 # ---- 5. Load baseline NAIRU data -----------------------------------------
 nairu_df <- read_csv(csv_in, show_col_types = FALSE) %>%
-  clean_names() %>%                       # variable, median, lowera, ...
+  clean_names() %>%
   rename(
-    lower = lowera,                      # use the 'a' interval
+    lower = lowera,
     upper = uppera
   ) %>%
   mutate(
-    date_qtr = as.yearqtr(date),         # keep as yearqtr for pretty ticks
-    date     = as.Date(date_qtr)         # Plotly likes Date objects
+    date_qtr = as.yearqtr(date),
+    date     = as.Date(date_qtr)
   ) %>%
-  filter(date_qtr >= as.yearqtr("2010 Q1")) %>%   # post-GFC sample
+  filter(date_qtr >= as.yearqtr("2010 Q1")) %>%
   arrange(date_qtr)
 
-nairu_df %>%
-  summarise(
-    n_rows   = n(),
-    n_lower  = sum(!is.na(lower)),
-    n_upper  = sum(!is.na(upper)),
-    min_gap  = min(upper - lower, na.rm = TRUE),
-    any_reversed = any(lower >= upper, na.rm = TRUE)
-  )
-
-
-# quick sanity check in the CI log
 message("Loaded ", nrow(nairu_df), " rows – ",
         sum(!is.na(nairu_df$median)), " have a median value")
 
 # ---- 6. Figure 1: full history ------------------------------------------
 p1 <- ggplot(nairu_df, aes(x = date)) +
-  geom_ribbon(
-    data = nairu_df,
-    aes(ymin = lower, ymax = upper),
-    fill   = "orange",
-    alpha  = 0.3,
-    colour = NA          # border off; set to "black" if you want an outline
-  ) +
+  geom_ribbon(aes(ymin = lower, ymax = upper),
+              fill   = "orange", alpha = 0.3, colour = NA) +
   geom_line(aes(y = median, group = 1),
-            colour = "red",  linewidth = 1) +
+            colour = "red", linewidth = 1) +
   geom_line(aes(y = lur,    group = 1),
             colour = "blue", linewidth = 0.8) +
   geom_point(data = slice_tail(nairu_df, n = 1),
@@ -124,47 +107,33 @@ p1 <- ggplot(nairu_df, aes(x = date)) +
 
 ggsave(file.path(output_dir, "nairu_history.png"),
        p1, width = 8, height = 5, dpi = 300)
-
 saveWidget(ggplotly(p1, tooltip = "text"),
            file.path(output_dir, "nairu_history.html"))
 
-
 # ---- 7. Figure 2: zoom 2010-present -------------------------------------
-nairu_zoom <- nairu_df |>
+nairu_zoom <- nairu_df %>%
   filter(date_qtr >= as.yearqtr("2010 Q1"))
 
 p2 <- ggplot(nairu_zoom, aes(x = date)) +
-  # 90 % credible-interval “fan”
-  geom_ribbon(
-    aes(ymin = lower, ymax = upper),
-    fill  = "orange",
-    alpha = 0.3
-  ) +
-  # NAIRU median and unemployment rate
+  geom_ribbon(aes(ymin = lower, ymax = upper),
+              fill  = "orange", alpha = 0.3) +
   geom_line(aes(y = median, group = 1),
-            colour = "red",  linewidth = 1) +
+            colour = "red", linewidth = 1) +
   geom_line(aes(y = lur,    group = 1),
             colour = "blue", linewidth = 0.8) +
-  # Highlight the latest NAIRU point
   geom_point(data = slice_tail(nairu_zoom, n = 1),
-             aes(y = median),
-             colour = "black", size = 3) +
+             aes(y = median), colour = "black", size = 3) +
   scale_x_date(date_breaks = "1 year", date_labels = "%Y") +
   labs(title    = "NAIRU estimate (post-GFC)",
        subtitle = "90 % credible interval",
        x = "Quarter", y = "Percent") +
   my_theme
 
-# save static & interactive versions
 ggsave(file.path(output_dir, "nairu_zoom_2010.png"),
        p2, width = 8, height = 5, dpi = 300)
-
 saveWidget(ggplotly(p2, tooltip = "text"),
            file.path(output_dir, "nairu_zoom_2010.html"))
-
 message("Figure 2 saved")
-
-
 
 # ---- 8. Figure 3: Most-recent by release type ---------------------------
 types <- list.files(vintage_dir, pattern = "\\.csv$", full.names = TRUE)
@@ -188,16 +157,13 @@ summary_df <- tmp_df %>%
   distinct(new_qtrs, .keep_all = TRUE) %>%
   mutate(idx = row_number())
 
-# Debug: inspect summary_df
-print(summary_df)
-
 p3 <- ggplot(
   summary_df,
   aes(x = factor(idx), y = nairu_latest, fill = release_type,
       text = paste0("Release: ", new_qtrs, "<br>NAIRU: ", nairu_latest))
 ) +
   geom_col(width = 0.7) +
-  scale_y_continuous(limits = c(4, 5)) +                         
+  scale_y_continuous(limits = c(4, 5)) +
   scale_x_discrete(labels = paste0(summary_df$release_type, "\n", summary_df$new_qtrs)) +
   labs(title = "Most-recent NAIRU estimates by release type",
        x = "Release (type and quarter)", y = "NAIRU (%)",
@@ -205,39 +171,26 @@ p3 <- ggplot(
   my_theme
 
 ggsave(file.path(output_dir, "nairu_last8_bar.png"), p3, width = 9, height = 5, dpi = 300)
-saveWidget(ggplotly(p3, tooltip = "text"), file.path(output_dir, "nairu_last8_bar.html"))
+saveWidget(ggplotly(p3, tooltip = "text"),
+           file.path(output_dir, "nairu_last8_bar.html"))
 message("Figure 3 saved")
 
 # ---- 9. Figure 4: All vintages series colored ---------------------------
-# Use map2_dfr to attach vintage label clearly from filename
 files      <- list.files(vintage_dir, pattern = "\\.csv$", full.names = TRUE)
 labels     <- tools::file_path_sans_ext(basename(files))
 vintages_df <- map2_dfr(files, labels, function(path, label) {
   df <- suppressMessages(read_csv(path, show_col_types = FALSE)) %>% ensure_dates()
   df %>% mutate(vintage = label)
 })
-# Debug: inspect vintages_df
-print(str(vintages_df)); print(head(vintages_df))
 
-# 1. Identify all vintages, and pick out "Baseline" if it's there:
 all_vints  <- unique(vintages_df$vintage)
-old_labels <- setdiff(all_vints, "Baseline")
-
-vints <- unique(vintages_df$vintage)
-
-if ("Baseline" %in% vints) {
-  # one extra colour for Baseline
-  palette   <- rainbow(length(vints) - 1)
-  color_map <- setNames(
-    c(palette, "black"),
-    c(setdiff(vints, "Baseline"), "Baseline")
-  )
+if ("Baseline" %in% all_vints) {
+  palette   <- rainbow(length(all_vints) - 1)
+  color_map <- setNames(c(palette, "black"), c(setdiff(all_vints, "Baseline"), "Baseline"))
 } else {
-  # no Baseline; one-for-one mapping
-  palette   <- rainbow(length(vints))
-  color_map <- setNames(palette, vints)
+  palette   <- rainbow(length(all_vints))
+  color_map <- setNames(palette, all_vints)
 }
-
 
 p4 <- ggplot(
   vintages_df,
@@ -254,4 +207,35 @@ ggsave(file.path(output_dir, "nairu_all_vintages.png"), p4, width = 8, height = 
 saveWidget(ggplotly(p4, tooltip = "text"), file.path(output_dir, "nairu_all_vintages.html"))
 message("Figure 4 saved: all vintages")
 
-                           
+# ---- 10. Figure 5: NAIRU across all regions ------------------------------
+# Expects NAIRU_all_regions.csv to live in output_dir
+regions_file <- file.path(output_dir, "NAIRU_all_regions.csv")
+nairu_regions <- read_csv(regions_file, show_col_types = FALSE) %>%
+  mutate(
+    date   = as.Date(date),
+    region = as.factor(region)
+  )
+
+p5 <- ggplot(nairu_regions, aes(x = date, y = median, group = region)) +
+  geom_ribbon(aes(ymin = lower90, ymax = upper90, fill = region),
+              alpha = 0.25, colour = NA) +
+  geom_line(aes(colour = region), linewidth = 0.8) +
+  scale_x_date(date_breaks = "2 years", date_labels = "%Y") +
+  scale_y_continuous(labels = number_format(accuracy = 0.1)) +
+  labs(
+    title    = "Estimated NAIRU by Region",
+    subtitle = "Median (solid lines) and 90% credible intervals",
+    x        = NULL,
+    y        = "Percent",
+    colour   = "Region",
+    fill     = "Region"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "bottom")
+
+# save static & interactive
+ggsave(file.path(output_dir, "nairu_regions.png"),
+       p5, width = 8, height = 5, dpi = 300)
+saveWidget(ggplotly(p5, tooltip = "text"),
+           file.path(output_dir, "nairu_regions.html"))
+message("Figure 5 saved: regions")
