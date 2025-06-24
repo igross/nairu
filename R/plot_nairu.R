@@ -208,12 +208,16 @@ saveWidget(ggplotly(p4, tooltip = "text"), file.path(output_dir, "nairu_all_vint
 message("Figure 4 saved: all vintages")
 
 # ---- 10. Figure 5: NAIRU across all regions ------------------------------
-# Expects NAIRU_all_regions.csv to live in output_dir
 regions_file <- file.path(output_dir, "NAIRU_all_regions.csv")
+
 nairu_regions <- read_csv(regions_file, show_col_types = FALSE) %>%
+  # cope with either "YYYY-MM-DD" or "YYYY Qq" strings
   mutate(
-    date   = as.Date(date),
-    region = as.factor(region)
+    date = case_when(
+      grepl("Q", date) ~ as.Date(as.yearqtr(date, format = "%Y Q%q")),
+      TRUE             ~ as.Date(date)
+    ),
+    region = factor(region)
   )
 
 p5 <- ggplot(nairu_regions, aes(x = date, y = median, group = region)) +
@@ -239,3 +243,4 @@ ggsave(file.path(output_dir, "nairu_regions.png"),
 saveWidget(ggplotly(p5, tooltip = "text"),
            file.path(output_dir, "nairu_regions.html"))
 message("Figure 5 saved: regions")
+
