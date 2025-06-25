@@ -297,7 +297,7 @@ lag_weights <- long_df %>%
          pp_contrib = weight * total,       # == value, explicit for clarity
          date_qtr   = format(date, "%Y Q%q")) %>%
   select(date_qtr, component, lag, value, total, weight, pp_contrib)
-
+ 
 write_csv(lag_weights, file.path(out_dir, "weights.csv"))
 message("✔  Saved per-lag weights to pt_lag_weights.csv")
 
