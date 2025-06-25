@@ -272,8 +272,8 @@ library(dplyr);    library(tidyr);   library(readr);   library(zoo)
 library(ggplot2);  library(plotly);  library(htmlwidgets)
 
 # ---- 0. paths ---------------------------------------------------------------
-infl_file <- file.path(out_dir, "infl_pi_decomp.csv")
-ulc_file  <- file.path(out_dir, "ulc_decomp.csv")
+infl_file <- file.path(output_dir, "infl_pi_decomp.csv")
+ulc_file  <- file.path(output_dir, "ulc_decomp.csv")
 
 # ---- 1. read → pivot_longer -------------------------------------------------
 infl_df <- read_csv(infl_file, show_col_types = FALSE) %>%
@@ -335,7 +335,7 @@ ggsave(
 
 htmlwidgets::saveWidget(
   plotly::ggplotly(p_decomp, tooltip = "text"),
-  file.path(out_dir, "infl_ulc_decomp.html")
+  file.path(output_dir, "infl_ulc_decomp.html")
 )
 
 message("✔  Figure saved: full decomposition for Inflation & ULC")
