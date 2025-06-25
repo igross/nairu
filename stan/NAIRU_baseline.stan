@@ -35,8 +35,8 @@ parameters {
   // ── Latent NAIRU state & initial conditions ───────────────────────────────
   vector[T] NAIRU;
   vector[1] nhat_init;
-  vector[3] pthat_init;
-  vector[2] puhat_init;
+  vector[5] pthat_init;
+  vector[4] puhat_init;
   real<lower=0>  tau;           // σ_NAIRU
   real           ulc_missing;   // placeholder for last ULC obs
 
