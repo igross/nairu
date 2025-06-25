@@ -308,7 +308,64 @@ for (t in 6:Tn) {   # π needs t ≥ 6; ULC formulas also safe here
 
   # ΔULC demeaned
   pi_ulc[t] <- phi_pt_0 * Y1_demeaned[t-1] +
-               su
+               sum(phi_pt_l * Y1_demeaned[t-(2:4)])
+
+  deterministic_pi <- pi_exp[t] + pi_imp[t] + pi_ugap[t] +
+                      pi_mom[t] + pi_ulc[t] +
+                      xi_pt_med[1]*Y_mat[t,6] + xi_pt_med[2]*Y_mat[t,7]
+
+  pi_resid[t] <- Y_mat[t,4] - deterministic_pi
+
+  ## ---- ULC -----------------------------------------------------------------
+  pu_lags[t] <- beta_pu_med[1]*Y_mat[t-1,4] +
+                beta_pu_med[2]*Y_mat[t-2,4]
+
+  pu_dum[t]  <- xi_pu_med[1]*Y_mat[t,8] + xi_pu_med[2]*Y_mat[t,9]
+
+  pu_ugap[t] <- gamma_pu_med * (1 - nairu_med[t]/Y_mat[t,3]) +
+                sum(gamma_pu_l * (1 - nairu_med[t-(1:2)] / Y_mat[t-(1:2),3]))
+
+  pu_mom[t]  <- lambda_pu_med * (Y_mat[t-1,3] - Y_mat[t-2,3]) / Y_mat[t,3] +
+                sum(lambda_pu_l *
+                    ((Y_mat[t-(2:3),3] - Y_mat[t-(3:4),3]) /
+                      Y_mat[t-(1:2),3]))
+
+  pu_exp[t]  <- (1 - sum(beta_pu_med)) * Y_mat[t,5] +
+                sum(delta_pu_l * Y_mat[t-(1:2),5])
+
+  deterministic_pu <- pu_lags[t] + pu_dum[t] + pu_ugap[t] +
+                      pu_mom[t] + pu_exp[t]
+
+  pu_resid[t] <- Y_mat[t,1] - deterministic_pu
+}
+
+# ---------------------------------------------------------------------------
+# 4.  Assemble tidy tables and write CSVs
+# ---------------------------------------------------------------------------
+infl_pi_decomp <- tibble(
+  date_qtr     = dates,
+  expectations = pi_exp,
+  import_price = pi_imp,
+  unemp_gap    = pi_ugap,
+  momentum     = pi_mom,
+  ulc_demeaned = pi_ulc,
+  residuals    = pi_resid
+)
+
+ulc_decomp <- tibble(
+  date_qtr      = dates,
+  lags          = pu_lags,
+  dummies       = pu_dum,
+  unemp_gap     = pu_ugap,
+  momentum      = pu_mom,
+  expectations  = pu_exp,
+  residuals     = pu_resid
+)
+
+write_csv(infl_pi_decomp, file.path(out_dir, "infl_pi_decomp.csv"))
+write_csv(ulc_decomp,       file.path(out_dir, "ulc_decomp.csv"))
+
+message("✔  Saved infl_pi_decomp.csv and ulc_decomp.csv")
 
 
 
