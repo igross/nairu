@@ -1,0 +1,69 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NAIRU model dashboard</title>
+<style>
+  body{font-family:"Segoe UI",Roboto,sans-serif;background:#f5f7fa;color:#333;
+       margin:0;padding:40px 20px;}
+  h1{font-size:2rem;color:#2c3e50;text-align:center;margin-bottom:20px;}
+  h2{font-size:1.4rem;color:#2c3e50;margin:40px 0 15px 0;text-align:center;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));
+        gap:30px;padding:10px;max-width:1200px;margin:0 auto;}
+  .chart-card{background:#fff;border-radius:10px;box-shadow:0 4px 10px
+              rgba(0,0,0,0.05);padding:15px;text-align:center;}
+  .chart-card img{width:100%;border-radius:6px;}
+</style>
+</head>
+<body>
+
+<h1>NAIRU Model Results — 25 Jun 2025</h1>
+
+  <p style="max-width:800px;margin:0 auto 30px auto;text-align:center;
+            font-size:1.1rem;color:#444;">
+    This dashboard shows the latest <strong>state-space NAIRU model</strong>
+    results: the median NAIRU path and a full decomposition of quarterly
+    inflation and unit-labour-cost growth.  Charts refresh automatically from
+    the GitHub Actions pipeline.
+  </p>  <!-- intro paragraph -->
+
+  <div style="margin:40px auto;max-width:600px;">
+    <h2 style="text-align:center;">Estimated NAIRU (median)</h2>
+    <img src="nairu_spark.png" style="width:100%;">
+  </div>  <!-- sparkline -->
+
+    <h2 style="text-align:center;">Inflation &amp; ULC Decomposition</h2>
+    <div style="display:flex;justify-content:center;margin:40px 0;">
+      <iframe src="../output/infl_ulc_decomp.html"
+        style="width:95%;height:800px;border:none;border-radius:15px;
+               box-shadow:0 4px 20px rgba(0,0,0,0.1);"></iframe>
+    </div>  <!-- decomposition chart(s) -->
+<h2 style="text-align:center;margin-top:60px;">Additional Charts</h2> <div class="grid"> 
+      <div class="chart-card">
+        <iframe src="../output/nairu_all_vintages.html"
+          style="width:100%;height:600px;border:none;border-radius:10px;"></iframe>
+      </div>
+
+      <div class="chart-card">
+        <iframe src="../output/nairu_history.html"
+          style="width:100%;height:600px;border:none;border-radius:10px;"></iframe>
+      </div>
+
+      <div class="chart-card">
+        <iframe src="../output/nairu_last8_bar.html"
+          style="width:100%;height:600px;border:none;border-radius:10px;"></iframe>
+      </div>
+
+      <div class="chart-card">
+        <iframe src="../output/nairu_regions.html"
+          style="width:100%;height:600px;border:none;border-radius:10px;"></iframe>
+      </div>
+
+      <div class="chart-card">
+        <iframe src="../output/nairu_zoom_2010.html"
+          style="width:100%;height:600px;border:none;border-radius:10px;"></iframe>
+      </div> </div>  <!-- any extra charts -->
+
+</body>
+</html>
