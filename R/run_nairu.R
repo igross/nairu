@@ -301,9 +301,10 @@ for (t in 6:Tn) {
   pi_ulc[t]  <- phi_pt_0 * Y1_demeaned[t-1] +
                 sum(phi_pt_l * Y1_demeaned[t-(2:4)])
 
+  pi_dum[t]  <- xi_pt_med[1]*Y_mat[t,6] + xi_pt_med[2]*Y_mat[t,7]
+
   deterministic_pi <- pi_exp[t] + pi_imp[t] + pi_ugap[t] +
-                      pi_mom[t] + pi_ulc[t] +
-                      xi_pt_med[1]*Y_mat[t,6] + xi_pt_med[2]*Y_mat[t,7]
+                      pi_mom[t] + pi_ulc[t] + pi_dum[t]
 
   pi_resid[t] <- Y_mat[t,4] - deterministic_pi
 
