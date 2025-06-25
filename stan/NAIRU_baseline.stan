@@ -58,7 +58,7 @@ parameters {
 
   vector[2]            xi_pt;             // dummies
   real<lower=0>        eps_pt;            // σ_π
- 
+
   // ── ULC (ulc_t) coefficients ───────────────────────────────────────────────
   real                 delta_pu_0;
   vector[2]            delta_pu_lag;
