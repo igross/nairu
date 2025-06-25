@@ -264,13 +264,15 @@ alpha_pt_l  <- apply(draws$alpha_pt_lag, 2, median)
 xi_pt_med   <- apply(draws$xi_pt, 2, median)
 
 # ULC-side coefficients
-beta_pu_med   <- apply(draws$beta_pu, 2, median)
-gamma_pu_med  <- median(draws$gamma_pu)
-lambda_pu_med <- median(draws$lambda_pu)
-delta_pu_l    <- apply(draws$delta_pu_lag, 2, median)
-gamma_pu_l    <- apply(draws$gamma_pu_lag, 2, median)
-lambda_pu_l   <- apply(draws$lambda_pu_lag, 2, median)
-xi_pu_med     <- apply(draws$xi_pu, 2, median)
+# ── pull ULC-side parameters that *do* exist -------------------------------
+delta_pu_0  <- median(draws$delta_pu_0)                # scalar
+delta_pu_l  <- apply(draws$delta_pu_lag, 2, median)    # length 2
+gamma_pu_0  <- median(draws$gamma_pu_0)
+gamma_pu_l  <- apply(draws$gamma_pu_lag, 2, median)
+lambda_pu_0 <- median(draws$lambda_pu_0)
+lambda_pu_l <- apply(draws$lambda_pu_lag, 2, median)
+xi_pu_med   <- apply(draws$xi_pu, 2, median)           # length 2
+
 
 # ---------------------------------------------------------------------------
 # 2.  Initialise output vectors
@@ -330,8 +332,8 @@ for (t in 6:Tn) {   # π needs t ≥ 6; ULC formulas also safe here
                     ((Y_mat[t-(2:3),3] - Y_mat[t-(3:4),3]) /
                       Y_mat[t-(1:2),3]))
 
-  pu_exp[t]  <- (1 - sum(beta_pu_med)) * Y_mat[t,5] +
-                sum(delta_pu_l * Y_mat[t-(1:2),5])
+pu_exp[t] <- delta_pu_0  * Y_mat[t, 5] +
+             sum(delta_pu_l * Y_mat[t-(1:2), 5])
 
   deterministic_pu <- pu_lags[t] + pu_dum[t] + pu_ugap[t] +
                       pu_mom[t] + pu_exp[t]
