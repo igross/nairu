@@ -273,7 +273,7 @@ library(ggplot2); library(plotly);  library(htmlwidgets)
 
 # ---- 1. read CSV, add labels -------------------------------------------------
 decomp_df <- read_csv(
-  file.path(output_dir, "pt_lag_weights.csv"),
+  file.path(output_dir, "weights.csv"),
   show_col_types = FALSE
 ) %>%
   mutate(
