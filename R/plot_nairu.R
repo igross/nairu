@@ -276,45 +276,25 @@ ulc_file  <- file.path(output_dir, "ulc_decomp.csv")
 # ---- 1. read → long (ordered factor) ----------------------------------------
 comp_levels <- c("expectations", "dummies", "import_price",
                  "ulc_demeaned", "momentum", "unemp_gap", "residuals")
-comp_labels <- c(
-  expectations = "Expectations",
-  dummies      = "Dummies",
-  import_price = "Import prices",
-  ulc_demeaned = "ΔULC demeaned",
-  momentum     = "Momentum",
-  unemp_gap    = "Unemployment gap",
-  residuals    = "Residuals"
+
+decomp_df <- mutate(
+  decomp_df,
+  component = factor(component, levels = comp_levels)   # keep as-is
 )
 
-infl_df <- read_csv(infl_file, show_col_types = FALSE) %>% mutate(series = "Inflation")
-ulc_df  <- read_csv(ulc_file , show_col_types = FALSE) %>% mutate(series = "ULC")
-
-decomp_df <- bind_rows(infl_df, ulc_df) %>%
-  pivot_longer(-c(date_qtr, series),
-               names_to = "component", values_to = "value") %>%
-  mutate(
-    component = factor(component, levels = comp_levels),   # bottom→top order
-    date_qtr  = as.yearqtr(date_qtr, "%Y Q%q"),
-    date      = as.Date(date_qtr)
-  ) %>%
-  filter(!is.na(value))
-
-# ---- 2. colours -------------------------------------------------------------
-palette_cols <- viridisLite::turbo(length(comp_levels))
-names(palette_cols) <- comp_levels
-
-# ---- 3. plot ---------------------------------------------------------------
+# 2. no reverse argument
 p_decomp <- ggplot(
   decomp_df,
   aes(
     x   = date,
     y   = value,
     fill= component,
-    text= sprintf("%s<br>%s: %.2f pp",
-                  format(date_qtr, "%Y-Q%q"), comp_labels[component], value)
+    text= sprintf(
+      "%s<br>%s: %.2f pp",
+      format(date_qtr, "%Y-Q%q"), comp_labels[component], value)
   )
 ) +
-  geom_col(width = 90, position = position_stack(reverse = TRUE)) +  # ← fix
+  geom_col(width = 90, position = "stack") +              # ← plain “stack”
   facet_wrap(~ series, ncol = 1, scales = "free_y") +
   labs(
     title = "NAIRU-model decomposition – full component detail",
