@@ -261,42 +261,65 @@ message("✔  Figure 5 saved: regions")
 
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+#  FULL decomposition plot – every regressor × lag pair shown separately
+#  (no aggregation by lag or by regressor).
+#
+#  Input  : pt_lag_weights.csv   (date_qtr, component, lag, value, …)
+#  Output : infl_ulc_decomp.png  +  infl_ulc_decomp.html
+# ─────────────────────────────────────────────────────────────────────────────
+library(dplyr);   library(readr);   library(zoo)
+library(ggplot2); library(plotly);  library(htmlwidgets)
+
+# ---- 1. read CSV, add labels -------------------------------------------------
 decomp_df <- read_csv(
   file.path(output_dir, "pt_lag_weights.csv"),
   show_col_types = FALSE
 ) %>%
   mutate(
-    # parse the quarter string
-    date_qtr = as.yearqtr(date_qtr, format = "%Y Q%q"),
-    date     = as.Date(date_qtr),
-    series   = "Inflation"      # <- add this
-  )
+    date_qtr   = as.yearqtr(date_qtr, format = "%Y Q%q"),
+    date       = as.Date(date_qtr),
+    series     = "Inflation",
+    comp_lag   = sprintf("%s_%s", component, lag),          # e.g. expectations_lag2
+    comp_lag   = factor(comp_lag)                           # keeps unique combos
+  ) %>%
+  select(date_qtr, date, series, comp_lag, value)
 
-# ---- re‐draw the decomposition bar chart --------------------------
-p_decomp <- ggplot(decomp_df, aes(
-    x = date,
-    y = value,
-    fill     = component,
-    text     = sprintf("%s<br>%s: %.2f pp", format(date_qtr, "%Y-Q%q"), component, value)
-  )) +
+# ---- 2. draw stacked bar chart (full detail) --------------------------------
+p_decomp <- ggplot(
+    decomp_df,
+    aes(
+      x   = date,
+      y   = value,
+      fill= comp_lag,
+      text= sprintf(
+        "%s<br>%s: %.2f pp",
+        format(date_qtr, "%Y-Q%q"), comp_lag, value
+      )
+    )
+  ) +
   geom_col(width = 90, position = "stack") +
   facet_wrap(~ series, ncol = 1, scales = "free_y") +
   labs(
-    title = "NAIRU‐model decomposition of Inflation lags",
-    x     = "Year",
-    y     = "Percentage‐point contribution (q/q)"
+    title = "NAIRU-model decomposition – contributions of every regressor-lag pair",
+    x     = "Year", y = "Percentage-point contribution (q/q)"
   ) +
-  scale_fill_brewer(palette = "Set2", name = "Lag") +
+  scale_fill_viridis_d(name = "Regressor + lag", option = "plasma", begin = 0, end = 0.85) +
   my_theme +
   theme(legend.position = "bottom")
 
-# ---- save it ---------------------------------------------
-ggsave(file.path(output_dir, "infl_ulc_decomp.png"),
-       p_decomp, width = 9, height = 6, dpi = 300)
+# ---- 3. save static PNG & interactive HTML ----------------------------------
+ggsave(
+  filename = file.path(output_dir, "infl_ulc_decomp.png"),
+  plot     = p_decomp,
+  width    = 9, height = 6, dpi = 300
+)
+
 htmlwidgets::saveWidget(
   plotly::ggplotly(p_decomp, tooltip = "text"),
   file.path(output_dir, "infl_ulc_decomp.html")
 )
-message("✔  Figure saved: inflation‐lags decomposition")
-                           
+
+message("✔  Figure saved: full inflation decomposition (all regressor-lag pairs)")
+
                            
