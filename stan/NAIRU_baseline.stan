@@ -42,7 +42,7 @@ parameters {
 
   // ── Inflation (π_t) coefficients ───────────────────────────────────────────
   real<lower = 0, upper = 1>                 delta_pt_0;
-  vector[3]l<lower = 0, upper = 1>            delta_pt_lag;
+  vector[3]<lower = 0, upper = 1>            delta_pt_lag;
 
   real                 phi_pt_0;          // ΔULC_demeaned (t-1)
   vector[3]            phi_pt_lag;
