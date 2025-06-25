@@ -24,7 +24,7 @@ if (!Sys.Date() %in% release_calendar) {
   message(
     glue::glue("⏩ {Sys.Date()} is not an ABS CPI/National-Accounts release day – skipping refresh.")
   )
-  quit(save = "no")   # graceful, zero-exit termination
+ # quit(save = "no")   # graceful, zero-exit termination
 }
 
 
@@ -196,7 +196,7 @@ data_list <- list(
 # Compile The Model
 compiled_model <- stan_model(file = file.path("stan", "NAIRU_baseline.stan"))
          
-sampled_model_baseline <- sampling(compiled_model, data = data_list, chains=4,iter = 100, control = list(max_treedepth = 15))
+sampled_model_baseline <- sampling(compiled_model, data = data_list, chains=4,iter = 10000, control = list(max_treedepth = 15))
 
 
 
