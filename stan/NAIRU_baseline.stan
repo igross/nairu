@@ -77,34 +77,34 @@ model {
   // ── Priors ────────────────────────────────────────────────────────────────
   // ρ = 0.5  decay for lag means
   for (k in 1:2) {
-    delta_pt_lag[k]  ~ normal(pow(0.5,k) * 0.0  , 0.10);   // expectations
-    phi_pt_lag[k]    ~ normal(pow(0.5,k) * 0.06 , 0.10);   // ΔULC_demeaned
-    gamma_pt_lag[k]  ~ normal(pow(0.5,k) * -0.38, 0.10);   // U-gap
-    lambda_pt_lag[k] ~ normal(pow(0.5,k) * -0.70, 0.10);   // momentum
-    alpha_pt_lag[k]  ~ normal(pow(0.5,k) * 0.10 , 0.10);   // import-Δ
+    delta_pt_lag[k]  ~ normal(pow(0.5,k) * 0.0  , 0.20);   // expectations
+    phi_pt_lag[k]    ~ normal(pow(0.5,k) * 0.06 , 0.20);   // ΔULC_demeaned
+    gamma_pt_lag[k]  ~ normal(pow(0.5,k) * -0.38, 0.20);   // U-gap
+    lambda_pt_lag[k] ~ normal(pow(0.5,k) * -0.70, 0.20);   // momentum
+    alpha_pt_lag[k]  ~ normal(pow(0.5,k) * 0.10 , 0.20);   // import-Δ
   }
   for (k in 1:2) {
     delta_pu_lag[k]  ~ normal(pow(0.5,k) * 0.30 , 0.10);
-    gamma_pu_lag[k]  ~ normal(pow(0.5,k) * -2   , 1.00);
-    lambda_pu_lag[k] ~ normal(pow(0.5,k) * -3   , 1.00);
+    gamma_pu_lag[k]  ~ normal(pow(0.5,k) * -2   , 1);
+    lambda_pu_lag[k] ~ normal(pow(0.5,k) * -3   , 1);
   }
 
   // Contemporaneous coefficients (same priors as original model)
   delta_pt_0  ~ beta(2,2);                          // (0,1) on expectations
-  phi_pt_0    ~ normal(0.06 , 0.10);
-  gamma_pt_0  ~ normal(-0.38, 0.10);
-  lambda_pt_0 ~ normal(-0.70, 0.10);
-  alpha_pt_0  ~ normal(0.10 , 0.10);
+  phi_pt_0    ~ normal(0.06 , 0.20);
+  gamma_pt_0  ~ normal(-0.38, 0.20);
+  lambda_pt_0 ~ normal(-0.70, 0.20);
+  alpha_pt_0  ~ normal(0.10 , 0.20);
   xi_pt       ~ normal(0    , 3);
-  eps_pt      ~ normal(0.30 , 0.10);
+  eps_pt      ~ normal(0.30 , 0.20);
 
-  delta_pu_0  ~ normal(0.30 , 0.10);
+  delta_pu_0  ~ normal(0.30 , 0.20);
   gamma_pu_0  ~ normal(-2   , 1.00);
   lambda_pu_0 ~ normal(-3   , 1.00);
   xi_pu       ~ normal(0    , 3);
   eps_pu      ~ normal(1.17 , 1.00);
 
-  tau         ~ normal(0.10 , 0.10);
+  tau         ~ normal(0.10 , 0.20);
 
   nhat_init   ~ normal(5.5  , 0.2);
   pthat_init  ~ normal(1.5  , 2);
