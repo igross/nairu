@@ -118,8 +118,7 @@ jobs:
       - name: State NAIRU
         run: Rscript -e 'source("R/state_nairu.R", echo=TRUE)'
 
-      - name: Make visuals
-        run: Rscript -e 'source("R/plot_nairu.R", echo=TRUE)'
+
 
 
       # Optional: inspect workspace tree in Actions log
