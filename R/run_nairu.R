@@ -274,43 +274,32 @@ lambda_pu_l <- apply(draws$lambda_pu_lag, 2, median)
 xi_pu_med   <- apply(draws$xi_pu, 2, median)           # length 2
 
 
-# ---------------------------------------------------------------------------
-# 2.  Initialise output vectors
-# ---------------------------------------------------------------------------
-# inflation terms
+# initialise only what we will keep
 pi_exp <- pi_ulc <- pi_ugap <- pi_mom <- pi_imp <- pi_resid <- rep(NA, Tn)
-# ULC terms
-pu_lags <- pu_dum <- pu_ugap <- pu_mom <- pu_exp <- pu_resid <- rep(NA, Tn)
+pu_dum <- pu_ugap <- pu_mom <- pu_exp <- pu_resid <- rep(NA, Tn)
 
-# ---------------------------------------------------------------------------
-# 3.  Recreate components
-# ---------------------------------------------------------------------------
-for (t in 6:Tn) {   # π needs t ≥ 6; ULC formulas also safe here
-  ## ---- Inflation (π) -------------------------------------------------------
-  # expectations
-  pi_exp[t] <- delta_pt_0  * Y_mat[t,5] +
-               sum(delta_pt_l * Y_mat[t-(1:3), 5])
+for (t in 6:Tn) {
 
-  # import-price Δ
+  ## ── Inflation (π) components (unchanged) ────────────────────────────────
+  pi_exp[t] <- delta_pt_0 * Y_mat[t, 5] +
+               sum(delta_pt_l * Y_mat[t - (1:3), 5])
+
   pi_imp[t] <- alpha_pt_0 * (Y2_demeaned[t-1] - Y2_demeaned[t-2]) +
                sum(alpha_pt_l *
                    (Y2_demeaned[t-(2:4)] - Y2_demeaned[t-(3:5)]))
 
-  # unemployment gap
   pi_ugap[t] <- gamma_pt_0 * ((Y_mat[t,3] - nairu_med[t]) / Y_mat[t,3]) +
                 sum(gamma_pt_l *
                     ((Y_mat[t-(1:3),3] - nairu_med[t-(1:3)]) /
                       Y_mat[t-(1:3),3]))
 
-  # momentum
-  pi_mom[t] <- lambda_pt_0 * (Y_mat[t-1,3] - Y_mat[t-2,3]) / Y_mat[t,3] +
-               sum(lambda_pt_l *
-                   ((Y_mat[t-(2:4),3] - Y_mat[t-(3:5),3]) /
-                     Y_mat[t-(1:3),3]))
+  pi_mom[t]  <- lambda_pt_0 * (Y_mat[t-1,3] - Y_mat[t-2,3]) / Y_mat[t,3] +
+                sum(lambda_pt_l *
+                    ((Y_mat[t-(2:4),3] - Y_mat[t-(3:5),3]) /
+                      Y_mat[t-(1:3),3]))
 
-  # ΔULC demeaned
-  pi_ulc[t] <- phi_pt_0 * Y1_demeaned[t-1] +
-               sum(phi_pt_l * Y1_demeaned[t-(2:4)])
+  pi_ulc[t]  <- phi_pt_0 * Y1_demeaned[t-1] +
+                sum(phi_pt_l * Y1_demeaned[t-(2:4)])
 
   deterministic_pi <- pi_exp[t] + pi_imp[t] + pi_ugap[t] +
                       pi_mom[t] + pi_ulc[t] +
@@ -318,45 +307,38 @@ for (t in 6:Tn) {   # π needs t ≥ 6; ULC formulas also safe here
 
   pi_resid[t] <- Y_mat[t,4] - deterministic_pi
 
-  ## ---- ULC -----------------------------------------------------------------
-  pu_lags[t] <- beta_pu_med[1]*Y_mat[t-1,4] +
-                beta_pu_med[2]*Y_mat[t-2,4]
 
-  pu_dum[t]  <- xi_pu_med[1]*Y_mat[t,8] + xi_pu_med[2]*Y_mat[t,9]
+  ## ── ULC components (NO lagged-π term) ───────────────────────────────────
+  pu_dum[t] <- xi_pu_med[1]*Y_mat[t,8] + xi_pu_med[2]*Y_mat[t,9]
 
-  pu_ugap[t] <- gamma_pu_med * (1 - nairu_med[t]/Y_mat[t,3]) +
+  pu_ugap[t] <- gamma_pu_0 * (1 - nairu_med[t]/Y_mat[t,3]) +
                 sum(gamma_pu_l * (1 - nairu_med[t-(1:2)] / Y_mat[t-(1:2),3]))
 
-  pu_mom[t]  <- lambda_pu_med * (Y_mat[t-1,3] - Y_mat[t-2,3]) / Y_mat[t,3] +
+  pu_mom[t]  <- lambda_pu_0 * (Y_mat[t-1,3] - Y_mat[t-2,3]) / Y_mat[t,3] +
                 sum(lambda_pu_l *
                     ((Y_mat[t-(2:3),3] - Y_mat[t-(3:4),3]) /
                       Y_mat[t-(1:2),3]))
 
-pu_exp[t] <- delta_pu_0  * Y_mat[t, 5] +
-             sum(delta_pu_l * Y_mat[t-(1:2), 5])
+  pu_exp[t]  <- delta_pu_0 * Y_mat[t,5] +
+                sum(delta_pu_l * Y_mat[t-(1:2),5])
 
-  deterministic_pu <- pu_lags[t] + pu_dum[t] + pu_ugap[t] +
-                      pu_mom[t] + pu_exp[t]
-
-  pu_resid[t] <- Y_mat[t,1] - deterministic_pu
+  deterministic_pu <- pu_dum[t] + pu_ugap[t] + pu_mom[t] + pu_exp[t]
+  pu_resid[t]      <- Y_mat[t,1] - deterministic_pu
 }
 
-# ---------------------------------------------------------------------------
-# 4.  Assemble tidy tables and write CSVs
-# ---------------------------------------------------------------------------
+# build tidy data frames ------------------------------------------------------
 infl_pi_decomp <- tibble(
-  date_qtr     = dates,
-  expectations = pi_exp,
-  import_price = pi_imp,
-  unemp_gap    = pi_ugap,
-  momentum     = pi_mom,
-  ulc_demeaned = pi_ulc,
-  residuals    = pi_resid
+  date_qtr      = dates,
+  expectations  = pi_exp,
+  import_price  = pi_imp,
+  unemp_gap     = pi_ugap,
+  momentum      = pi_mom,
+  ulc_demeaned  = pi_ulc,
+  residuals     = pi_resid
 )
 
 ulc_decomp <- tibble(
   date_qtr      = dates,
-  lags          = pu_lags,
   dummies       = pu_dum,
   unemp_gap     = pu_ugap,
   momentum      = pu_mom,
@@ -366,8 +348,5 @@ ulc_decomp <- tibble(
 
 write_csv(infl_pi_decomp, file.path(out_dir, "infl_pi_decomp.csv"))
 write_csv(ulc_decomp,       file.path(out_dir, "ulc_decomp.csv"))
-
-message("✔  Saved infl_pi_decomp.csv and ulc_decomp.csv")
-
-
+message("✔  Saved updated CSVs without lagged-π term in ULC block")
 
