@@ -262,10 +262,9 @@ message("✔  Figure 5 saved: regions")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  FULL decomposition bar-chart
-#    • explicit stacking order: expectations → dummies → import-price →
-#      ΔULC_demeaned → momentum → unemployment-gap → residuals
-#    • bright, equally spaced colours (viridis “turbo” palette)
+#  FULL decomposition bar-chart (ordered stack)
+#  • input:  infl_pi_decomp.csv  /  ulc_decomp.csv   in output_dir
+#  • output: infl_ulc_decomp.png /  infl_ulc_decomp.html   in output_dir
 # ─────────────────────────────────────────────────────────────────────────────
 library(dplyr);    library(tidyr);   library(readr);   library(zoo)
 library(ggplot2);  library(plotly);  library(htmlwidgets); library(viridisLite)
@@ -274,27 +273,34 @@ library(ggplot2);  library(plotly);  library(htmlwidgets); library(viridisLite)
 infl_file <- file.path(output_dir, "infl_pi_decomp.csv")
 ulc_file  <- file.path(output_dir, "ulc_decomp.csv")
 
-# ---- 1. read → long ---------------------------------------------------------
-infl_df <- read_csv(infl_file, show_col_types = FALSE) %>% mutate(series = "Inflation")
-ulc_df  <- read_csv(ulc_file , show_col_types = FALSE) %>% mutate(series = "ULC")
-
-# desired bottom-to-top stacking order
+# ---- 1. read → long (ordered factor) ----------------------------------------
 comp_levels <- c("expectations", "dummies", "import_price",
                  "ulc_demeaned", "momentum", "unemp_gap", "residuals")
+comp_labels <- c(
+  expectations = "Expectations",
+  dummies      = "Dummies",
+  import_price = "Import prices",
+  ulc_demeaned = "ΔULC demeaned",
+  momentum     = "Momentum",
+  unemp_gap    = "Unemployment gap",
+  residuals    = "Residuals"
+)
+
+infl_df <- read_csv(infl_file, show_col_types = FALSE) %>% mutate(series = "Inflation")
+ulc_df  <- read_csv(ulc_file , show_col_types = FALSE) %>% mutate(series = "ULC")
 
 decomp_df <- bind_rows(infl_df, ulc_df) %>%
   pivot_longer(-c(date_qtr, series),
                names_to = "component", values_to = "value") %>%
   mutate(
-    component = factor(component,            # ← make it an ordered factor
-                       levels = comp_levels),
+    component = factor(component, levels = comp_levels),   # bottom→top order
     date_qtr  = as.yearqtr(date_qtr, "%Y Q%q"),
     date      = as.Date(date_qtr)
   ) %>%
   filter(!is.na(value))
 
-# ---- 2. colour palette ------------------------------------------------------
-palette_cols <- viridisLite::turbo(length(comp_levels))   # 7 bright colours
+# ---- 2. colours -------------------------------------------------------------
+palette_cols <- viridisLite::turbo(length(comp_levels))
 names(palette_cols) <- comp_levels
 
 # ---- 3. plot ---------------------------------------------------------------
@@ -303,11 +309,9 @@ p_decomp <- ggplot(
   aes(
     x   = date,
     y   = value,
-    fill= component,                # ← uses the ordered factor
-    text= sprintf(
-      "%s<br>%s: %.2f pp",
-      format(date_qtr, "%Y-Q%q"), component, value
-    )
+    fill= component,
+    text= sprintf("%s<br>%s: %.2f pp",
+                  format(date_qtr, "%Y-Q%q"), comp_labels[component], value)
   )
 ) +
   geom_col(width = 90, position = "stack") +
@@ -318,9 +322,10 @@ p_decomp <- ggplot(
     y     = "Percentage-point contribution (q/q)"
   ) +
   scale_fill_manual(
-    name    = "Component",
-    values  = palette_cols,
-    breaks  = comp_levels               # legend in same order as stack
+    name   = "Component",
+    values = palette_cols,
+    breaks = comp_levels,
+    labels = comp_labels
   ) +
   my_theme +
   theme(legend.position = "bottom")
@@ -337,7 +342,4 @@ htmlwidgets::saveWidget(
   file.path(output_dir, "infl_ulc_decomp.html")
 )
 
-message("✔  Figure saved with distinct colours and ordered stacking")
-
-
-                           
+message("✔  Figure saved to ", output_dir, " with ordered stacking and clear labels")
