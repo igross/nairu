@@ -326,7 +326,7 @@ p_decomp <- ggplot(
 
 # ---- 3. save static + interactive ------------------------------------------
 ggsave(
-  filename = file.path(out_dir, "infl_ulc_decomp.png"),
+  filename = file.path(output_dir, "infl_ulc_decomp.png"),
   plot     = p_decomp,
   width    = 9,
   height   = 6,
