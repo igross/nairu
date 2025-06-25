@@ -24,7 +24,7 @@ if (!Sys.Date() %in% release_calendar) {
   message(
     glue::glue("⏩ {Sys.Date()} is not an ABS CPI/National-Accounts release day – skipping refresh.")
   )
-  # quit(save = "no")   # graceful, zero-exit termination
+  quit(save = "no")   # graceful, zero-exit termination
 }
 
 
