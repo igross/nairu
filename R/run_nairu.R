@@ -228,61 +228,79 @@ draws <- rstan::extract(sampled_model_baseline,
 n_periods <- dim(draws$pt_lag1)[2]
 dates     <- est_data$date             # your vector of yearqtr dates
 
-# 2. build a tibble of medians for each lag
-library(dplyr)
-library(purrr)
+# ─────────────────────────────────────────────────────────────────────────────
+#  Inflation decomposition: any regressor, any number of lags
+# ─────────────────────────────────────────────────────────────────────────────
+library(dplyr);  library(purrr);  library(tibble);  library(readr);  library(stringr)
 
-         
-lag_df <- map_dfr(1:3, function(j) {
-  arr_j <- draws[[paste0("pt_lag", j)]]      # draws × periods
-  med_j <- apply(arr_j, 2, median)           # length = n_periods
+# 1. pull *all* posterior arrays ------------------------------------------------
+draws <- rstan::extract(sampled_model_baseline, permuted = TRUE)
+param_names <- names(draws)
+
+# 2. locate inflation parameters ------------------------------------------------
+#    lagged pieces:   pt_<regressor>_lag<k>
+lag_params <- grep("^pt_[A-Za-z0-9]+_lag[0-9]+$", param_names, value = TRUE)
+
+#    contemporaneous pieces (optional, no '_lag'):
+cont_params <- setdiff(grep("^pt_[A-Za-z0-9]+$", param_names, value = TRUE),
+                       c("pt_residuals", "pt_lags"))   # keep if present
+
+# helper to get median time-series ------------------------------------------------
+median_ts <- function(arr) apply(arr, 2, median)
+dates     <- est_data$date                    # vector of zoo::yearqtr dates
+nyq       <- length(dates)
+
+# 3. tidy dataframe of *lagged* contributions -----------------------------------
+lag_df <- map_dfr(lag_params, function(p) {
+  lag_num <- str_extract(p, "lag[0-9]+")        # e.g. "lag2"
+  reg_name <- str_remove(p, "_lag[0-9]+$")      # strip lag suffix
+  reg_name <- str_remove(reg_name, "^pt_")      # strip pt_
+
   tibble(
-    date   = dates,
-    lag    = paste0("lag", j),
-    contrib = med_j
+    date      = dates,
+    component = reg_name,                       # expectations / unemp_gap / …
+    lag       = lag_num,
+    value     = median_ts(draws[[p]])
   )
 })
 
-# 3. compute weight of each lag in the total
-#    first get medians of the total
-total_med <- apply(draws$pt_lags, 2, median)
-total_df  <- tibble(date = dates, total = total_med)
-
-lag_weights <- lag_df %>%
-  left_join(total_df, by = "date") %>%
-  group_by(date) %>%
-  mutate(weight = contrib / total) %>%
-  ungroup()
-
-# (1) Ensure pp_contrib exists
-lag_weights <- lag_weights %>%
-  mutate(
-    # weight = contrib / total  already exists
-    pp_contrib = total * weight,
-    date_qtr   = format(date, "%Y Q%q")   # match your decomp CSV key
+# 4. contemporaneous pieces (if you kept them in Stan) --------------------------
+cont_df <- map_dfr(cont_params, function(p) {
+  tibble(
+    date      = dates,
+    component = str_remove(p, "^pt_"),
+    lag       = "lag0",
+    value     = median_ts(draws[[p]])
   )
+})
 
-# (2) Read the decomposition CSV and pull out only the “lags” row
-decomp <- read_csv(
-  file.path(out_dir, "infl_ulc_decomp.csv"),
-  show_col_types = FALSE
-) %>%
-  filter(component == "lags") %>%
-  select(date_qtr, total_lags = value)
+# merge & order
+long_df <- bind_rows(cont_df, lag_df) %>%
+  arrange(component, lag, date)
 
-# (3) Join and assemble final table
-final_df <- lag_weights %>%
-  left_join(decomp, by = "date_qtr") %>%
-  mutate(
-    component = lag,        # e.g. "lag1", "lag2", "lag3"
-    value     = pp_contrib  # what you’ll plot
-  ) %>%
-  select(date_qtr, component, contrib, total, weight, pp_contrib, value)
+# 5. total contribution of each regressor (sum over its lags) -------------------
+totals_df <- long_df %>%
+  group_by(date, component) %>%
+  summarise(value = sum(value), .groups = "drop") %>%
+  mutate(date_qtr = format(date, "%Y Q%q")) %>%
+  select(date_qtr, component, value)
 
-# (4) Write it out
-out_file <- file.path(out_dir, "pt_lag_weights.csv")
-write_csv(final_df, out_file)
-message("✔  Saved per‐lag PP contributions to ", out_file)
+write_csv(totals_df, file.path(out_dir, "infl_decomp.csv"))
+message("✔  Saved regressor totals to infl_decomp.csv")
+
+# 6. weights & pp-contrib for every lag of every regressor ----------------------
+lag_weights <- long_df %>%
+  group_by(date, component) %>%
+  mutate(total = sum(value)) %>%            # regressor-specific total
+  ungroup() %>%
+  mutate(weight     = value / total,
+         pp_contrib = weight * total,       # == value, explicit for clarity
+         date_qtr   = format(date, "%Y Q%q")) %>%
+  select(date_qtr, component, lag, value, total, weight, pp_contrib)
+
+write_csv(lag_weights, file.path(out_dir, "pt_lag_weights.csv"))
+message("✔  Saved per-lag weights to pt_lag_weights.csv")
+
 
 
 
