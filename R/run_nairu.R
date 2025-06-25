@@ -24,7 +24,7 @@ if (!Sys.Date() %in% release_calendar) {
   message(
     glue::glue("⏩ {Sys.Date()} is not an ABS CPI/National-Accounts release day – skipping refresh.")
   )
-  quit(save = "no")   # graceful, zero-exit termination
+  # quit(save = "no")   # graceful, zero-exit termination
 }
 
 
@@ -275,7 +275,7 @@ xi_pu_med   <- apply(draws$xi_pu, 2, median)           # length 2
 
 
 # initialise only what we will keep
-pi_exp <- pi_ulc <- pi_ugap <- pi_mom <- pi_imp <- pi_resid <- rep(NA, Tn)
+pi_exp <- pi_ulc <- pi_ugap <- pi_mom <- pi_imp <- pi_resid <- pi_dum <- rep(NA, Tn)
 pu_dum <- pu_ugap <- pu_mom <- pu_exp <- pu_resid <- rep(NA, Tn)
 
 for (t in 6:Tn) {
@@ -335,6 +335,7 @@ infl_pi_decomp <- tibble(
   unemp_gap     = pi_ugap,
   momentum      = pi_mom,
   ulc_demeaned  = pi_ulc,
+  dummies = pi_dum,
   residuals     = pi_resid
 )
 
