@@ -221,86 +221,94 @@ print(summarised_state_baseline)
 csv_path <- file.path(out_dir, "NAIRU_baseline.csv")
 readr::write_csv(summarised_state_baseline, csv_path)
 
-# 1. extract your lag‐by‐lag arrays plus the total
-draws <- rstan::extract(sampled_model_baseline,
-                        pars = c("pt_lags","pt_lag1","pt_lag2","pt_lag3"))
-
-n_periods <- dim(draws$pt_lag1)[2]
-dates     <- est_data$date             # your vector of yearqtr dates
-
 # ─────────────────────────────────────────────────────────────────────────────
-#  Inflation decomposition: any regressor, any number of lags
+#  REBUILD BOTH DECOMPOSITIONS (π & ULC) FROM POSTERIOR MEDIANS
+#  • Assumes `sampled_model_baseline` (rstan fit) and `est_data`
+#    (date + 9-column design matrix) already exist.
+#  • Writes two tidy CSVs:
+#        infl_pi_decomp.csv   – inflation components
+#        ulc_decomp.csv       – ULC components
 # ─────────────────────────────────────────────────────────────────────────────
-library(dplyr);  library(purrr);  library(tibble);  library(readr);  library(stringr)
+library(rstan);   library(dplyr);   library(tibble);  library(readr)
 
-# 1. pull *all* posterior arrays ------------------------------------------------
-draws <- rstan::extract(sampled_model_baseline, permuted = TRUE)
-param_names <- names(draws)
+# ---------------------------------------------------------------------------
+# 0.  Housekeeping
+# ---------------------------------------------------------------------------
+Y_mat  <- as.matrix(est_data[, -1])     # remove date col
+dates  <- est_data$date                 # zoo::yearqtr vector
+Tn     <- nrow(Y_mat)
 
-# 2. locate inflation parameters ------------------------------------------------
-#    lagged pieces:   pt_<regressor>_lag<k>
-lag_params <- grep("^pt_[A-Za-z0-9]+_lag[0-9]+$", param_names, value = TRUE)
+# demeaned series identical to Stan's transformed data
+Y2_demeaned <- Y_mat[, 2] - mean(Y_mat[, 2])
+Y1_demeaned <- Y_mat[, 1] - mean(Y_mat[, 1])
 
-#    contemporaneous pieces (optional, no '_lag'):
-cont_params <- setdiff(grep("^pt_[A-Za-z0-9]+$", param_names, value = TRUE),
-                       c("pt_residuals", "pt_lags"))   # keep if present
+# ---------------------------------------------------------------------------
+# 1.  Extract posterior medians we need
+# ---------------------------------------------------------------------------
+draws <- rstan::extract(sampled_model_baseline)
 
-# helper to get median time-series ------------------------------------------------
-median_ts <- function(arr) apply(arr, 2, median)
-dates     <- est_data$date                    # vector of zoo::yearqtr dates
-nyq       <- length(dates)
+# NAIRU
+nairu_med <- apply(draws$NAIRU, 2, median)
 
-# 3. tidy dataframe of *lagged* contributions -----------------------------------
-lag_df <- map_dfr(lag_params, function(p) {
-  lag_num <- str_extract(p, "lag[0-9]+")        # e.g. "lag2"
-  reg_name <- str_remove(p, "_lag[0-9]+$")      # strip lag suffix
-  reg_name <- str_remove(reg_name, "^pt_")      # strip pt_
+# π-side coefficients
+delta_pt_0  <- median(draws$delta_pt_0)
+delta_pt_l  <- apply(draws$delta_pt_lag, 2, median)
+phi_pt_0    <- median(draws$phi_pt_0)
+phi_pt_l    <- apply(draws$phi_pt_lag, 2, median)
+gamma_pt_0  <- median(draws$gamma_pt_0)
+gamma_pt_l  <- apply(draws$gamma_pt_lag, 2, median)
+lambda_pt_0 <- median(draws$lambda_pt_0)
+lambda_pt_l <- apply(draws$lambda_pt_lag, 2, median)
+alpha_pt_0  <- median(draws$alpha_pt_0)
+alpha_pt_l  <- apply(draws$alpha_pt_lag, 2, median)
+xi_pt_med   <- apply(draws$xi_pt, 2, median)
 
-  tibble(
-    date      = dates,
-    component = reg_name,                       # expectations / unemp_gap / …
-    lag       = lag_num,
-    value     = median_ts(draws[[p]])
-  )
-})
+# ULC-side coefficients
+beta_pu_med   <- apply(draws$beta_pu, 2, median)
+gamma_pu_med  <- median(draws$gamma_pu)
+lambda_pu_med <- median(draws$lambda_pu)
+delta_pu_l    <- apply(draws$delta_pu_lag, 2, median)
+gamma_pu_l    <- apply(draws$gamma_pu_lag, 2, median)
+lambda_pu_l   <- apply(draws$lambda_pu_lag, 2, median)
+xi_pu_med     <- apply(draws$xi_pu, 2, median)
 
-# 4. contemporaneous pieces (if you kept them in Stan) --------------------------
-cont_df <- map_dfr(cont_params, function(p) {
-  tibble(
-    date      = dates,
-    component = str_remove(p, "^pt_"),
-    lag       = "lag0",
-    value     = median_ts(draws[[p]])
-  )
-})
+# ---------------------------------------------------------------------------
+# 2.  Initialise output vectors
+# ---------------------------------------------------------------------------
+# inflation terms
+pi_exp <- pi_ulc <- pi_ugap <- pi_mom <- pi_imp <- pi_resid <- rep(NA, Tn)
+# ULC terms
+pu_lags <- pu_dum <- pu_ugap <- pu_mom <- pu_exp <- pu_resid <- rep(NA, Tn)
 
-# merge & order
-long_df <- bind_rows(cont_df, lag_df) %>%
-  arrange(component, lag, date)
+# ---------------------------------------------------------------------------
+# 3.  Recreate components
+# ---------------------------------------------------------------------------
+for (t in 6:Tn) {   # π needs t ≥ 6; ULC formulas also safe here
+  ## ---- Inflation (π) -------------------------------------------------------
+  # expectations
+  pi_exp[t] <- delta_pt_0  * Y_mat[t,5] +
+               sum(delta_pt_l * Y_mat[t-(1:3), 5])
 
-# 5. total contribution of each regressor (sum over its lags) -------------------
-totals_df <- long_df %>%
-  group_by(date, component) %>%
-  summarise(value = sum(value), .groups = "drop") %>%
-  mutate(date_qtr = format(date, "%Y Q%q")) %>%
-  select(date_qtr, component, value)
+  # import-price Δ
+  pi_imp[t] <- alpha_pt_0 * (Y2_demeaned[t-1] - Y2_demeaned[t-2]) +
+               sum(alpha_pt_l *
+                   (Y2_demeaned[t-(2:4)] - Y2_demeaned[t-(3:5)]))
 
-write_csv(totals_df, file.path(out_dir, "infl_decomp.csv"))
-message("✔  Saved regressor totals to infl_decomp.csv")
+  # unemployment gap
+  pi_ugap[t] <- gamma_pt_0 * ((Y_mat[t,3] - nairu_med[t]) / Y_mat[t,3]) +
+                sum(gamma_pt_l *
+                    ((Y_mat[t-(1:3),3] - nairu_med[t-(1:3)]) /
+                      Y_mat[t-(1:3),3]))
 
-# 6. weights & pp-contrib for every lag of every regressor ----------------------
-lag_weights <- long_df %>%
-  group_by(date, component) %>%
-  mutate(total = sum(value)) %>%            # regressor-specific total
-  ungroup() %>%
-  mutate(weight     = value / total,
-         pp_contrib = weight * total,       # == value, explicit for clarity
-         date_qtr   = format(date, "%Y Q%q")) %>%
-  select(date_qtr, component, lag, value, total, weight, pp_contrib)
- 
-write_csv(lag_weights, file.path(out_dir, "weights.csv"))
-message("✔  Saved per-lag weights to pt_lag_weights.csv")
+  # momentum
+  pi_mom[t] <- lambda_pt_0 * (Y_mat[t-1,3] - Y_mat[t-2,3]) / Y_mat[t,3] +
+               sum(lambda_pt_l *
+                   ((Y_mat[t-(2:4),3] - Y_mat[t-(3:5),3]) /
+                     Y_mat[t-(1:3),3]))
 
+  # ΔULC demeaned
+  pi_ulc[t] <- phi_pt_0 * Y1_demeaned[t-1] +
+               su
 
 
 
