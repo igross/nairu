@@ -77,32 +77,32 @@ model {
   // ── Priors ────────────────────────────────────────────────────────────────
   // ρ = 0.5  decay for lag means
   for (k in 1:3) {
-    delta_pt_lag[k]  ~ normal(pow(0.5,k) * 0.0  , 0.50);   // expectations
-    phi_pt_lag[k]    ~ normal(pow(0.5,k) * 0.06 , 0.50);   // ΔULC_demeaned
-    gamma_pt_lag[k]  ~ normal(pow(0.5,k) * -0.38, 0.50);   // U-gap
-    lambda_pt_lag[k] ~ normal(pow(0.5,k) * -0.70, 0.20);   // momentum
-    alpha_pt_lag[k]  ~ normal(pow(0.5,k) * 0.10 , 0.50);   // import-Δ
+    delta_pt_lag[k]  ~ normal(pow(0.5,k) * 0.0  , 0.10);   // expectations
+    phi_pt_lag[k]    ~ normal(pow(0.5,k) * 0.06 , 0.10);   // ΔULC_demeaned
+    gamma_pt_lag[k]  ~ normal(pow(0.5,k) * -0.38, 0.10);   // U-gap
+    lambda_pt_lag[k] ~ normal(pow(0.5,k) * -0.70, 0.10);   // momentum
+    alpha_pt_lag[k]  ~ normal(pow(0.5,k) * 0.10 , 0.10);   // import-Δ
   }
   for (k in 1:2) {
     delta_pu_lag[k]  ~ normal(pow(0.5,k) * 0.30 , 0.10);
-    gamma_pu_lag[k]  ~ normal(pow(0.5,k) * -2   , 2.00);
-    lambda_pu_lag[k] ~ normal(pow(0.5,k) * -3   , 2.00);
+    gamma_pu_lag[k]  ~ normal(pow(0.5,k) * -2   , 1.00);
+    lambda_pu_lag[k] ~ normal(pow(0.5,k) * -3   , 1.00);
   }
 
   // Contemporaneous coefficients (same priors as original model)
   delta_pt_0  ~ beta(2,2);                          // (0,1) on expectations
-  phi_pt_0    ~ normal(0.06 , 0.50);
-  gamma_pt_0  ~ normal(-0.38, 0.50);
-  lambda_pt_0 ~ normal(-0.70, 0.20);
-  alpha_pt_0  ~ normal(0.10 , 0.50);
+  phi_pt_0    ~ normal(0.06 , 0.10);
+  gamma_pt_0  ~ normal(-0.38, 0.10);
+  lambda_pt_0 ~ normal(-0.70, 0.10);
+  alpha_pt_0  ~ normal(0.10 , 0.10);
   xi_pt       ~ normal(0    , 3);
-  eps_pt      ~ normal(0.30 , 0.50);
+  eps_pt      ~ normal(0.30 , 0.10);
 
   delta_pu_0  ~ normal(0.30 , 0.10);
-  gamma_pu_0  ~ normal(-2   , 2.00);
-  lambda_pu_0 ~ normal(-3   , 2.00);
+  gamma_pu_0  ~ normal(-2   , 1.00);
+  lambda_pu_0 ~ normal(-3   , 1.00);
   xi_pu       ~ normal(0    , 3);
-  eps_pu      ~ normal(1.17 , 2.00);
+  eps_pu      ~ normal(1.17 , 1.00);
 
   tau         ~ normal(0.10 , 0.10);
 
