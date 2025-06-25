@@ -314,7 +314,7 @@ p_decomp <- ggplot(
                   format(date_qtr, "%Y-Q%q"), comp_labels[component], value)
   )
 ) +
-  geom_col(width = 90, position = "stack") +
+  geom_col(width = 90, position = position_stack(reverse = TRUE)) +  # ← fix
   facet_wrap(~ series, ncol = 1, scales = "free_y") +
   labs(
     title = "NAIRU-model decomposition – full component detail",
@@ -329,6 +329,7 @@ p_decomp <- ggplot(
   ) +
   my_theme +
   theme(legend.position = "bottom")
+
 
 # ---- 4. save static + interactive ------------------------------------------
 ggsave(
