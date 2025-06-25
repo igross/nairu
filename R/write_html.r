@@ -11,6 +11,7 @@ dir.create(docs_dir, showWarnings = FALSE, recursive = TRUE)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1.  NAIRU sparkline  --------------------------------------------------------
+# ── 1. NAIRU sparkline -------------------------------------------------------
 spark_png  <- file.path(docs_dir, "nairu_spark.png")
 nairu_csv  <- file.path(output_dir, "NAIRU_baseline.csv")
 spark_html <- ""
@@ -18,16 +19,20 @@ spark_html <- ""
 if (file.exists(nairu_csv)) {
   nairu_df <- read_csv(nairu_csv, show_col_types = FALSE) %>%
               mutate(date = as.yearqtr(date))
-  ggplot(nairu_df, aes(date, median)) +
-    geom_line(size = 1, colour = "#2c3e50") +
-    theme_void() +
-    ggsave(spark_png, width = 6, height = 1.2, dpi = 120)
+
+  p_spark <- ggplot(nairu_df, aes(date, median)) +
+    geom_line(linewidth = 1, colour = "#2c3e50") +
+    theme_void()
+
+  ggsave(spark_png, plot = p_spark, width = 6, height = 1.2, dpi = 120)
+
   spark_html <- sprintf('
   <div style="margin:40px auto;max-width:600px;">
     <h2 style="text-align:center;">Estimated NAIRU (median)</h2>
     <img src="%s" style="width:100%%;">
   </div>', basename(spark_png))
 }
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 2. priority decomposition charts -------------------------------------------
