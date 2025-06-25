@@ -283,13 +283,14 @@ comp_levels <- c("expectations", "dummies", "import_price",
                  "ulc_demeaned", "momentum", "unemp_gap", "residuals")
 
 decomp_df <- bind_rows(infl_df, ulc_df) %>%
-  pivot_longer(-c(date_qtr, series), names_to = "component", values_to = "value") %>%
+  pivot_longer(-c(date_qtr, series),
+               names_to = "component", values_to = "value") %>%
   mutate(
-    component = factor(component, levels = comp_levels),
-    date_qtr  = as.yearqtr(date_qtr, format = "%Y Q%q"),
+    component = factor(component,            # ← make it an ordered factor
+                       levels = comp_levels),
+    date_qtr  = as.yearqtr(date_qtr, "%Y Q%q"),
     date      = as.Date(date_qtr)
   ) %>%
-  arrange(component) %>%                       # ensure ggplot sees rows in order
   filter(!is.na(value))
 
 # ---- 2. colour palette ------------------------------------------------------
@@ -302,9 +303,11 @@ p_decomp <- ggplot(
   aes(
     x   = date,
     y   = value,
-    fill= component,
-    text= sprintf("%s<br>%s: %.2f pp",
-                  format(date_qtr, "%Y-Q%q"), component, value)
+    fill= component,                # ← uses the ordered factor
+    text= sprintf(
+      "%s<br>%s: %.2f pp",
+      format(date_qtr, "%Y-Q%q"), component, value
+    )
   )
 ) +
   geom_col(width = 90, position = "stack") +
