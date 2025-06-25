@@ -262,64 +262,82 @@ message("✔  Figure 5 saved: regions")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  FULL decomposition plot – every regressor × lag pair shown separately
-#  (no aggregation by lag or by regressor).
-#
-#  Input  : pt_lag_weights.csv   (date_qtr, component, lag, value, …)
-#  Output : infl_ulc_decomp.png  +  infl_ulc_decomp.html
+#   STACKED-BAR DECOMPOSITION, FULL DETAIL
+#   • Works with the new wide-format CSVs created earlier:
+#         infl_pi_decomp.csv   (π components, wide)
+#         ulc_decomp.csv       (ULC components, wide)
+#   • Converts each to long form, adds a “series” flag, binds, and plots.
 # ─────────────────────────────────────────────────────────────────────────────
-library(dplyr);   library(readr);   library(zoo)
-library(ggplot2); library(plotly);  library(htmlwidgets)
+library(dplyr);    library(tidyr);   library(readr);   library(zoo)
+library(ggplot2);  library(plotly);  library(htmlwidgets)
 
-# ---- 1. read CSV, add labels -------------------------------------------------
-decomp_df <- read_csv(
-  file.path(output_dir, "weights.csv"),
-  show_col_types = FALSE
-) %>%
-  mutate(
-    date_qtr   = as.yearqtr(date_qtr, format = "%Y Q%q"),
-    date       = as.Date(date_qtr),
-    series     = "Inflation",
-    comp_lag   = sprintf("%s_%s", component, lag),          # e.g. expectations_lag2
-    comp_lag   = factor(comp_lag)                           # keeps unique combos
+# ---- 0. paths ---------------------------------------------------------------
+infl_file <- file.path(out_dir, "infl_pi_decomp.csv")
+ulc_file  <- file.path(out_dir, "ulc_decomp.csv")
+
+# ---- 1. read → pivot_longer -------------------------------------------------
+infl_df <- read_csv(infl_file, show_col_types = FALSE) %>%
+  mutate(series = "Inflation")
+
+ulc_df  <- read_csv(ulc_file,  show_col_types = FALSE) %>%
+  mutate(series = "ULC")
+
+decomp_df <- bind_rows(infl_df, ulc_df) %>%
+  pivot_longer(
+    -c(date_qtr, series),
+    names_to  = "component",
+    values_to = "value"
   ) %>%
-  select(date_qtr, date, series, comp_lag, value)
+  mutate(
+    date_qtr = as.yearqtr(date_qtr, format = "%Y Q%q"),
+    date     = as.Date(date_qtr),
+    comp_lab = component                       # shorter aesthetic mapping
+  ) %>%
+  filter(!is.na(value))                        # drop leading NA rows
 
-# ---- 2. draw stacked bar chart (full detail) --------------------------------
+# ---- 2. plot ---------------------------------------------------------------
 p_decomp <- ggplot(
-    decomp_df,
-    aes(
-      x   = date,
-      y   = value,
-      fill= comp_lag,
-      text= sprintf(
-        "%s<br>%s: %.2f pp",
-        format(date_qtr, "%Y-Q%q"), comp_lag, value
-      )
+  decomp_df,
+  aes(
+    x   = date,
+    y   = value,
+    fill= comp_lab,
+    text= sprintf(
+      "%s<br>%s: %.2f pp",
+      format(date_qtr, "%Y-Q%q"), comp_lab, value
     )
-  ) +
+  )
+) +
   geom_col(width = 90, position = "stack") +
   facet_wrap(~ series, ncol = 1, scales = "free_y") +
   labs(
-    title = "NAIRU-model decomposition – contributions of every regressor-lag pair",
-    x     = "Year", y = "Percentage-point contribution (q/q)"
+    title = "NAIRU-model decomposition – full component detail",
+    x     = "Year",
+    y     = "Percentage-point contribution (q/q)"
   ) +
-  scale_fill_viridis_d(name = "Regressor + lag", option = "plasma", begin = 0, end = 0.85) +
+  scale_fill_viridis_d(
+    name   = "Component",
+    option = "plasma",
+    begin  = 0,
+    end    = 0.85
+  ) +
   my_theme +
   theme(legend.position = "bottom")
 
-# ---- 3. save static PNG & interactive HTML ----------------------------------
+# ---- 3. save static + interactive ------------------------------------------
 ggsave(
-  filename = file.path(output_dir, "infl_ulc_decomp.png"),
+  filename = file.path(out_dir, "infl_ulc_decomp.png"),
   plot     = p_decomp,
-  width    = 9, height = 6, dpi = 300
+  width    = 9,
+  height   = 6,
+  dpi      = 300
 )
 
 htmlwidgets::saveWidget(
   plotly::ggplotly(p_decomp, tooltip = "text"),
-  file.path(output_dir, "infl_ulc_decomp.html")
+  file.path(out_dir, "infl_ulc_decomp.html")
 )
 
-message("✔  Figure saved: full inflation decomposition (all regressor-lag pairs)")
+message("✔  Figure saved: full decomposition for Inflation & ULC")
 
                            
