@@ -262,50 +262,49 @@ message("✔  Figure 5 saved: regions")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#   STACKED-BAR DECOMPOSITION, FULL DETAIL
-#   • Works with the new wide-format CSVs created earlier:
-#         infl_pi_decomp.csv   (π components, wide)
-#         ulc_decomp.csv       (ULC components, wide)
-#   • Converts each to long form, adds a “series” flag, binds, and plots.
+#  FULL decomposition bar-chart
+#    • explicit stacking order: expectations → dummies → import-price →
+#      ΔULC_demeaned → momentum → unemployment-gap → residuals
+#    • bright, equally spaced colours (viridis “turbo” palette)
 # ─────────────────────────────────────────────────────────────────────────────
 library(dplyr);    library(tidyr);   library(readr);   library(zoo)
-library(ggplot2);  library(plotly);  library(htmlwidgets)
+library(ggplot2);  library(plotly);  library(htmlwidgets); library(viridisLite)
 
 # ---- 0. paths ---------------------------------------------------------------
-infl_file <- file.path(output_dir, "infl_pi_decomp.csv")
-ulc_file  <- file.path(output_dir, "ulc_decomp.csv")
+infl_file <- file.path(out_dir, "infl_pi_decomp.csv")
+ulc_file  <- file.path(out_dir, "ulc_decomp.csv")
 
-# ---- 1. read → pivot_longer -------------------------------------------------
-infl_df <- read_csv(infl_file, show_col_types = FALSE) %>%
-  mutate(series = "Inflation")
+# ---- 1. read → long ---------------------------------------------------------
+infl_df <- read_csv(infl_file, show_col_types = FALSE) %>% mutate(series = "Inflation")
+ulc_df  <- read_csv(ulc_file , show_col_types = FALSE) %>% mutate(series = "ULC")
 
-ulc_df  <- read_csv(ulc_file,  show_col_types = FALSE) %>%
-  mutate(series = "ULC")
+# desired bottom-to-top stacking order
+comp_levels <- c("expectations", "dummies", "import_price",
+                 "ulc_demeaned", "momentum", "unemp_gap", "residuals")
 
 decomp_df <- bind_rows(infl_df, ulc_df) %>%
-  pivot_longer(
-    -c(date_qtr, series),
-    names_to  = "component",
-    values_to = "value"
-  ) %>%
+  pivot_longer(-c(date_qtr, series), names_to = "component", values_to = "value") %>%
   mutate(
-    date_qtr = as.yearqtr(date_qtr, format = "%Y Q%q"),
-    date     = as.Date(date_qtr),
-    comp_lab = component                       # shorter aesthetic mapping
+    component = factor(component, levels = comp_levels),
+    date_qtr  = as.yearqtr(date_qtr, format = "%Y Q%q"),
+    date      = as.Date(date_qtr)
   ) %>%
-  filter(!is.na(value))                        # drop leading NA rows
+  arrange(component) %>%                       # ensure ggplot sees rows in order
+  filter(!is.na(value))
 
-# ---- 2. plot ---------------------------------------------------------------
+# ---- 2. colour palette ------------------------------------------------------
+palette_cols <- viridisLite::turbo(length(comp_levels))   # 7 bright colours
+names(palette_cols) <- comp_levels
+
+# ---- 3. plot ---------------------------------------------------------------
 p_decomp <- ggplot(
   decomp_df,
   aes(
     x   = date,
     y   = value,
-    fill= comp_lab,
-    text= sprintf(
-      "%s<br>%s: %.2f pp",
-      format(date_qtr, "%Y-Q%q"), comp_lab, value
-    )
+    fill= component,
+    text= sprintf("%s<br>%s: %.2f pp",
+                  format(date_qtr, "%Y-Q%q"), component, value)
   )
 ) +
   geom_col(width = 90, position = "stack") +
@@ -315,29 +314,27 @@ p_decomp <- ggplot(
     x     = "Year",
     y     = "Percentage-point contribution (q/q)"
   ) +
-  scale_fill_viridis_d(
-    name   = "Component",
-    option = "plasma",
-    begin  = 0,
-    end    = 0.85
+  scale_fill_manual(
+    name    = "Component",
+    values  = palette_cols,
+    breaks  = comp_levels               # legend in same order as stack
   ) +
   my_theme +
   theme(legend.position = "bottom")
 
-# ---- 3. save static + interactive ------------------------------------------
+# ---- 4. save static + interactive ------------------------------------------
 ggsave(
-  filename = file.path(output_dir, "infl_ulc_decomp.png"),
+  filename = file.path(out_dir, "infl_ulc_decomp.png"),
   plot     = p_decomp,
-  width    = 9,
-  height   = 6,
-  dpi      = 300
+  width    = 9, height = 6, dpi = 300
 )
 
 htmlwidgets::saveWidget(
   plotly::ggplotly(p_decomp, tooltip = "text"),
-  file.path(output_dir, "infl_ulc_decomp.html")
+  file.path(out_dir, "infl_ulc_decomp.html")
 )
 
-message("✔  Figure saved: full decomposition for Inflation & ULC")
+message("✔  Figure saved with distinct colours and ordered stacking")
+
 
                            
