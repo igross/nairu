@@ -252,13 +252,11 @@ nairu_med <- apply(draws$NAIRU, 2, median)
 
 # π-side coefficients
 delta_pt_0  <- median(draws$delta_pt_0)
-delta_pt_l  <- apply(draws$delta_pt_lag, 2, median)
 phi_pt_0    <- median(draws$phi_pt_0)
 phi_pt_l    <- apply(draws$phi_pt_lag, 2, median)
 gamma_pt_0  <- median(draws$gamma_pt_0)
 gamma_pt_l  <- apply(draws$gamma_pt_lag, 2, median)
 lambda_pt_0 <- median(draws$lambda_pt_0)
-lambda_pt_l <- apply(draws$lambda_pt_lag, 2, median)
 alpha_pt_0  <- median(draws$alpha_pt_0)
 alpha_pt_l  <- apply(draws$alpha_pt_lag, 2, median)
 xi_pt_med   <- apply(draws$xi_pt, 2, median)
@@ -266,11 +264,9 @@ xi_pt_med   <- apply(draws$xi_pt, 2, median)
 # ULC-side coefficients
 # ── pull ULC-side parameters that *do* exist -------------------------------
 delta_pu_0  <- median(draws$delta_pu_0)                # scalar
-delta_pu_l  <- apply(draws$delta_pu_lag, 2, median)    # length 2
 gamma_pu_0  <- median(draws$gamma_pu_0)
 gamma_pu_l  <- apply(draws$gamma_pu_lag, 2, median)
 lambda_pu_0 <- median(draws$lambda_pu_0)
-lambda_pu_l <- apply(draws$lambda_pu_lag, 2, median)
 xi_pu_med   <- apply(draws$xi_pu, 2, median)           # length 2
 
 
