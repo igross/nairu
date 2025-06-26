@@ -77,16 +77,16 @@ model {
   // ── Priors ────────────────────────────────────────────────────────────────
   // ρ = 0.5  decay for lag means
   for (k in 1:2) {
-    delta_pt_lag[k]  ~ normal(pow(0.5,k) * 0.0  , 0.20);   // expectations
+  //  delta_pt_lag[k]  ~ normal(pow(0.5,k) * 0.0  , 0.20);   // expectations
     phi_pt_lag[k]    ~ normal(pow(0.5,k) * 0.06 , 0.20);   // ΔULC_demeaned
     gamma_pt_lag[k]  ~ normal(pow(0.5,k) * -0.38, 0.20);   // U-gap
-    lambda_pt_lag[k] ~ normal(pow(0.5,k) * -0.70, 0.20);   // momentum
+ //   lambda_pt_lag[k] ~ normal(pow(0.5,k) * -0.70, 0.20);   // momentum
     alpha_pt_lag[k]  ~ normal(pow(0.5,k) * 0.10 , 0.20);   // import-Δ
   }
   for (k in 1:2) {
-    delta_pu_lag[k]  ~ normal(pow(0.5,k) * 0.30 , 0.10);
+//    delta_pu_lag[k]  ~ normal(pow(0.5,k) * 0.30 , 0.10);
     gamma_pu_lag[k]  ~ normal(pow(0.5,k) * -2   , 1);
-    lambda_pu_lag[k] ~ normal(pow(0.5,k) * -3   , 1);
+//    lambda_pu_lag[k] ~ normal(pow(0.5,k) * -3   , 1);
   }
 
   // Contemporaneous coefficients (same priors as original model)
@@ -134,14 +134,14 @@ model {
 
       // add lags 1-3 of each regressor
       for (k in 1:2) {
-        exp_now  += delta_pt_lag[k] *
-                    Y[t-k,5];
+//        exp_now  += delta_pt_lag[k] *
+//                   Y[t-k,5];
 
         ugap_now += gamma_pt_lag[k] *
                     ((Y[t-k,3] - NAIRU[t-k]) / Y[t-k,3]);
 
-        mom_now  += lambda_pt_lag[k] *
-                    (Y[t-1-k,3] - Y[t-2-k,3]) / Y[t-k,3];
+//        mom_now  += lambda_pt_lag[k] *
+//                    (Y[t-1-k,3] - Y[t-2-k,3]) / Y[t-k,3];
 
         imp_now  += alpha_pt_lag[k] *
                     (Y2_demeaned[t-1-k] - Y2_demeaned[t-2-k]);
@@ -161,10 +161,10 @@ model {
       real mom_now  = lambda_pu_0 * (Y[t-1,3] - Y[t-2,3]) / Y[t,3];
 
       for (k in 1:2) {
-        exp_now  += delta_pu_lag[k] * Y[t-k,5];
+//        exp_now  += delta_pu_lag[k] * Y[t-k,5];
         ugap_now += gamma_pu_lag[k] * (1 - NAIRU[t-k] / Y[t-k,3]);
-        mom_now  += lambda_pu_lag[k] *
-                    (Y[t-1-k,3] - Y[t-2-k,3]) / Y[t-k,3];
+//        mom_now  += lambda_pu_lag[k] *
+//                    (Y[t-1-k,3] - Y[t-2-k,3]) / Y[t-k,3];
       }
 
       pu_hat[t] = exp_now + ugap_now + mom_now
