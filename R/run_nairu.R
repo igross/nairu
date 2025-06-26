@@ -277,8 +277,7 @@ pu_dum <- pu_ugap <- pu_mom <- pu_exp <- pu_resid <- rep(NA, Tn)
 for (t in 6:Tn) {
 
   ## ── Inflation (π) components (unchanged) ────────────────────────────────
-  pi_exp[t] <- delta_pt_0 * Y_mat[t, 5] +
-               sum(delta_pt_l * Y_mat[t - (1:3), 5])
+  pi_exp[t] <- delta_pt_0 * Y_mat[t, 5] 
 
   pi_imp[t] <- alpha_pt_0 * (Y2_demeaned[t-1] - Y2_demeaned[t-2]) +
                sum(alpha_pt_l *
@@ -289,10 +288,7 @@ for (t in 6:Tn) {
                     ((Y_mat[t-(1:3),3] - nairu_med[t-(1:3)]) /
                       Y_mat[t-(1:3),3]))
 
-  pi_mom[t]  <- lambda_pt_0 * (Y_mat[t-1,3] - Y_mat[t-2,3]) / Y_mat[t,3] +
-                sum(lambda_pt_l *
-                    ((Y_mat[t-(2:4),3] - Y_mat[t-(3:5),3]) /
-                      Y_mat[t-(1:3),3]))
+  pi_mom[t]  <- lambda_pt_0 * (Y_mat[t-1,3] - Y_mat[t-2,3]) / Y_mat[t,3] 
 
   pi_ulc[t]  <- phi_pt_0 * Y1_demeaned[t-1] +
                 sum(phi_pt_l * Y1_demeaned[t-(2:4)])
@@ -311,13 +307,9 @@ for (t in 6:Tn) {
   pu_ugap[t] <- gamma_pu_0 * (1 - nairu_med[t]/Y_mat[t,3]) +
                 sum(gamma_pu_l * (1 - nairu_med[t-(1:2)] / Y_mat[t-(1:2),3]))
 
-  pu_mom[t]  <- lambda_pu_0 * (Y_mat[t-1,3] - Y_mat[t-2,3]) / Y_mat[t,3] +
-                sum(lambda_pu_l *
-                    ((Y_mat[t-(2:3),3] - Y_mat[t-(3:4),3]) /
-                      Y_mat[t-(1:2),3]))
+  pu_mom[t]  <- lambda_pu_0 * (Y_mat[t-1,3] - Y_mat[t-2,3]) / Y_mat[t,3] 
 
-  pu_exp[t]  <- delta_pu_0 * Y_mat[t,5] +
-                sum(delta_pu_l * Y_mat[t-(1:2),5])
+  pu_exp[t]  <- delta_pu_0 * Y_mat[t,5] 
 
   deterministic_pu <- pu_dum[t] + pu_ugap[t] + pu_mom[t] + pu_exp[t]
   pu_resid[t]      <- Y_mat[t,1] - deterministic_pu
