@@ -352,3 +352,41 @@ write_csv(infl_pi_decomp, file.path(out_dir, "infl_pi_decomp.csv"))
 write_csv(ulc_decomp,       file.path(out_dir, "ulc_decomp.csv"))
 message("✔  Saved updated CSVs without lagged-π term in ULC block")
 
+         # ── Save all posterior parameters except NAIRU ──────────────────────────────
+library(dplyr);  library(tidyr);  library(readr)
+
+# (A) full draw matrix  -------------------------------------------------------
+param_draws <- as.data.frame(sampled_model_baseline) %>%
+  select(-starts_with("NAIRU"), -lp__)          # drop latent state & log-post
+
+write_csv(
+  param_draws,
+  file.path(out_dir, "posterior_draws_params.csv")
+)
+
+
+# (B) compact summary table ---------------------------------------------------
+param_summary <- param_draws %>%
+  pivot_longer(everything(),
+               names_to  = "parameter",
+               values_to = "value") %>%
+  group_by(parameter) %>%
+  summarise(
+    mean    = mean(value),
+    median  = median(value),
+    sd      = sd(value),
+    lower5  = quantile(value, 0.05),
+    lower15 = quantile(value, 0.15),
+    upper85 = quantile(value, 0.85),
+    upper95 = quantile(value, 0.95),
+    .groups = "drop"
+  )
+
+write_csv(
+  param_summary,
+  file.path(out_dir, "posterior_summary_params.csv")
+)
+
+message("✔  Parameter draws and summaries written to the output directory.")
+
+
