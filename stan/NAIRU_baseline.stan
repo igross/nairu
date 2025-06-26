@@ -77,10 +77,10 @@ parameters {
 model {
   // ── Priors ────────────────────────────────────────────────────────────────
   // ρ = 0.5  decay for lag means
-  for (k in 1:2) {
+  for (k in 1:3) {
 
     phi_pt_lag[k]    ~ normal(pow(0.5,k) * 0.06 , 0.50);   // ΔULC_demeaned
-    gamma_pt_lag[k]  ~ normal(pow(0.5,k) * -0.38, 0.50);   // U-gap
+    gamma_pt_lag[k]  ~ normal(pow(0.7,k) * -0.38, 0.50);   // U-gap
  //   lambda_pt_lag[k] ~ normal(pow(0.5,k) * -0.70, 0.50);   // momentum
     alpha_pt_lag[k]  ~ normal(pow(0.5,k) * 0.10 , 0.50);   // import-Δ
   }
@@ -134,7 +134,7 @@ model {
       real ulc_now  = phi_pt_0 * Y1_demeaned[t-1];
 
       // add lags 1-3 of each regressor
-      for (k in 1:2) {
+      for (k in 1:3) {
 //        exp_now  += delta_pt_lag[k] *
 //                   Y[t-k,5];
 
@@ -193,7 +193,7 @@ generated quantities {
     real imp_now  = alpha_pt_0 * (Y2_demeaned[t-1] - Y2_demeaned[t-2]);
     real ulc_now  = phi_pt_0 * Y1_demeaned[t-1];
 
-    for (k in 1:2) {
+    for (k in 1:3) {
  //     exp_now  += delta_pt_lag[k]  * Y[t-k,5];
       ugap_now += gamma_pt_lag[k]  *
                   ((Y[t-k,3] - NAIRU[t-k]) / Y[t-k,3]);
