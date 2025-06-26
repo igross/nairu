@@ -194,11 +194,11 @@ generated quantities {
     real ulc_now  = phi_pt_0 * Y1_demeaned[t-1];
 
     for (k in 1:2) {
-      exp_now  += delta_pt_lag[k]  * Y[t-k,5];
+ //     exp_now  += delta_pt_lag[k]  * Y[t-k,5];
       ugap_now += gamma_pt_lag[k]  *
                   ((Y[t-k,3] - NAIRU[t-k]) / Y[t-k,3]);
-      mom_now  += lambda_pt_lag[k] *
-                  (Y[t-1-k,3] - Y[t-2-k,3]) / Y[t-k,3];
+//      mom_now  += lambda_pt_lag[k] *
+//                  (Y[t-1-k,3] - Y[t-2-k,3]) / Y[t-k,3];
       imp_now  += alpha_pt_lag[k]  *
                   (Y2_demeaned[t-1-k] - Y2_demeaned[t-2-k]);
       ulc_now  += phi_pt_lag[k]    * Y1_demeaned[t-1-k];
