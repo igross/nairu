@@ -41,7 +41,7 @@ parameters {
   real<lower = -2.3, upper = 3.7>        ulc_missing;
 
   // ── Inflation equation (π_t) ──────────────────────────────────────
-  real<lower = 0,    upper = 1>          delta_pt_0;
+  real<lower = 0,    upper = 2>          delta_pt_0;
 
 
   real<lower = -0.54, upper = 0.66>      phi_pt_0;
@@ -91,7 +91,7 @@ model {
   }
 
   // Contemporaneous coefficients (same priors as original model)
-  delta_pt_0  ~ beta(2,2);                          // (0,1) on expectations
+  delta_pt_0  ~ normal(1,0.1);                          // (0,1) on expectations
   phi_pt_0    ~ normal(0.06 , 0.50);
   gamma_pt_0  ~ normal(-0.38, 0.50);
   lambda_pt_0 ~ normal(-0.70, 0.50);
