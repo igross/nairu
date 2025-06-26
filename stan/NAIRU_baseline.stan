@@ -119,7 +119,7 @@ model {
     vector[T] pt_hat;
     vector[T] pu_hat;
 
-    nairu_hat[1] = nhat_init[1];
+    nairu_hat[1] = nhat_init;
     pt_hat[1:5]  = pthat_init;
     pu_hat[1:4]  = puhat_init;
 
