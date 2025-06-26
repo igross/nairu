@@ -42,7 +42,7 @@ parameters {
 
   // ── Inflation equation (π_t) ──────────────────────────────────────
   real<lower = 0,    upper = 1>          delta_pt_0;
-  vector<lower = -0.60, upper = 0.60>[3] delta_pt_lag;
+
 
   real<lower = -0.54, upper = 0.66>      phi_pt_0;
   vector<lower = -0.60, upper = 0.60>[3] phi_pt_lag;
@@ -61,7 +61,6 @@ parameters {
 
   // ── ULC equation (ulc_t) ──────────────────────────────────────────
   real<lower = -0.30, upper = 0.90>      delta_pu_0;
-  vector<lower = -0.60, upper = 0.60>[2] delta_pu_lag;
 
   real<lower = -5,   upper = 1>          gamma_pu_0;
   vector<lower = -4,   upper = 2>[2]     gamma_pu_lag;
@@ -79,28 +78,28 @@ model {
   // ── Priors ────────────────────────────────────────────────────────────────
   // ρ = 0.5  decay for lag means
   for (k in 1:2) {
-  //  delta_pt_lag[k]  ~ normal(pow(0.5,k) * 0.0  , 0.20);   // expectations
-    phi_pt_lag[k]    ~ normal(pow(0.5,k) * 0.06 , 0.20);   // ΔULC_demeaned
-    gamma_pt_lag[k]  ~ normal(pow(0.5,k) * -0.38, 0.20);   // U-gap
- //   lambda_pt_lag[k] ~ normal(pow(0.5,k) * -0.70, 0.20);   // momentum
-    alpha_pt_lag[k]  ~ normal(pow(0.5,k) * 0.10 , 0.20);   // import-Δ
+
+    phi_pt_lag[k]    ~ normal(pow(0.5,k) * 0.06 , 0.50);   // ΔULC_demeaned
+    gamma_pt_lag[k]  ~ normal(pow(0.5,k) * -0.38, 0.50);   // U-gap
+ //   lambda_pt_lag[k] ~ normal(pow(0.5,k) * -0.70, 0.50);   // momentum
+    alpha_pt_lag[k]  ~ normal(pow(0.5,k) * 0.10 , 0.50);   // import-Δ
   }
   for (k in 1:2) {
-//    delta_pu_lag[k]  ~ normal(pow(0.5,k) * 0.30 , 0.10);
+
     gamma_pu_lag[k]  ~ normal(pow(0.5,k) * -2   , 1);
 //    lambda_pu_lag[k] ~ normal(pow(0.5,k) * -3   , 1);
   }
 
   // Contemporaneous coefficients (same priors as original model)
   delta_pt_0  ~ beta(2,2);                          // (0,1) on expectations
-  phi_pt_0    ~ normal(0.06 , 0.20);
-  gamma_pt_0  ~ normal(-0.38, 0.20);
-  lambda_pt_0 ~ normal(-0.70, 0.20);
-  alpha_pt_0  ~ normal(0.10 , 0.20);
+  phi_pt_0    ~ normal(0.06 , 0.50);
+  gamma_pt_0  ~ normal(-0.38, 0.50);
+  lambda_pt_0 ~ normal(-0.70, 0.50);
+  alpha_pt_0  ~ normal(0.10 , 0.50);
   xi_pt       ~ normal(0    , 3);
-  eps_pt      ~ normal(0.30 , 0.20);
+  eps_pt      ~ normal(0.30 , 0.50);
 
-  delta_pu_0  ~ normal(0.30 , 0.20);
+  delta_pu_0  ~ normal(0.30 , 0.50);
   gamma_pu_0  ~ normal(-2   , 1.00);
   lambda_pu_0 ~ normal(-3   , 1.00);
   xi_pu       ~ normal(0    , 3);
