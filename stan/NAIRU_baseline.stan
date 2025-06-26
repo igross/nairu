@@ -35,41 +35,41 @@ parameters {
   // ── Latent state & initial conditions ──
   vector[T] NAIRU;                                   // unchanged
   real<lower = 4,  upper =7>     nhat_init;     // 5.5 ± 3 × 0.20
-  vector[5] <lower = -4.5, upper = 7.5> pthat_init;  // 1.5 ± 6
-  vector[4] <lower = -5,  upper = 7>   puhat_init;   // 1    ± 6
+  vector[5]<lower = -4.5, upper = 7.5> pthat_init;  // 1.5 ± 6
+  vector[4]<lower = -5,  upper = 7>   puhat_init;   // 1    ± 6
   real<lower = 0,   upper = 0.40>      tau;          // 0.10 ± 0.30 → positive part
   real<lower = -2.3, upper = 3.7>      ulc_missing;  // 0.7 ± 3 × 1
 
   // ── Inflation equation (π_t) ─────────────────────────────────────────────
   real<lower = 0,    upper = 1>        delta_pt_0;          // Beta(2,2) already [0,1]
-  vector[3] <lower = -0.60, upper = 0.60>  delta_pt_lag;     // 0 ± 0.60
+  vector[3]<lower = -0.60, upper = 0.60>  delta_pt_lag;     // 0 ± 0.60
 
   real<lower = -0.54, upper = 0.66>    phi_pt_0;            // 0.06 ± 0.60
-  vector[3] <lower = -0.60, upper = 0.60>  phi_pt_lag;       //            ± 0.60
+  vector[3]<lower = -0.60, upper = 0.60>  phi_pt_lag;       //            ± 0.60
 
   real<lower = -0.98, upper = 0.22>    gamma_pt_0;          // –0.38 ± 0.60
-  vector[3] <lower = -1.18, upper = 0.02> gamma_pt_lag;      // –0.19/–0.095 ± 0.60
+  vector[3]<lower = -1.18, upper = 0.02> gamma_pt_lag;      // –0.19/–0.095 ± 0.60
 
   real<lower = -1.30, upper = -0.10>   lambda_pt_0;         // –0.70 ± 0.60
-  vector[3] <lower = -0.95, upper = 0.25> lambda_pt_lag;     // –0.35/–0.175 ± 0.60
+  vector[3]<lower = -0.95, upper = 0.25> lambda_pt_lag;     // –0.35/–0.175 ± 0.60
 
   real<lower = -0.50, upper = 0.70>    alpha_pt_0;          // 0.10 ± 0.60
-  vector[3] <lower = -0.60, upper = 0.60>  alpha_pt_lag;     //            ± 0.60
+  vector[3]<lower = -0.60, upper = 0.60>  alpha_pt_lag;     //            ± 0.60
 
-  vector[2] <lower = -9,   upper = 9>  xi_pt;               // 0 ± 9   (σ = 3)
+  vector[2]<lower = -9,   upper = 9>  xi_pt;               // 0 ± 9   (σ = 3)
   real<lower = 0,    upper = 0.90>     eps_pt;              // 0.30 ± 0.60 (positive)
 
   // ── ULC equation (ulc_t) ────────────────────────────────────────────────
   real<lower = -0.30, upper = 0.90>    delta_pu_0;          // 0.30 ± 0.60
-  vector[2] <lower = -0.60, upper = 0.60>  delta_pu_lag;     // 0 ± 0.60
+  vector[2]<lower = -0.60, upper = 0.60>  delta_pu_lag;     // 0 ± 0.60
 
   real<lower = -5,   upper = 1>        gamma_pu_0;          // –2 ± 3
-  vector[2] <lower = -4,   upper = 2>  gamma_pu_lag;        // –1/–0.5 ± 3
+  vector[2]<lower = -4,   upper = 2>  gamma_pu_lag;        // –1/–0.5 ± 3
 
   real<lower = -6,   upper = 0>        lambda_pu_0;         // –3 ± 3
-  vector[2] <lower = -6,  upper = 0>   lambda_pu_lag;       // –1.5/–0.75 ± 3
+  vector[2]<lower = -6,  upper = 0>   lambda_pu_lag;       // –1.5/–0.75 ± 3
 
-  vector[2] <lower = -9,   upper = 9>  xi_pu;               // 0 ± 9   (σ = 3)
+  vector[2]<lower = -9,   upper = 9>  xi_pu;               // 0 ± 9   (σ = 3)
   real<lower = 0,    upper = 4.17>     eps_pu;              // 1.17 ± 3 × 1
 }
 
