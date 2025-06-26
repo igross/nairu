@@ -170,7 +170,7 @@ data_set <- data_set %>%
 
 # Pick Sample
 est_data <- data_set %>%
-  filter(date > "1997q3" & date < "2025q1") %>%
+  filter(date > "1997q3" ) %>%
   mutate(dummy1 = ifelse(date >= "2021Q3" & date <= "2023Q1", 1, 0),
          dummy2 = ifelse(date >= "2022Q1" & date <= "2022Q4", 1, 0),
          dummy3 = ifelse(date == "2020Q2", 1, 0),
