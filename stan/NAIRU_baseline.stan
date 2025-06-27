@@ -119,14 +119,14 @@ model {
     vector[T] pu_hat;
 
     nairu_hat[1] = nhat_init;
-    pt_hat[1:5]  = pthat_init;
+    pt_hat[1:6]  = pthat_init;
     pu_hat[1:4]  = puhat_init;
 
     // simple random-walk for NAIRU
     for (t in 2:T) nairu_hat[t] = NAIRU[t-1];
 
     // π_t equation (t ≥ 4)
-    for (t in 6:T) {
+    for (t in 7:T) {
       real exp_now  = delta_pt_0 * Y[t,5];
       real ugap_now = gamma_pt_0 * ((Y[t,3] - NAIRU[t]) / Y[t,3]);
       real mom_now  = lambda_pt_0 * (Y[t-1,3] - Y[t-2,3]) / Y[t,3];
