@@ -45,16 +45,16 @@ parameters {
 
 
   real<lower = -0.54, upper = 0.66>      phi_pt_0;
-  vector<lower = -0.60, upper = 0.60>[3] phi_pt_lag;
+  vector<lower = -0.60, upper = 0.60>[4] phi_pt_lag;
 
   real<lower = -0.98, upper = 0.22>      gamma_pt_0;
-  vector<lower = -1.18, upper = 0.02>[3] gamma_pt_lag;
+  vector<lower = -1.18, upper = 0.02>[4] gamma_pt_lag;
 
   real<lower = -1.30, upper = -0.10>     lambda_pt_0;
-  vector<lower = -0.95, upper = 0.25>[3] lambda_pt_lag;
+  vector<lower = -0.95, upper = 0.25>[4] lambda_pt_lag;
 
   real<lower = -0.50, upper = 0.70>      alpha_pt_0;
-  vector<lower = -0.60, upper = 0.60>[3] alpha_pt_lag;
+  vector<lower = -0.60, upper = 0.60>[4] alpha_pt_lag;
 
   vector<lower = -9,   upper = 9>[2]     xi_pt;
   real<lower = 0,    upper = 0.90>       eps_pt;
@@ -77,7 +77,7 @@ parameters {
 model {
   // ── Priors ────────────────────────────────────────────────────────────────
   // ρ = 0.5  decay for lag means
-  for (k in 1:3) {
+  for (k in 1:4) {
 
     phi_pt_lag[k]    ~ normal(pow(0.5,k) * 0.06 , 0.50);   // ΔULC_demeaned
     gamma_pt_lag[k]  ~ normal(pow(0.7,k) * -0.38, 0.50);   // U-gap
@@ -134,7 +134,7 @@ model {
       real ulc_now  = phi_pt_0 * Y1_demeaned[t-1];
 
       // add lags 1-3 of each regressor
-      for (k in 1:3) {
+      for (k in 1:4) {
 //        exp_now  += delta_pt_lag[k] *
 //                   Y[t-k,5];
 
@@ -193,7 +193,7 @@ generated quantities {
     real imp_now  = alpha_pt_0 * (Y2_demeaned[t-1] - Y2_demeaned[t-2]);
     real ulc_now  = phi_pt_0 * Y1_demeaned[t-1];
 
-    for (k in 1:3) {
+    for (k in 1:4) {
  //     exp_now  += delta_pt_lag[k]  * Y[t-k,5];
       ugap_now += gamma_pt_lag[k]  *
                   ((Y[t-k,3] - NAIRU[t-k]) / Y[t-k,3]);
