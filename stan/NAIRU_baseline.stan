@@ -35,8 +35,8 @@ parameters {
   // ── Latent state & initial conditions ─────────────────────────────
   vector[T] NAIRU;
   real<lower = 4.9,  upper = 6.1>        nhat_init;
-  vector<lower = -4.5, upper = 7.5>[6]   pthat_init;
-  vector<lower = -5,   upper = 7>[4]     puhat_init;
+  vector<lower = -4.5, upper = 7.5>[7]   pthat_init;
+  vector<lower = -5,   upper = 7>[5]     puhat_init;
   real<lower = 0,   upper = 0.40>        tau;
   real<lower = -2.3, upper = 3.7>        ulc_missing;
 
