@@ -156,7 +156,7 @@ model {
     }
 
     // ulc_t equation (t ≥ 3)
-    for (t in 5:T-1) {
+    for (t in 6:T-1) {
       real exp_now  = delta_pu_0 * Y[t,5];
       real ugap_now = gamma_pu_0 * (1 - NAIRU[t] / Y[t,3]);
       real mom_now  = lambda_pu_0 * (Y[t-1,3] - Y[t-2,3]) / Y[t,3];
