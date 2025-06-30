@@ -119,8 +119,8 @@ model {
     vector[T] pu_hat;
 
     nairu_hat[1] = nhat_init;
-    pt_hat[1:6]  = pthat_init;
-    pu_hat[1:4]  = puhat_init;
+    pt_hat[1:7]  = pthat_init;
+    pu_hat[1:5]  = puhat_init;
 
     // simple random-walk for NAIRU
     for (t in 2:T) nairu_hat[t] = NAIRU[t-1];
