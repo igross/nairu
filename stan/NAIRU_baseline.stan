@@ -186,7 +186,7 @@ generated quantities {
   vector[T] pt_residuals;
   for (t in 1:T) pt_residuals[t] = 0;        // initialise
 
-  for (t in 6:T) {
+  for (t in 8:T) {
     real exp_now  = delta_pt_0 * Y[t,5];
     real ugap_now = gamma_pt_0 * ((Y[t,3] - NAIRU[t]) / Y[t,3]);
     real mom_now  = lambda_pt_0 * (Y[t-1,3] - Y[t-2,3]) / Y[t,3];
