@@ -20,9 +20,9 @@ library(janitor)
 
 # ---- 2. Set up file paths -----------------------------------------------
 target_dir  <- getwd()
-csv_in      <- file.path(target_dir, "output", "NAIRU_baseline.csv")
-vintage_dir <- file.path(target_dir, "output", "vintages")
-output_dir  <- file.path(target_dir, "output")
+csv_in      <- file.path(target_dir, "docs", "NAIRU_baseline.csv")
+vintage_dir <- file.path(target_dir, "docs", "vintages")
+output_dir  <- file.path(target_dir, "docs")
 dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
 
 # ---- 3. ABS release months (approximate) ---------------------------------
