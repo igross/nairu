@@ -14,7 +14,7 @@ dir.create(docs_dir, showWarnings = FALSE, recursive = TRUE)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1.  look for a NAIRU sparkline PNG ------------------------------------------
-spark_png  <- file.path(output_dir, "nairu_spark.png")
+spark_png  <- file.path(output_dir, "nairu_zoom_2010.png")
 spark_html <- if (file.exists(spark_png)) {
   sprintf('
   <div style="margin:40px auto;max-width:600px;">
