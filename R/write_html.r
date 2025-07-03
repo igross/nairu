@@ -9,7 +9,7 @@ suppressPackageStartupMessages({
 })
 
 output_dir <- "output"            # folder that holds all PNG/HTML plots
-docs_dir   <- "docs"
+docs_dir   <- "output"
 dir.create(docs_dir, showWarnings = FALSE, recursive = TRUE)
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -117,4 +117,4 @@ html <- sprintf('
    intro_paragraph, spark_html, decomp_html, other_charts_html)
 
 writeLines(html, file.path(docs_dir, "index.html"))
-message("✅ docs/index.html written (PNG-only mode).")
+message("✅ output/index.html written (PNG-only mode).")
