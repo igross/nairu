@@ -8,8 +8,8 @@ suppressPackageStartupMessages({
   library(stringr)
 })
 
-output_dir <- "output"            # folder that holds all PNG/HTML plots
-docs_dir   <- "output"
+output_dir <- "docs"            # folder that holds all PNG/HTML plots
+docs_dir   <- "docs"
 dir.create(docs_dir, showWarnings = FALSE, recursive = TRUE)
 
 # ─────────────────────────────────────────────────────────────────────────────
