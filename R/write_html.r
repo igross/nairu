@@ -14,13 +14,14 @@ dir.create(docs_dir, showWarnings = FALSE, recursive = TRUE)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1.  NAIRU sparkline ----------------------------------------------------------
-spark_png  <- file.path(output_dir, "nairu_zoom_2010.png")
-spark_html <- if (file.exists(spark_png)) {
+spark_html <- if (file.exists(nairu_zoom_2010.html)) {
   sprintf('
-  <div style="margin:40px auto;max-width:800px;">
-    <h2 style="text-align:center;">Estimated NAIRU (median)</h2>
-    <img src="%s" style="width:100%%;">
-  </div>', basename(spark_png))           # ← drop leading "docs/"
+    <h2 style="text-align:center;">NAIRU</h2>
+    <div style="display:flex;justify-content:center;margin:40px 0;">
+      <iframe src="%s"
+              style="width:95%%;height:800px;border:none;border-radius:15px;
+                     box-shadow:0 4px 20px rgba(0,0,0,0.1);"></iframe>
+    </div>', basename(nairu_zoom_2010.html))   # ← no "../", no "docs/"
 } else ""
 
 # ─────────────────────────────────────────────────────────────────────────────
