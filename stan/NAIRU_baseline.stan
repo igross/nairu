@@ -105,7 +105,7 @@ model {
   xi_pu       ~ normal(0    , 3);
   eps_pu      ~ normal(2 , 1.00);
 
-  tau         ~ normal(0.10 , 0.10);
+  tau         ~ normal(0.08 , 0.10);
 
   nhat_init   ~ normal(5.5  , 0.2);
   pthat_init  ~ normal(1.5  , 2);
