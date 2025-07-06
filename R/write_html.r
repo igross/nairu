@@ -17,7 +17,7 @@ dir.create(docs_dir, showWarnings = FALSE, recursive = TRUE)
 spark_png  <- file.path(output_dir, "nairu_zoom_2010.png")
 spark_html <- if (file.exists(spark_png)) {
   sprintf('
-  <div style="margin:40px auto;max-width:600px;">
+  <div style="margin:40px auto;max-width:800px;">
     <h2 style="text-align:center;">Estimated NAIRU (median)</h2>
     <img src="%s" style="width:100%%;">
   </div>', basename(spark_png))           # ← drop leading "docs/"
@@ -113,7 +113,7 @@ html <- sprintf('
 
 </body>
 </html>', format(Sys.Date(), "%d %b %Y"),
-   intro_paragraph, spark_html, decomp_html, other_charts_html)
+   intro_paragraph, spark_html, decomp_html)
 
 writeLines(html, file.path(docs_dir, "index.html"))
 message("✅ docs/index.html written (PNG-only mode).")
