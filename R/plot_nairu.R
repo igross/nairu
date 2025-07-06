@@ -48,7 +48,8 @@ read_vintage_safe <- function(path) {
 
   df <- suppressMessages(read_csv(path, show_col_types = FALSE))
   if (nrow(df) == 0 || !"median" %in% names(df)) return(tibble())
-  df <- ensure_dates(df)
+  df <- ensure_dates(df) %>%
+      mutate(date = as.Date(date, frac = 0.5))   # ← mid-quarter
 
   idx <- which(df$date == file_date)
   if (length(idx) == 0) idx <- which.max(df$date)
@@ -80,10 +81,11 @@ nairu_df <- read_csv(csv_in, show_col_types = FALSE) %>%
     lower = lowera,
     upper = uppera
   ) %>%
-  mutate(
-    date_qtr = as.yearqtr(date),
-    date     = as.Date(date_qtr)
-  ) %>%
+mutate(
+  date_qtr = as.yearqtr(date),
+  date     = as.Date(date_qtr, frac = 0.5)   # ← mid-quarter
+)
+ %>%
   filter(date_qtr >= as.yearqtr("2010 Q1")) %>%
   arrange(date_qtr)
 
@@ -228,7 +230,7 @@ parsed_dt[!is_q]     <- as.Date(nairu_regions_raw$date[!is_q])
 # 10.3 Build final data frame
 nairu_regions <- nairu_regions_raw %>%
   mutate(
-    date   = parsed_dt,
+    date   = as.Date(parsed_dt, frac = 0.5),  # ← mid-quarter
     region = factor(region)
   )
 
