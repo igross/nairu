@@ -84,8 +84,7 @@ nairu_df <- read_csv(csv_in, show_col_types = FALSE) %>%
 mutate(
   date_qtr = as.yearqtr(date),
   date     = as.Date(date_qtr, frac = 0.5)   # ← mid-quarter
-)
- %>%
+) %>%
   filter(date_qtr >= as.yearqtr("2010 Q1")) %>%
   arrange(date_qtr)
 
