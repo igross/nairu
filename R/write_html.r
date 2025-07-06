@@ -18,7 +18,7 @@ nairu_html <- file.path(output_dir, "nairu_zoom_2010.html")
 
 spark_html <- if (file.exists(nairu_html)) {
   sprintf('
-    <h2 style="text-align:center;">Non-Accelerating Inflation Rate of Unemployment</h2>
+
     <div style="display:flex;justify-content:center;margin:40px 0;">
       <iframe src="%s"
               style="width:95%%;height:800px;border:none;border-radius:15px;
