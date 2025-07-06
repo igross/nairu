@@ -1,4 +1,4 @@
-# write_index_html.R  — NAIRU dashboard (PNG-only version)
+# write_index_html.R  — NAIRU dashboard (PNG-only version, fixed paths)
 # ----------------------------------------------------------------------------
 # Builds docs/index.html **without reading any CSVs**.
 # Assumes all charts (static PNGs or interactive HTML) are already saved
@@ -13,40 +13,39 @@ docs_dir   <- "docs"
 dir.create(docs_dir, showWarnings = FALSE, recursive = TRUE)
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 1.  look for a NAIRU sparkline PNG ------------------------------------------
+# 1.  NAIRU sparkline ----------------------------------------------------------
 spark_png  <- file.path(output_dir, "nairu_zoom_2010.png")
 spark_html <- if (file.exists(spark_png)) {
   sprintf('
   <div style="margin:40px auto;max-width:600px;">
     <h2 style="text-align:center;">Estimated NAIRU (median)</h2>
     <img src="%s" style="width:100%%;">
-  </div>', file.path(output_dir, basename(spark_png)))
+  </div>', basename(spark_png))           # ← drop leading "docs/"
 } else ""
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 2.  priority decomposition charts -------------------------------------------
-static_png <- file.path(output_dir, "infl_ulc_decomp.png")
+# 2.  Inflation & ULC decomposition -------------------------------------------
+static_png       <- file.path(output_dir, "infl_ulc_decomp.png")
 interactive_html <- file.path(output_dir, "infl_ulc_decomp.html")
 
 decomp_html <- if (file.exists(interactive_html)) {
   sprintf('
     <h2 style="text-align:center;">Inflation &amp; ULC Decomposition</h2>
     <div style="display:flex;justify-content:center;margin:40px 0;">
-      <iframe src="../%s"
-        style="width:95%%;height:800px;border:none;border-radius:15px;
-               box-shadow:0 4px 20px rgba(0,0,0,0.1);"></iframe>
-    </div>', file.path(output_dir, basename(interactive_html)))
+      <iframe src="%s"
+              style="width:95%%;height:800px;border:none;border-radius:15px;
+                     box-shadow:0 4px 20px rgba(0,0,0,0.1);"></iframe>
+    </div>', basename(interactive_html))   # ← no "../", no "docs/"
 } else if (file.exists(static_png)) {
   sprintf('
     <h2 style="text-align:center;">Inflation &amp; ULC Decomposition</h2>
     <div class="chart-card" style="max-width:1000px;margin:0 auto;">
       <img src="%s" alt="Decomposition stacked bar">
-    </div>', file.path(output_dir, basename(static_png)))
+    </div>', basename(static_png))         # ← drop leading "docs/"
 } else ""
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 3.  auto-include any *other* plots in output_dir ----------------------------
-#     • PNGs with matching HTML -> use iframe; otherwise embed IMG
+# 3.  Auto-include any other plots in output_dir ------------------------------
 priority_files <- basename(c(spark_png, static_png, interactive_html))
 
 png_files  <- list.files(output_dir, "\\.png$",  full.names = FALSE)
@@ -60,14 +59,14 @@ for (png in png_files) {
   if (html_match %in% html_files) {
     chart_cards <- c(chart_cards, sprintf(
       '<div class="chart-card">
-         <iframe src="../%s"
+         <iframe src="%s"
                  style="width:100%%;height:600px;border:none;border-radius:10px;"></iframe>
-       </div>', file.path(output_dir, html_match)))
+       </div>', html_match))               # ← plain filename
   } else {
     chart_cards <- c(chart_cards, sprintf(
       '<div class="chart-card">
          <img src="%s" alt="%s">
-       </div>', file.path(output_dir, png), stem))
+       </div>', png, stem))                # ← plain filename
   }
 }
 
@@ -117,4 +116,4 @@ html <- sprintf('
    intro_paragraph, spark_html, decomp_html, other_charts_html)
 
 writeLines(html, file.path(docs_dir, "index.html"))
-message("✅ output/index.html written (PNG-only mode).")
+message("✅ docs/index.html written (PNG-only mode).")
