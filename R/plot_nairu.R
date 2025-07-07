@@ -314,7 +314,7 @@ decomp_df <- bind_rows(infl_df, ulc_df) %>%
   pivot_longer(-c(date_qtr, series),
                names_to = "component", values_to = "value") %>%
   mutate(
-    component = factor(component, levels = comp_levels),   # bottom→top order
+    component = factor(component, levels = comp_labels),   # bottom→top order
     date_qtr  = as.yearqtr(date_qtr, "%Y Q%q"),
     date      = as.Date(date_qtr)
   ) %>%
