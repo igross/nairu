@@ -92,15 +92,22 @@ message("Loaded ", nrow(nairu_df), " rows – ",
         sum(!is.na(nairu_df$median)), " have a median value")
 
 # ---- 6. Figure 1: full history ------------------------------------------
+
 p1 <- ggplot(nairu_df, aes(x = date)) +
-  geom_ribbon(aes(ymin = lower, ymax = upper),
-              fill   = "orange", alpha = 0.3, colour = NA) +
-  geom_line(aes(y = median, group = 1),
+  geom_ribbon(aes(ymin = lower, ymax = upper,
+                  text = sprintf("%s<br>Credible band: %.2f – %.2f",
+                                 qtr_lbl, lower, upper)),
+              fill = "orange", alpha = .30, colour = NA) +
+  geom_line(aes(y = median,
+                text = sprintf("%s<br>Median NAIRU: %.2f", qtr_lbl, median)),
             colour = "red", linewidth = 1) +
-  geom_line(aes(y = lur,    group = 1),
-            colour = "blue", linewidth = 0.8) +
-  geom_point(data = slice_tail(nairu_df, n = 1),
-             aes(y = median), colour = "black", size = 3) +
+  geom_line(aes(y = lur,
+                text = sprintf("%s<br>Unemp. rate: %.2f", qtr_lbl, lur)),
+            colour = "blue", linewidth = .8) +
+  geom_point(data = slice_tail(nairu_df, 1),
+             aes(y = median,
+                 text = sprintf("Latest (%s)<br>Median: %.2f", qtr_lbl, median)),
+             colour = "black", size = 3) +
   scale_x_date(date_breaks = "2 years", date_labels = "%Y") +
   labs(title = "NAIRU estimate with 90 % credible interval",
        x = "Year", y = "Percent") +
