@@ -284,6 +284,8 @@ ulc_file  <- file.path(output_dir, "ulc_decomp.csv")
 # ---- 1. read → long (ordered factor) ----------------------------------------
 comp_levels <- c("expectations", "dummies", "import_price",
                  "ulc_demeaned", "momentum", "unemp_gap", "residuals")
+
+                           
 comp_labels <- c(
   expectations = "Expectations",
   dummies      = "Dummies",
@@ -332,7 +334,7 @@ p_decomp <- ggplot(
   scale_fill_manual(
     name   = "Component",
     values = palette_cols,
-    breaks = comp_levels,
+    breaks = comp_labels,
     labels = comp_labels
   ) +
   my_theme +
