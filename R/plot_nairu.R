@@ -326,19 +326,18 @@ library(ggplot2);  library(plotly);  library(htmlwidgets); library(viridisLite)
 infl_file <- file.path(output_dir, "infl_pi_decomp.csv")
 ulc_file  <- file.path(output_dir, "ulc_decomp.csv")
 
-# ---- 1. read → long (ordered factor) ----------------------------------------
+# ── Decomposition: read + reshape + relabel ───────────────────────────────
 comp_levels <- c("expectations", "dummies", "import_price",
                  "ulc_demeaned", "momentum", "unemp_gap", "residuals")
 
-                           
 comp_labels <- c(
-  expectations = "Expectations",
-  dummies      = "Dummies",
-  import_price = "Import prices",
-  ulc_demeaned = "ΔULC demeaned",
+  expectations = "Inflation expectations",
+  dummies      = "Dummy variables",
+  import_price = "Import-price shocks",
+  ulc_demeaned = "ΔULC (demeaned)",
   momentum     = "Momentum",
   unemp_gap    = "Unemployment gap",
-  residuals    = "Residuals"
+  residuals    = "Residual"
 )
 
 infl_df <- read_csv(infl_file, show_col_types = FALSE) %>% mutate(series = "Inflation")
@@ -347,20 +346,21 @@ ulc_df  <- read_csv(ulc_file , show_col_types = FALSE) %>% mutate(series = "ULC"
 decomp_df <- bind_rows(infl_df, ulc_df) %>%
   pivot_longer(-c(date_qtr, series),
                names_to = "component", values_to = "value") %>%
-  # trim / clean just in case, then relabel
-  mutate(
-    component = recode(component, !!!comp_labels),      # pretty names
-    component = factor(component, levels = comp_labels),# keep order
+  mutate(                                     # ❶ relabel right here
+    component = recode(component, !!!comp_labels),
+    component = factor(component, levels = comp_labels),  # legend order
     date_qtr  = as.yearqtr(date_qtr, "%Y Q%q"),
     date      = as.Date(date_qtr)
   ) %>%
   filter(!is.na(value))
 
-# 2️⃣  Build a colour vector *named by the pretty labels*
-palette_cols <- viridisLite::turbo(length(comp_labels))
-names(palette_cols) <- comp_labels
+# ── Colour palette keyed by pretty labels ─────────────────────────────────
+palette_cols <- setNames(
+  viridisLite::turbo(length(comp_labels)),
+  comp_labels                                   # names = legend entries
+)
 
-# ---- 3. plot ---------------------------------------------------------------
+# ── Plot ──────────────────────────────────────────────────────────────────
 p_decomp <- ggplot(
   decomp_df,
   aes(
@@ -368,36 +368,26 @@ p_decomp <- ggplot(
     y   = value,
     fill= component,
     text= sprintf("%s<br>%s: %.2f pp",
-                  format(date_qtr, "%Y-Q%q"), comp_labels[component], value)
+                  format(date_qtr, "%Y-Q%q"), component, value)
   )
 ) +
-  geom_col(width = 90, position = position_stack(reverse = TRUE)) +  # ← fix
+  geom_col(width = 90, position = position_stack(reverse = TRUE)) +
   facet_wrap(~ series, ncol = 1, scales = "free_y") +
   labs(
     title = "NAIRU-model decomposition – full component detail",
     x     = "Year",
     y     = "Percentage-point contribution (q/q)"
   ) +
-  scale_fill_manual(
-    name   = "Component",
-    values = palette_cols,
-    breaks = comp_levels,
-    labels = comp_labels
-  ) +
+  scale_fill_manual(name = "Component", values = palette_cols) +  # ❷ legend text & colours
   my_theme +
   theme(legend.position = "bottom")
 
-
-# ---- 4. save static + interactive ------------------------------------------
-ggsave(
-  filename = file.path(output_dir, "infl_ulc_decomp.png"),
-  plot     = p_decomp,
-  width    = 9, height = 6, dpi = 300
-)
+# ── Save ──────────────────────────────────────────────────────────────────
+ggsave(file.path(output_dir, "infl_ulc_decomp.png"),
+       p_decomp, width = 9, height = 6, dpi = 300)
 
 htmlwidgets::saveWidget(
   plotly::ggplotly(p_decomp, tooltip = "text"),
   file.path(output_dir, "infl_ulc_decomp.html")
 )
 
-message("✔  Figure saved to ", output_dir, " with ordered stacking and clear labels")
