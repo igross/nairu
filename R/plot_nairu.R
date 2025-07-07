@@ -347,16 +347,18 @@ ulc_df  <- read_csv(ulc_file , show_col_types = FALSE) %>% mutate(series = "ULC"
 decomp_df <- bind_rows(infl_df, ulc_df) %>%
   pivot_longer(-c(date_qtr, series),
                names_to = "component", values_to = "value") %>%
+  # trim / clean just in case, then relabel
   mutate(
-    component = factor(component, levels = comp_levels),   # bottom→top order
+    component = recode(component, !!!comp_labels),      # pretty names
+    component = factor(component, levels = comp_labels),# keep order
     date_qtr  = as.yearqtr(date_qtr, "%Y Q%q"),
     date      = as.Date(date_qtr)
   ) %>%
   filter(!is.na(value))
 
-# ---- 2. colours -------------------------------------------------------------
-palette_cols <- viridisLite::turbo(length(comp_levels))
-names(palette_cols) <- comp_levels
+# 2️⃣  Build a colour vector *named by the pretty labels*
+palette_cols <- viridisLite::turbo(length(comp_labels))
+names(palette_cols) <- comp_labels
 
 # ---- 3. plot ---------------------------------------------------------------
 p_decomp <- ggplot(
