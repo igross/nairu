@@ -14,9 +14,9 @@ dir.create(docs_dir, showWarnings = FALSE, recursive = TRUE)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1.  Interactive NAIRU chart --------------------------------------------------
-nairu_html <- file.path(output_dir, "nairu.html")
+nairu_html <- file.path(output_dir, "nairu_history.html")
 
-spark_html <- if (file.exists(nairu_history.html)) {
+spark_html <- if (file.exists(nairu_html)) {
   sprintf('
 
     <div style="display:flex;justify-content:center;margin:40px 0;">
