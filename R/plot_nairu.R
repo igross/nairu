@@ -92,6 +92,7 @@ mutate(
 nairu_df  <- nairu_df  %>% mutate(qtr_lbl = format(date_qtr, "%Y-Q%q"))
 nairu_zoom <- nairu_df %>% filter(date_qtr >= as.yearqtr("2010 Q1"))  # reuse with qtr_lbl
 
+tail(nairu_df)
 
 message("Loaded ", nrow(nairu_df), " rows – ",
         sum(!is.na(nairu_df$median)), " have a median value")
