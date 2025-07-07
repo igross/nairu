@@ -99,19 +99,26 @@ message("Loaded ", nrow(nairu_df), " rows – ",
 
 # ---- 6. Figure 1: full history ------------------------------------------
 
-p1 <- ggplot(nairu_df, aes(x = date)) +
-  geom_ribbon(aes(ymin = lower, ymax = upper,
-                  text = sprintf("%s<br>Credible band: %.2f – %.2f",
-                                 qtr_lbl, lower, upper)),
-              fill = "orange", alpha = .30, colour = NA) +
-  geom_line(aes(y = median,
-                text = sprintf("%s<br>Median NAIRU: %.2f", qtr_lbl, median)),
-            colour = "red", linewidth = 1) +
-  geom_line(aes(y = lur,
-                text = sprintf("%s<br>Unemp. rate: %.2f", qtr_lbl, lur)),
-            colour = "blue", linewidth = .8) +
+# ── Figure 1 ──────────────────────────────────────────────────────────────
+p1 <- ggplot(nairu_df, aes(x = date, group = 1)) +     # << add group = 1
+  geom_ribbon(
+    aes(ymin = lower, ymax = upper,
+        text = sprintf("%s<br>Credible band: %.2f – %.2f",
+                        qtr_lbl, lower, upper)),
+    fill = "orange", alpha = .30, colour = NA
+  ) +
+  geom_line(
+    aes(y = median,
+        text = sprintf("%s<br>Median NAIRU: %.2f", qtr_lbl, median)),
+    colour = "red", linewidth = 1
+  ) +
+  geom_line(
+    aes(y = lur,
+        text = sprintf("%s<br>Unemp. rate: %.2f", qtr_lbl, lur)),
+    colour = "blue", linewidth = .8
+  ) +
   geom_point(
-    data = slice_tail(nairu_df, n = 1),   # <<< add “n =”
+    data = slice_tail(nairu_df, n = 1),
     aes(y = median,
         text = sprintf("Latest (%s)<br>Median: %.2f", qtr_lbl, median)),
     colour = "black", size = 3
@@ -121,39 +128,65 @@ p1 <- ggplot(nairu_df, aes(x = date)) +
        x = "Year", y = "Percent") +
   my_theme
 
+
 ggsave(file.path(output_dir, "nairu_history.png"),
        p1, width = 8, height = 5, dpi = 300)
 saveWidget(ggplotly(p1, tooltip = "text"),
            file.path(output_dir, "nairu_history.html"))
 
 # ---- 7. Figure 2: zoom 2010-present -------------------------------------
+# ---- Figure 2: NAIRU estimate (2010-present) -----------------------------
+
+# ensure we have the zoomed subset (with qtr_lbl already in nairu_df)
 nairu_zoom <- nairu_df %>%
   filter(date_qtr >= as.yearqtr("2010 Q1"))
 
-p2 <- ggplot(nairu_zoom, aes(x = date)) +
-  geom_ribbon(aes(ymin = lower, ymax = upper),
-              fill  = "orange", alpha = 0.3) +
-  geom_line(aes(y = median, group = 1),
-            colour = "red", linewidth = 1) +
-  geom_line(aes(y = lur,    group = 1),
-            colour = "blue", linewidth = 0.8) +
-  geom_point(
-    data = slice_tail(nairu_zoom, n = 1), # <<< add “n =”
+p2 <- ggplot(nairu_zoom, aes(x = date, group = 1)) +   # <- single group
+  geom_ribbon(
+    aes(ymin = lower, ymax = upper,
+        text = sprintf("%s<br>Credible band: %.2f – %.2f",
+                       qtr_lbl, lower, upper)),
+    fill = "orange", alpha = 0.3, colour = NA, na.rm = TRUE
+  ) +
+  geom_line(
     aes(y = median,
-        text = sprintf("Latest (%s)<br>Median: %.2f", qtr_lbl, median)),
+        text = sprintf("%s<br>Median NAIRU: %.2f",
+                       qtr_lbl, median)),
+    colour = "red", linewidth = 1, na.rm = TRUE
+  ) +
+  geom_line(
+    aes(y = lur,
+        text = sprintf("%s<br>Unemp. rate: %.2f",
+                       qtr_lbl, lur)),
+    colour = "blue", linewidth = 0.8, na.rm = TRUE
+  ) +
+  geom_point(                                          # highlight latest value
+    data = slice_tail(nairu_zoom, n = 1),
+    aes(y = median,
+        text = sprintf("Latest (%s)<br>Median: %.2f",
+                       qtr_lbl, median)),
     colour = "black", size = 3
   ) +
   scale_x_date(date_breaks = "1 year", date_labels = "%Y") +
-  labs(title    = "NAIRU estimate (post-GFC)",
-       subtitle = "90 % credible interval",
-       x = "Quarter", y = "Percent") +
+  labs(
+    title    = "NAIRU estimate (post-GFC)",
+    subtitle = "90 % credible interval",
+    x        = "Quarter",
+    y        = "Percent"
+  ) +
   my_theme
 
+# save outputs -------------------------------------------------------------
 ggsave(file.path(output_dir, "nairu_zoom_2010.png"),
        p2, width = 8, height = 5, dpi = 300)
-saveWidget(ggplotly(p2, tooltip = "text"),
-           file.path(output_dir, "nairu_zoom_2010.html"))
+
+saveWidget(
+  plotly::ggplotly(p2, tooltip = "text"),
+  file.path(output_dir, "nairu_zoom_2010.html")
+)
+
 message("Figure 2 saved")
+
 
 # ---- 8. Figure 3: Most-recent by release type ---------------------------
 types <- list.files(vintage_dir, pattern = "\\.csv$", full.names = TRUE)
