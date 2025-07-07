@@ -111,7 +111,7 @@ p1 <- ggplot(nairu_df, aes(x = date)) +
     colour = "black", size = 3
   ) +
   scale_x_date(date_breaks = "2 years", date_labels = "%Y") +
-  labs(title = "NAIRU estimate with 90 % credible interval",
+  labs(title = "NAIRU estimate with 90% uncertainty bands",
        x = "Year", y = "Percent") +
   my_theme
 
