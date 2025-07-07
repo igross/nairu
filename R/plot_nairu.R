@@ -104,10 +104,12 @@ p1 <- ggplot(nairu_df, aes(x = date)) +
   geom_line(aes(y = lur,
                 text = sprintf("%s<br>Unemp. rate: %.2f", qtr_lbl, lur)),
             colour = "blue", linewidth = .8) +
-  geom_point(data = slice_tail(nairu_df, 1),
-             aes(y = median,
-                 text = sprintf("Latest (%s)<br>Median: %.2f", qtr_lbl, median)),
-             colour = "black", size = 3) +
+  geom_point(
+    data = slice_tail(nairu_df, n = 1),   # <<< add “n =”
+    aes(y = median,
+        text = sprintf("Latest (%s)<br>Median: %.2f", qtr_lbl, median)),
+    colour = "black", size = 3
+  ) +
   scale_x_date(date_breaks = "2 years", date_labels = "%Y") +
   labs(title = "NAIRU estimate with 90 % credible interval",
        x = "Year", y = "Percent") +
@@ -129,8 +131,12 @@ p2 <- ggplot(nairu_zoom, aes(x = date)) +
             colour = "red", linewidth = 1) +
   geom_line(aes(y = lur,    group = 1),
             colour = "blue", linewidth = 0.8) +
-  geom_point(data = slice_tail(nairu_zoom, n = 1),
-             aes(y = median), colour = "black", size = 3) +
+  geom_point(
+    data = slice_tail(nairu_zoom, n = 1), # <<< add “n =”
+    aes(y = median,
+        text = sprintf("Latest (%s)<br>Median: %.2f", qtr_lbl, median)),
+    colour = "black", size = 3
+  ) +
   scale_x_date(date_breaks = "1 year", date_labels = "%Y") +
   labs(title    = "NAIRU estimate (post-GFC)",
        subtitle = "90 % credible interval",
