@@ -85,7 +85,7 @@ mutate(
   date_qtr = as.yearqtr(date),
   date     = as.Date(date_qtr, frac = 0.5)   # ← mid-quarter
 ) %>%
-  filter(date_qtr >= as.yearqtr("2010 Q1")) %>%
+  filter(date_qtr >= as.yearqtr("1999 Q1")) %>%
   arrange(date_qtr)
 
 # immediately after you construct nairu_df ─────────────────────────────
