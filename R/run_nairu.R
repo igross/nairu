@@ -347,10 +347,6 @@ library(dplyr);  library(tidyr);  library(readr)
 param_draws <- as.data.frame(sampled_model_baseline) %>%
   select(-starts_with("NAIRU"), -lp__)          # drop latent state & log-post
 
-write_csv(
-  param_draws,
-  file.path(out_dir, "posterior_draws_params.csv")
-)
 
 
 # (B) compact summary table ---------------------------------------------------
