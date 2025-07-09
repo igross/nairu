@@ -34,7 +34,7 @@ Sys.setenv(MAKEFLAGS = "-j4")          # speed up C++ build
 
 # ---- paths ----------------------------------------------------------------
 root    <- Sys.getenv("GITHUB_WORKSPACE", unset = here::here())
-out_dir <- file.path(root, "output")
+out_dir <- file.path(root, "docs")
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 setwd(root)
 
