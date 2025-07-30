@@ -176,7 +176,7 @@ est_data <- data_set %>%
          dummy3 = ifelse(date == "2020Q2", 1, 0),
          dummy4 = ifelse(date == "2020Q3", 1, 0))
 
-print(est_data, n=Inf)
+print(as_tibble(est_data), n = Inf, width = Inf)
          
 csv_path <- file.path(out_dir, "est_data.csv")
 readr::write_csv(est_data, csv_path)
