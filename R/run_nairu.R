@@ -168,6 +168,12 @@ data_set <- list(R_5206, R_6457, R_6202, R_g1, pie_rbaq) %>%
 data_set <- data_set %>%
   filter(!is.na(date))
 
+         data_set <- data_set %>%
+  arrange(date) %>%                           # make sure time is ordered
+  mutate(across(-date,                        # leave the index column alone
+                ~ na.locf(.x, na.rm = FALSE)) # last‑observation‑carried‑forward
+         )
+
 # Pick Sample
 est_data <- data_set %>%
   filter(date > "1997q3" ) %>%
@@ -175,6 +181,8 @@ est_data <- data_set %>%
          dummy2 = ifelse(date >= "2022Q1" & date <= "2022Q4", 1, 0),
          dummy3 = ifelse(date == "2020Q2", 1, 0),
          dummy4 = ifelse(date == "2020Q3", 1, 0))
+
+         
 
 print(as_tibble(est_data), n = Inf, width = Inf)
          
