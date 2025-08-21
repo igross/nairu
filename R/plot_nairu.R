@@ -391,3 +391,44 @@ htmlwidgets::saveWidget(
   file.path(output_dir, "infl_ulc_decomp.html")
 )
 
+
+                           # ---- 11. Phillips curve style scatter: inflation vs unemployment gap -----
+
+# Ensure trimmed-mean inflation is in your baseline CSV (assume col = "trimmed_mean")
+if (!"trimmed_mean" %in% names(nairu_df)) {
+  stop("Baseline file must include trimmed-mean year-ended inflation (col name = trimmed_mean)")
+}
+
+# 11.1 Calculate unemployment gap
+nairu_df <- nairu_df %>%
+  mutate(unemp_gap = lur - median)
+
+# 11.2 Scatter plot
+p_pc <- ggplot(nairu_df, aes(x = unemp_gap, y = trimmed_mean)) +
+  geom_point(alpha = 0.7, colour = "darkblue") +
+  geom_smooth(method = "lm", se = FALSE, colour = "red", linewidth = 0.8) +
+  # axis lines in the middle
+  geom_hline(yintercept = 2.5, colour = "black", linetype = "dashed") +
+  geom_vline(xintercept = 0,   colour = "black", linetype = "dashed") +
+  labs(
+    title    = "Inflation vs Unemployment Gap",
+    subtitle = "Trimmed-mean year-ended inflation vs NAIRU gap",
+    x        = "Unemployment gap (UR – NAIRU, % points)",
+    y        = "Trimmed-mean inflation (%, y/y)"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_line(colour = "grey85")
+  )
+
+# 11.3 Save
+ggsave(file.path(output_dir, "phillips_gap.png"),
+       p_pc, width = 7, height = 5, dpi = 300)
+htmlwidgets::saveWidget(
+  plotly::ggplotly(p_pc, tooltip = c("x","y")),
+  file.path(output_dir, "phillips_gap.html")
+)
+
+message("✔  Figure 6 saved: inflation vs unemployment gap")
+
