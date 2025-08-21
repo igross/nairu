@@ -424,9 +424,19 @@ y_max <- max(abs(range(nairu_df$trimmed_mean - 2.5, na.rm = TRUE)))
 x_lims <- c(-x_max, x_max)
 y_lims <- 2.5 + c(-y_max, y_max)
 
-# Circles for target
+# Define fractions of axis ranges
+x_frac <- 0.2  # e.g., 20% of x-axis range
+y_frac <- 0.2  # e.g., 20% of y-axis range
+
+x_range <- diff(x_lims)
+y_range <- diff(y_lims)
+
+# Create “ovals” with separate x and y radii
 circles <- data.frame(
-  x0 = 0, y0 = 2.5, r = c(0.5, 1.0)
+  x0 = 0,
+  y0 = 2.5,
+  rx = x_frac * x_range,   # horizontal radius
+  ry = y_frac * y_range    # vertical radius
 )
 
 print(nairu_df$alpha_val)
