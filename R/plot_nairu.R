@@ -425,20 +425,22 @@ circles <- data.frame(
   x0 = 0, y0 = 2.5, r = c(0.5, 1.0)
 )
 
+print(nairu_df)
+                           
 p_pc <- ggplot(nairu_df, aes(x = unemp_gap, y = trimmed_mean)) +
   # target circles
   geom_circle(data = circles, aes(x0 = x0, y0 = y0, r = r),
               inherit.aes = FALSE, colour = "grey40", linetype = "dashed",
               linewidth = 0.4, alpha = 0.5) +
-  # connected path (solid)
-  geom_path(colour = "steelblue", linewidth = 0.6) +
+  # fading line
+  geom_path(aes(alpha = alpha_val), colour = "steelblue", linewidth = 0.6) +
   # fading points
-  geom_point(aes(alpha = date), size = 1.5, colour = "steelblue") +
+  geom_point(aes(alpha = alpha_val), size = 1.5, colour = "steelblue") +
   # most recent point highlighted
   geom_point(
     data = slice_tail(nairu_df, n = 1),
     aes(x = unemp_gap, y = trimmed_mean),
-    colour = "black", fill = "yellow", shape = 21, size = 4, stroke = 1.2,
+    colour = "black", fill = "yellow", shape = 21, size = 1, stroke = 1.2,
     inherit.aes = FALSE
   ) +
   # axes cross
@@ -454,8 +456,8 @@ p_pc <- ggplot(nairu_df, aes(x = unemp_gap, y = trimmed_mean)) +
     y        = "Trimmed-mean inflation (%, y/y)"
   ) +
   theme_minimal(base_size = 13) +
-  theme(panel.grid = element_blank())
-
+  theme(panel.grid = element_blank(),
+        legend.position = "none")  # drop legend
 
 # Save
 ggsave(file.path(output_dir, "phillips_gap.png"),
