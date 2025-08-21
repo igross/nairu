@@ -493,7 +493,7 @@ saveWidget(plotly::ggplotly(p_pc, tooltip = c("x", "y")),
 unemployment_forecasts <- read_rba(series_id = "GLFSURSA")
 
 # Import trimmed mean inflation (year-ended, quarterly)
-trimmed_mean_inflation <- read_rba(series_id = "GCPIOCPMTMYP")
+trimmed_mean_forecast<- read_rba(series_id = "GCPIOCPMTMYP")
 
 # Get the most recent NAIRU median
 latest_median <- tail(nairu_df$median, 1)
