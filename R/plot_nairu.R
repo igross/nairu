@@ -474,7 +474,6 @@ geom_ellipse(
   scale_alpha_continuous(range = c(0.1, 1)) +
   labs(
     title    = "Inflation vs Unemployment Gap",
-    subtitle = "Trimmed-mean CPI inflation (y/y) vs NAIRU gap",
     x        = "Unemployment gap (UR – NAIRU, % points)",
     y        = "Trimmed-mean inflation (%, y/y)"
   ) +
