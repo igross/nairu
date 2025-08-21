@@ -403,37 +403,47 @@ trim_infl <- read_rba(series_id = "GCPIOCPMTMYP") %>%
   select(date, trimmed_mean = value)
 
 # 11.2 Merge into NAIRU dataset
+# ---- 11. Inflation vs Unemployment gap (with central axes) ----
+
+# Ensure unemployment gap is available
 nairu_df <- nairu_df %>%
-  left_join(trim_infl, by = "date") %>%
   mutate(unemp_gap = lur - median)
 
-# 11.3 Scatter plot: inflation vs unemployment gap
+# Set limits symmetric around the central cross (0 for x, 2.5 for y)
+x_max <- max(abs(range(nairu_df$unemp_gap, na.rm = TRUE)))
+y_max <- max(abs(range(nairu_df$trimmed_mean - 2.5, na.rm = TRUE)))
+
+x_lims <- c(-x_max, x_max)
+y_lims <- 2.5 + c(-y_max, y_max)
+
 p_pc <- ggplot(nairu_df, aes(x = unemp_gap, y = trimmed_mean)) +
-  geom_point(alpha = 0.7, colour = "darkblue") +
-  geom_smooth(method = "lm", se = FALSE, colour = "red", linewidth = 0.8) +
-  # cross-hair reference lines
-  geom_hline(yintercept = 2.5, colour = "black", linetype = "dashed") +
-  geom_vline(xintercept = 0,   colour = "black", linetype = "dashed") +
-  # highlight the latest data point
-  geom_point(data = slice_tail(nairu_df, n = 1),
-             aes(x = unemp_gap, y = trimmed_mean),
-             colour = "black", size = 4) +
+  geom_path(colour = "steelblue", linewidth = 0.6, alpha = 0.8) +   # connect dots over time
+  geom_point(size = 1.5, colour = "steelblue", alpha = 0.7) +       # small points
+  geom_point(                                                      # highlight latest
+    data = slice_tail(nairu_df, n = 1),
+    aes(x = unemp_gap, y = trimmed_mean),
+    colour = "black", size = 4
+  ) +
+  geom_hline(yintercept = 2.5, colour = "black") +  # central horizontal axis
+  geom_vline(xintercept = 0,   colour = "black") +  # central vertical axis
+  scale_x_continuous(limits = x_lims) +
+  scale_y_continuous(limits = y_lims) +
   labs(
     title    = "Inflation vs Unemployment Gap",
-    subtitle = "Trimmed-mean year-ended CPI inflation vs NAIRU gap",
+    subtitle = "Trimmed-mean CPI inflation (y/y) vs NAIRU gap",
     x        = "Unemployment gap (UR – NAIRU, % points)",
     y        = "Trimmed-mean inflation (%, y/y)"
   ) +
   theme_minimal(base_size = 13) +
   theme(
-    panel.grid.minor = element_blank(),
-    panel.grid.major = element_line(colour = "grey85")
+    panel.grid = element_blank()
   )
 
-# 11.4 Save outputs
-ggsave(file.path(output_dir, "phillips_gap.png"),
+# Save
+ggsave(file.path(output_dir, "phillips_gap_center_axes.png"),
        p_pc, width = 7, height = 5, dpi = 300)
 saveWidget(plotly::ggplotly(p_pc, tooltip = c("x","y")),
-           file.path(output_dir, "phillips_gap.html"))
+           file.path(output_dir, "phillips_gap_center_axes.html"))
 
-message("✔  Figure 6 saved: inflation vs unemployment gap")
+message("✔  Figure 6 saved: inflation vs unemployment gap with centred axes")
+
