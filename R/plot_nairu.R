@@ -17,6 +17,7 @@ library(htmlwidgets)
 library(lubridate)
 library(scales)      # added for date_breaks & number_format
 library(janitor)
+library(ggforce) 
 
 # ---- 2. Set up file paths -----------------------------------------------
 target_dir  <- getwd()
@@ -407,8 +408,9 @@ trim_infl <- read_rba(series_id = "GCPIOCPMTMYP") %>%
 
 # Ensure unemployment gap is available
 nairu_df <- nairu_df %>%
-  left_join(trim_infl, by = "date") %>%
-  mutate(unemp_gap = lur - median)
+  mutate(unemp_gap = lur - median,
+         age = as.numeric(date - min(date)),          # age in days
+         alpha_val = scales::rescale(date, to = c(0.1, 1)))  # fade old → new
 
 # Set limits symmetric around the central cross (0 for x, 2.5 for y)
 x_max <- max(abs(range(nairu_df$unemp_gap, na.rm = TRUE)))
@@ -417,18 +419,32 @@ y_max <- max(abs(range(nairu_df$trimmed_mean - 2.5, na.rm = TRUE)))
 x_lims <- c(-x_max, x_max)
 y_lims <- 2.5 + c(-y_max, y_max)
 
+# Circles (target)
+circles <- data.frame(
+  x0 = 0, y0 = 2.5, r = c(0.5, 1.0)   # radii in % points (tune if needed)
+)
+
 p_pc <- ggplot(nairu_df, aes(x = unemp_gap, y = trimmed_mean)) +
-  geom_path(colour = "steelblue", linewidth = 0.6, alpha = 0.8) +   # connect dots over time
-  geom_point(size = 1.5, colour = "steelblue", alpha = 0.7) +       # small points
-  geom_point(                                                      # highlight latest
+  # target circles
+  geom_circle(data = circles, aes(x0 = x0, y0 = y0, r = r),
+              inherit.aes = FALSE, colour = "red", linetype = "dashed",
+              linewidth = 0.4, alpha = 0.6) +
+  # connected path
+  geom_path(aes(alpha = alpha_val), colour = "steelblue", linewidth = 0.6) +
+  # fading points
+  geom_point(aes(alpha = alpha_val), size = 1.5, colour = "steelblue") +
+  # highlight most recent
+  geom_point(
     data = slice_tail(nairu_df, n = 1),
     aes(x = unemp_gap, y = trimmed_mean),
-    colour = "black", size = 4
+    colour = "black", fill = "yellow", shape = 21, size = 4, stroke = 1.2
   ) +
-  geom_hline(yintercept = 2.5, colour = "black") +  # central horizontal axis
-  geom_vline(xintercept = 0,   colour = "black") +  # central vertical axis
+  # axes cross
+  geom_hline(yintercept = 2.5, colour = "black") +
+  geom_vline(xintercept = 0,   colour = "black") +
   scale_x_continuous(limits = x_lims) +
   scale_y_continuous(limits = y_lims) +
+  scale_alpha_identity() +   # use computed alpha directly
   labs(
     title    = "Inflation vs Unemployment Gap",
     subtitle = "Trimmed-mean CPI inflation (y/y) vs NAIRU gap",
@@ -441,10 +457,10 @@ p_pc <- ggplot(nairu_df, aes(x = unemp_gap, y = trimmed_mean)) +
   )
 
 # Save
-ggsave(file.path(output_dir, "phillips_gap_center_axes.png"),
+ggsave(file.path(output_dir, "phillips_gap.png"),
        p_pc, width = 7, height = 5, dpi = 300)
 saveWidget(plotly::ggplotly(p_pc, tooltip = c("x","y")),
-           file.path(output_dir, "phillips_gap_center_axes.html"))
+           file.path(output_dir, "phillips_gap_target.html"))
 
-message("✔  Figure 6 saved: inflation vs unemployment gap with centred axes")
+message("✔  Figure saved: Phillips curve with target circles and fading history")
 
