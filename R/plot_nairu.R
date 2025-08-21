@@ -428,10 +428,10 @@ circles <- data.frame(
 p_pc <- ggplot(nairu_df, aes(x = unemp_gap, y = trimmed_mean)) +
   # target circles
   geom_circle(data = circles, aes(x0 = x0, y0 = y0, r = r),
-              inherit.aes = FALSE, colour = "red", linetype = "dashed",
-              linewidth = 0.4, alpha = 0.6) +
-  # connected path with fading
-  geom_path(aes(alpha = date), colour = "steelblue", linewidth = 0.6) +
+              inherit.aes = FALSE, colour = "grey40", linetype = "dashed",
+              linewidth = 0.4, alpha = 0.5) +
+  # connected path (solid)
+  geom_path(colour = "steelblue", linewidth = 0.6) +
   # fading points
   geom_point(aes(alpha = date), size = 1.5, colour = "steelblue") +
   # most recent point highlighted
@@ -446,7 +446,7 @@ p_pc <- ggplot(nairu_df, aes(x = unemp_gap, y = trimmed_mean)) +
   geom_vline(xintercept = 0,   colour = "black") +
   scale_x_continuous(limits = x_lims) +
   scale_y_continuous(limits = y_lims) +
-  scale_alpha_continuous(range = c(0.1, 1)) +   # fade old → new
+  scale_alpha_continuous(range = c(0.1, 1)) +
   labs(
     title    = "Inflation vs Unemployment Gap",
     subtitle = "Trimmed-mean CPI inflation (y/y) vs NAIRU gap",
@@ -454,9 +454,8 @@ p_pc <- ggplot(nairu_df, aes(x = unemp_gap, y = trimmed_mean)) +
     y        = "Trimmed-mean inflation (%, y/y)"
   ) +
   theme_minimal(base_size = 13) +
-  theme(
-    panel.grid = element_blank()
-  )
+  theme(panel.grid = element_blank())
+
 
 # Save
 ggsave(file.path(output_dir, "phillips_gap.png"),
