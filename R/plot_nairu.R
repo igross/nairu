@@ -435,7 +435,7 @@ circles <- data.frame(
   x0 = 0,
   y0 = 2.5,
   rx = c(0.5 * x_max, 0.25 * x_max),  # horizontal radii
-  ry = c(0.5 * y_max *1.2, 0.25 * y_max*1.2)   # vertical radii
+  ry = c(0.5 * y_max *1.3, 0.25 * y_max*1.3)   # vertical radii
 )
 
 print(nairu_df$alpha_val)
