@@ -445,9 +445,13 @@ cutoff_date <- max(nairu_df$date) - lubridate::years(2)
 
 p_pc <- ggplot(nairu_df, aes(x = unemp_gap, y = trimmed_mean)) +
   # target circles
-  geom_circle(data = circles, aes(x0 = x0, y0 = y0, r = r),
-              inherit.aes = FALSE, colour = "grey40", linetype = "dashed",
-              linewidth = 0.4, alpha = 0.5) +
+  geom_ellipse(
+  data = circles,
+  aes(x0 = x0, y0 = y0, a = rx, b = ry),
+  inherit.aes = FALSE,
+  colour = "grey40", linetype = "dashed",
+  linewidth = 0.4, alpha = 0.5
+) +
   # line for last 2 years only
   geom_path(
     data = nairu_df %>% filter(date >= cutoff_date),
