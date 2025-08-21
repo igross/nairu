@@ -485,3 +485,112 @@ ggsave(file.path(output_dir, "phillips_gap.png"),
        p_pc, width = 7, height = 5, dpi = 300)
 saveWidget(plotly::ggplotly(p_pc, tooltip = c("x", "y")),
            file.path(output_dir, "phillips_gap_target.html"))
+
+
+                           library(readrba)
+
+# Import unemployment rate (monthly, seasonally adjusted)
+unemployment_forecasts <- read_rba(series_id = "GLFSURSA")
+
+# Import trimmed mean inflation (year-ended, quarterly)
+trimmed_mean_inflation <- read_rba(series_id = "GCPIOCPMTMYP")
+
+
+# Trimmed mean inflation forecast (quarterly)
+trimmed_mean_forecast <- trimmed_mean_inflation %>%
+  mutate(date_qtr = as.yearqtr(date, "%Y-%m-%d"),
+         date = as.Date(date_qtr, frac = 0.5)) %>%
+  select(date, trimmed_mean = value)
+
+# Unemployment forecast (monthly → convert to quarterly mid-point)
+unemp_forecast <- unemployment_forecasts %>%
+  mutate(date_qtr = as.yearqtr(date, "%Y-%m-%d"),
+         date = as.Date(date_qtr, frac = 0.5)) %>%
+  select(date, lur = value)
+
+# Merge forecasts
+forecasts_df <- trimmed_mean_forecast %>%
+  left_join(unemp_forecast, by = "date") %>%
+  mutate(unemp_gap = lur - median(nairu_df$median, na.rm = TRUE),
+         type = "forecast")
+
+# --- Prepare original NAIRU data ---
+nairu_df <- nairu_df %>%
+  mutate(alpha_val = scales::rescale(date, to = c(0.1, 1)))
+
+x_max <- max(abs(range(nairu_df$unemp_gap, na.rm = TRUE)))
+y_max <- max(abs(range(nairu_df$trimmed_mean - 2.5, na.rm = TRUE)))
+
+x_lims <- c(-x_max, x_max)
+y_lims <- 2.5 + c(-y_max, y_max)
+
+# Target ovals
+circles <- data.frame(
+  x0 = 0,
+  y0 = 2.5,
+  rx = c(0.5 * x_max, 0.25 * x_max),
+  ry = c(0.5 * y_max * 1.3, 0.25 * y_max * 1.3)
+)
+
+cutoff_date <- max(nairu_df$date) - years(2)
+
+# --- Plot ---
+p_pc <- ggplot() +
+  # target ovals
+  geom_ellipse(
+    data = circles,
+    aes(x0 = x0, y0 = y0, a = rx, b = ry, angle = 0),
+    inherit.aes = FALSE,
+    colour = "grey40", linetype = "dashed",
+    linewidth = 0.4, alpha = 0.5
+  ) +
+  # last 2 years of actual series
+  geom_path(
+    data = nairu_df %>% filter(date >= cutoff_date),
+    aes(x = unemp_gap, y = trimmed_mean),
+    colour = "steelblue", linewidth = 0.6
+  ) +
+  # fading points (full history)
+  geom_point(
+    data = nairu_df,
+    aes(x = unemp_gap, y = trimmed_mean, alpha = alpha_val),
+    size = 1, colour = "steelblue"
+  ) +
+  # RBA forecasts
+  geom_path(
+    data = forecasts_df,
+    aes(x = unemp_gap, y = trimmed_mean),
+    colour = "red", linewidth = 0.6
+  ) +
+  geom_point(
+    data = forecasts_df,
+    aes(x = unemp_gap, y = trimmed_mean),
+    colour = "red", size = 1.5
+  ) +
+  # most recent actual point highlighted
+  geom_point(
+    data = slice_tail(nairu_df, n = 1),
+    aes(x = unemp_gap, y = trimmed_mean),
+    colour = "black", fill = "red", shape = 21, size = 1.5, stroke = 1.2,
+    inherit.aes = FALSE
+  ) +
+  # axes cross
+  geom_hline(yintercept = 2.5, colour = "black") +
+  geom_vline(xintercept = 0, colour = "black") +
+  scale_x_continuous(limits = x_lims) +
+  scale_y_continuous(limits = y_lims) +
+  scale_alpha_continuous(range = c(0.1, 1)) +
+  labs(
+    title = "Inflation vs Unemployment Gap",
+    x = "Unemployment gap (UR – NAIRU, % points)",
+    y = "Trimmed-mean inflation (%, y/y)"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    panel.border = element_rect(colour = "black", fill = NA, linewidth = 1),
+    legend.position = "none",
+    panel.grid = element_blank()
+  )
+
+# --- Save ---
+ggsave(file.path(output_dir, "phillips_gap_forecasts.png"), p_pc, width = 7, height = 5, dpi = 300)
