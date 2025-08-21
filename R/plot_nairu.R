@@ -478,7 +478,7 @@ geom_ellipse(
     y        = "Trimmed-mean inflation (%, y/y)"
   ) +
   theme_minimal(base_size = 13) +
-  theme(panel.border = element_rect(colour = "black", fill = NA, linewidth = 1))  # drop legend
+  theme(panel.border = element_rect(colour = "black", fill = NA, linewidth = 1),legend.position = "none")  # drop legend
 
 # Save
 ggsave(file.path(output_dir, "phillips_gap.png"),
