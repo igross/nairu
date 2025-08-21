@@ -499,10 +499,18 @@ trimmed_mean_inflation <- read_rba(series_id = "GCPIOCPMTMYP")
 latest_median <- tail(nairu_df$median, 1)
 
 # Merge forecasts using latest median for gap
-forecasts_df <- trimmed_mean_inflation %>%
-  left_join(unemployment_forecasts, by = "date") %>%
+# Prepare forecast dataframe
+forecasts_df <- trimmed_mean_forecast %>%
+  # align dates to quarters
+  mutate(date = as.Date(as.yearqtr(date, format = "%Y-%m-%d"), frac = 0.5)) %>%
+  left_join(
+    unemployment_forecasts %>%
+      mutate(date = as.Date(as.yearqtr(date, format = "%Y-%m-%d"), frac = 0.5)) %>%
+      select(date, lur = value),
+    by = "date"
+  ) %>%
   mutate(
-    unemp_gap = lur - latest_median,  # use most recent NAIRU median
+    unemp_gap = lur - latest_median,  # use latest NAIRU
     type = "forecast"
   )
 
