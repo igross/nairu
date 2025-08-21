@@ -431,15 +431,21 @@ circles <- data.frame(
 
 print(nairu_df$alpha_val)
                            
+cutoff_date <- max(nairu_df$date) - lubridate::years(2)
+
 p_pc <- ggplot(nairu_df, aes(x = unemp_gap, y = trimmed_mean)) +
   # target circles
   geom_circle(data = circles, aes(x0 = x0, y0 = y0, r = r),
               inherit.aes = FALSE, colour = "grey40", linetype = "dashed",
               linewidth = 0.4, alpha = 0.5) +
-  # fading line
-  geom_path(aes(alpha = alpha_val), colour = "steelblue", linewidth = 0.6) +
-  # fading points
-  geom_point(aes(alpha = alpha_val), size = 1.5, colour = "steelblue") +
+  # line for last 2 years only
+  geom_path(
+    data = nairu_df %>% filter(date >= cutoff_date),
+    aes(x = unemp_gap, y = trimmed_mean),
+    colour = "steelblue", linewidth = 0.6
+  ) +
+  # fading points (all)
+  geom_point(aes(alpha = alpha_val), size = 1, colour = "steelblue") +
   # most recent point highlighted
   geom_point(
     data = slice_tail(nairu_df, n = 1),
