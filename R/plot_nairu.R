@@ -431,12 +431,11 @@ y_frac <- 0.2  # e.g., 20% of y-axis range
 x_range <- diff(x_lims)
 y_range <- diff(y_lims)
 
-# Create “ovals” with separate x and y radii
 circles <- data.frame(
   x0 = 0,
   y0 = 2.5,
-  rx = x_frac * x_range,   # horizontal radius
-  ry = y_frac * y_range    # vertical radius
+  rx = c(0.5 * x_max, 0.25 * x_max),  # horizontal radii
+  ry = c(0.5 * y_max, 0.25 * y_max)   # vertical radii
 )
 
 print(nairu_df$alpha_val)
@@ -445,13 +444,13 @@ cutoff_date <- max(nairu_df$date) - lubridate::years(2)
 
 p_pc <- ggplot(nairu_df, aes(x = unemp_gap, y = trimmed_mean)) +
   # target circles
-  geom_ellipse(
+geom_ellipse(
   data = circles,
-  aes(x0 = x0, y0 = y0, a = rx, b = ry),
+  aes(x0 = x0, y0 = y0, a = rx, b = ry, angle = 0),  # add angle = 0
   inherit.aes = FALSE,
   colour = "grey40", linetype = "dashed",
   linewidth = 0.4, alpha = 0.5
-) +
+)+
   # line for last 2 years only
   geom_path(
     data = nairu_df %>% filter(date >= cutoff_date),
