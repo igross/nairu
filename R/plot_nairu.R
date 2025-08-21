@@ -495,24 +495,17 @@ unemployment_forecasts <- read_rba(series_id = "GLFSURSA")
 # Import trimmed mean inflation (year-ended, quarterly)
 trimmed_mean_inflation <- read_rba(series_id = "GCPIOCPMTMYP")
 
+# Get the most recent NAIRU median
+latest_median <- tail(nairu_df$median, 1)
 
-# Trimmed mean inflation forecast (quarterly)
-trimmed_mean_forecast <- trimmed_mean_inflation %>%
-  mutate(date_qtr = as.yearqtr(date, "%Y-%m-%d"),
-         date = as.Date(date_qtr, frac = 0.5)) %>%
-  select(date, trimmed_mean = value)
-
-# Unemployment forecast (monthly → convert to quarterly mid-point)
-unemp_forecast <- unemployment_forecasts %>%
-  mutate(date_qtr = as.yearqtr(date, "%Y-%m-%d"),
-         date = as.Date(date_qtr, frac = 0.5)) %>%
-  select(date, lur = value)
-
-# Merge forecasts
+# Merge forecasts using latest median for gap
 forecasts_df <- trimmed_mean_forecast %>%
-  left_join(unemp_forecast, by = "date") %>%
-  mutate(unemp_gap = lur - median(nairu_df$median, na.rm = TRUE),
-         type = "forecast")
+  left_join(unemployment_forecasts, by = "date") %>%
+  mutate(
+    unemp_gap = lur - latest_median,  # use most recent NAIRU median
+    type = "forecast"
+  )
+
 
 # --- Prepare original NAIRU data ---
 nairu_df <- nairu_df %>%
