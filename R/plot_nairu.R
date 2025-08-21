@@ -408,6 +408,7 @@ trim_infl <- read_rba(series_id = "GCPIOCPMTMYP") %>%
 
 # Ensure unemployment gap is available
 nairu_df <- nairu_df %>%
+  left_join(trim_infl, by = "date") %>%
   mutate(unemp_gap = lur - median,
          age = as.numeric(date - min(date)),          # age in days
          alpha_val = scales::rescale(date, to = c(0.1, 1)))  # fade old → new
