@@ -463,7 +463,7 @@ geom_ellipse(
   geom_point(
     data = slice_tail(nairu_df, n = 1),
     aes(x = unemp_gap, y = trimmed_mean),
-    colour = "black", fill = "yellow", shape = 21, size = 1, stroke = 1.2,
+    colour = "black", fill = "red", shape = 21, size = 1, stroke = 1.2,
     inherit.aes = FALSE
   ) +
   # axes cross
