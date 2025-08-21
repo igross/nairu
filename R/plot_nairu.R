@@ -397,7 +397,7 @@ htmlwidgets::saveWidget(
 library(readrba)
 
 # 11.1 Download year-ended trimmed-mean CPI inflation from RBA
-trim_infl <- readrba(series_id = "GCPIOCPMTMYP") %>%
+trim_infl <- read_rba(series_id = "GCPIOCPMTMYP") %>%
   mutate(date_qtr = as.yearqtr(date, "%Y-%m-%d"),
          date     = as.Date(date_qtr, frac = 0.5)) %>%
   select(date, trimmed_mean = value)
