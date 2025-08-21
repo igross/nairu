@@ -413,6 +413,10 @@ nairu_df <- nairu_df %>%
          age = as.numeric(date - min(date)),          # age in days
          alpha_val = scales::rescale(date, to = c(0.1, 1)))  # fade old → new
 
+
+                           nairu_df <- nairu_df %>% 
+  mutate(alpha_val = scales::rescale(date, to = c(0.1, 1)))
+
 # Set limits symmetric around the central cross (0 for x, 2.5 for y)
 x_max <- max(abs(range(nairu_df$unemp_gap, na.rm = TRUE)))
 y_max <- max(abs(range(nairu_df$trimmed_mean - 2.5, na.rm = TRUE)))
@@ -425,7 +429,7 @@ circles <- data.frame(
   x0 = 0, y0 = 2.5, r = c(0.5, 1.0)
 )
 
-print(nairu_df)
+print(nairu_df$alpha_val)
                            
 p_pc <- ggplot(nairu_df, aes(x = unemp_gap, y = trimmed_mean)) +
   # target circles
