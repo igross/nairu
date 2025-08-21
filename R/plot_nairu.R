@@ -499,7 +499,7 @@ trimmed_mean_inflation <- read_rba(series_id = "GCPIOCPMTMYP")
 latest_median <- tail(nairu_df$median, 1)
 
 # Merge forecasts using latest median for gap
-forecasts_df <- trimmed_mean_forecast %>%
+forecasts_df <- trimmed_mean_inflation %>%
   left_join(unemployment_forecasts, by = "date") %>%
   mutate(
     unemp_gap = lur - latest_median,  # use most recent NAIRU median
