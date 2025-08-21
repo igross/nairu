@@ -503,6 +503,9 @@ latest_median <- tail(nairu_df$median, 1)
 forecasts_df <- trimmed_mean_forecast %>%
   # align dates to quarters
   mutate(date = as.Date(as.yearqtr(date, format = "%Y-%m-%d"), frac = 0.5)) %>%
+       mutate(
+    trimmed_mean = value
+  ) %>%
   left_join(
     unemployment_forecasts %>%
       mutate(date = as.Date(as.yearqtr(date, format = "%Y-%m-%d"), frac = 0.5)) %>%
