@@ -1,7 +1,7 @@
 # ---- libraries ------------------------------------------------------------
 library(ggthemes); library(reshape2); library(readabs);  library(dplyr)
 library(ggplot2);   library(zoo);      library(rstan);   library(readrba)
-library(lubridate); library(readr);    library(here)
+library(lubridate); library(readr);    library(here);     library(stringr)
 
 
 # ---- ABS quarterly release timetable -------------------------------------------------
@@ -51,9 +51,116 @@ abs_5206 <- read_abs(series_id = c("A2304402X", "A2302915V"))
 abs_6202 <- read_abs(series_id = c("A84423043C", "A84423047L"))
 abs_6457 <- read_abs(series_id = c("A2298279F"))
 abs_6345 <- read_abs(series_id = c("A2713849C"))
-rba_g3 <- read_rba(series_id = c("GBONYLD")) 
-#rba_g1 <- read_rba(series_id = c("GCPIOCPMTMQP","GCPITIQP","GCPINTIQP")) 
-rba_g1 <- read_abs(series_id = c("A3604510W","A2330530C","A2330575J")) 
+rba_g3 <- read_rba(series_id = c("GBONYLD"))
+#rba_g1 <- read_rba(series_id = c("GCPIOCPMTMQP","GCPITIQP","GCPINTIQP"))
+rba_g1 <- read_abs(series_id = c("A3604510W","A2330530C","A2330575J"))
+
+rba_series_meta <- read_rba_seriesid()
+
+search_cols <- intersect(c("series", "description", "title", "units"), names(rba_series_meta))
+
+if (length(search_cols) > 0) {
+  rba_series_meta$search_text <- str_to_lower(do.call(paste, c(rba_series_meta[search_cols], sep = " ")))
+} else {
+  rba_series_meta$search_text <- ""
+}
+
+lookup_rba_series <- function(keywords, table = NULL, frequency = NULL) {
+  keywords <- as.vector(keywords)
+  results <- rba_series_meta
+
+  if (!is.null(table) && "table_no" %in% names(results)) {
+    results <- results %>% filter(table_no %in% table)
+  }
+
+  if (!is.null(frequency) && "frequency" %in% names(results)) {
+    results <- results %>% filter(frequency %in% frequency)
+  }
+
+  for (kw in keywords) {
+    results <- results %>% filter(str_detect(search_text, str_to_lower(kw)))
+  }
+
+  if (nrow(results) == 0) {
+    stop(sprintf("Unable to find RBA series for keywords: %s", paste(keywords, collapse = ", ")))
+  }
+
+  results$series_id[[1]]
+}
+
+quarterly_average <- function(df) {
+  df %>%
+    mutate(date = zoo::as.yearqtr(date)) %>%
+    group_by(date) %>%
+    summarise(value = mean(value, na.rm = TRUE), .groups = "drop")
+}
+
+log_diff_transform <- function(df, new_name, lag_n = 1) {
+  df <- df %>% arrange(date)
+  lagged <- dplyr::lag(df$value, lag_n)
+  valid <- !is.na(df$value) & !is.na(lagged) & df$value > 0 & lagged > 0
+  df[[new_name]] <- NA_real_
+  df[[new_name]][valid] <- 100 * (log(df$value[valid]) - log(lagged[valid]))
+  df[, c("date", new_name)]
+}
+
+underlying_series_id <- lookup_rba_series(
+  c("trimmed mean", "inflation", "year-ended"),
+  table     = c("G1", "G3"),
+  frequency = "Quarterly"
+)
+underlying_inflation <- read_rba(series_id = underlying_series_id) %>%
+  quarterly_average() %>%
+  rename(UNDERLYING_INFLATION = value)
+
+aena_series_id <- lookup_rba_series(
+  c("average", "earnings", "national accounts"),
+  frequency = "Quarterly"
+)
+aena_quarterly <- read_rba(series_id = aena_series_id) %>%
+  quarterly_average()
+R_aena <- log_diff_transform(aena_quarterly, "DLAENA")
+
+productivity_series_id <- lookup_rba_series(
+  c("labour", "productivity"),
+  frequency = "Quarterly"
+)
+productivity_quarterly <- read_rba(series_id = productivity_series_id) %>%
+  quarterly_average()
+R_productivity <- log_diff_transform(productivity_quarterly, "DLPRODUCTIVITY")
+
+underutilisation_series_id <- lookup_rba_series(c("underutilisation rate"))
+R_underutilisation <- read_rba(series_id = underutilisation_series_id) %>%
+  quarterly_average() %>%
+  rename(UNDERUTILISATION_RATE = value)
+
+unemployment_series_id <- lookup_rba_series(c("unemployment rate"))
+R_unemployment <- read_rba(series_id = unemployment_series_id) %>%
+  quarterly_average() %>%
+  rename(UNEMPLOYMENT_RATE = value)
+
+labour_series_id <- lookup_rba_series(c("participation rate"))
+R_labour <- read_rba(series_id = labour_series_id) %>%
+  quarterly_average() %>%
+  rename(LABOUR_PARTICIPATION = value)
+
+capacity_series_id <- lookup_rba_series(c("capacity utilisation"))
+R_capacity <- read_rba(series_id = capacity_series_id) %>%
+  quarterly_average() %>%
+  rename(CAPACITY_UTILISATION = value)
+
+jobs_ads_series_id <- lookup_rba_series(c("job", "advertisements"))
+jobs_ads_quarterly <- read_rba(series_id = jobs_ads_series_id) %>%
+  quarterly_average()
+R_job_ads <- log_diff_transform(jobs_ads_quarterly, "DLJOBADS")
+
+vacancies_series_id <- lookup_rba_series(
+  c("job", "vacancies"),
+  frequency = "Quarterly"
+)
+vacancies_quarterly <- read_rba(series_id = vacancies_series_id) %>%
+  quarterly_average()
+R_vacancies <- log_diff_transform(vacancies_quarterly, "DLVACANCIES")
 
 #---------------------------------------------------------------------------------------------------------
 # Cleanup ABS Spreadsheets
@@ -119,6 +226,56 @@ pie_rbaq <- read_csv(myfile)
 pie_rbaq <- pie_rbaq %>%
   rename(date=OBS) %>%
   mutate(date = zoo::as.yearqtr(date))
+
+transformed_inputs <- list(
+  R_5206,
+  R_6345,
+  R_6457,
+  R_6202,
+  R_g1,
+  pie_rbaq,
+  underlying_inflation,
+  R_aena,
+  R_productivity,
+  R_underutilisation,
+  R_unemployment,
+  R_labour,
+  R_capacity,
+  R_job_ads,
+  R_vacancies
+) %>%
+  Reduce(function(dtf1, dtf2) full_join(dtf1, dtf2, by = "date"), .) %>%
+  arrange(date)
+
+transformed_plot_data <- transformed_inputs %>%
+  tidyr::pivot_longer(-date, names_to = "series", values_to = "value") %>%
+  filter(!is.na(value)) %>%
+  mutate(date_plot = as.Date(date))
+
+transformed_plot <- ggplot(
+  transformed_plot_data,
+  aes(x = date_plot, y = value, colour = series)
+) +
+  geom_line(linewidth = 0.6, alpha = 0.9) +
+  labs(
+    title = "Transformed macroeconomic series",
+    x     = "Date",
+    y     = "Value",
+    colour= "Series"
+  ) +
+  theme_minimal(base_size = 11)
+
+plot_path <- file.path(out_dir, "transformed_inputs.png")
+
+ggsave(
+  plot_path,
+  transformed_plot,
+  width = 10,
+  height = 6,
+  dpi = 300
+)
+
+message(glue::glue("💾 Saved transformed series plot to {plot_path}"))
 
 
   latest_date_df1 <- max(R_5206$date)
