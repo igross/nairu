@@ -16,6 +16,8 @@ data {
   int<lower=1> T;               // # observations
   int<lower=1> J;               // dimension of Y
   matrix[T, J] Y;               // data matrix
+  int<lower=0, upper=1> ulc_obs[T];
+  int<lower=0, upper=T> missing_ulc_index;
 }
 
 transformed data {
@@ -23,11 +25,30 @@ transformed data {
   vector[T] Y1_demeaned;        // demeaned ΔULC    (col 1)
 
   real Y2_mean = mean(col(Y, 2));
-  real Y1_mean = mean(col(Y, 1));
+  real Y1_mean;
+  real Y1_sum = 0;
+  int ulc_count = 0;
+
+  for (t in 1:T) {
+    if (ulc_obs[t] == 1) {
+      Y1_sum += Y[t, 1];
+      ulc_count += 1;
+    }
+  }
+
+  if (ulc_count > 0) {
+    Y1_mean = Y1_sum / ulc_count;
+  } else {
+    Y1_mean = 0;
+  }
 
   for (t in 1:T) {
     Y2_demeaned[t] = Y[t, 2] - Y2_mean;
-    Y1_demeaned[t] = Y[t, 1] - Y1_mean;
+    if (ulc_obs[t] == 1) {
+      Y1_demeaned[t] = Y[t, 1] - Y1_mean;
+    } else {
+      Y1_demeaned[t] = 0;
+    }
   }
 }
 
@@ -156,7 +177,7 @@ model {
     }
 
     // ulc_t equation (t ≥ 3)
-    for (t in 6:T-1) {
+    for (t in 6:T) {
       real exp_now  = delta_pu_0 * Y[t,5];
       real ugap_now = gamma_pu_0 * (1 - NAIRU[t] / Y[t,3]);
       real mom_now  = lambda_pu_0 * (Y[t-1,3] - Y[t-2,3]) / Y[t,3];
@@ -171,12 +192,20 @@ model {
       pu_hat[t] = exp_now + ugap_now + mom_now
                 + xi_pu[1]*Y[t,8] + xi_pu[2]*Y[t,9];
     }
-    pu_hat[T] = ulc_missing;   // last observation placeholder
 
     // ── Likelihood ──────────────────────────────────────────────────────────
     target += normal_lpdf(NAIRU    | nairu_hat, tau);
     target += normal_lpdf(Y[,4]    | pt_hat   , eps_pt);
-    target += normal_lpdf(Y[,1]    | pu_hat   , eps_pu);
+    if (missing_ulc_index > 0) {
+      for (t in 1:T) {
+        if (t != missing_ulc_index && ulc_obs[t] == 1) {
+          target += normal_lpdf(Y[t,1] | pu_hat[t], eps_pu);
+        }
+      }
+      target += normal_lpdf(ulc_missing | pu_hat[missing_ulc_index], eps_pu);
+    } else {
+      target += normal_lpdf(Y[,1]    | pu_hat   , eps_pu);
+    }
   }
 }
 
