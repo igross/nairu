@@ -1,7 +1,7 @@
 # ---- libraries ------------------------------------------------------------
 library(ggthemes); library(reshape2); library(readabs);  library(dplyr)
 library(ggplot2);   library(zoo);      library(rstan);   library(readrba)
-library(lubridate); library(readr);    library(here)
+library(lubridate); library(readr);    library(here);     library(stringr)
 
 
 # ---- ABS quarterly release timetable -------------------------------------------------
@@ -51,9 +51,116 @@ abs_5206 <- read_abs(series_id = c("A2304402X", "A2302915V"))
 abs_6202 <- read_abs(series_id = c("A84423043C", "A84423047L"))
 abs_6457 <- read_abs(series_id = c("A2298279F"))
 abs_6345 <- read_abs(series_id = c("A2713849C"))
-rba_g3 <- read_rba(series_id = c("GBONYLD")) 
-#rba_g1 <- read_rba(series_id = c("GCPIOCPMTMQP","GCPITIQP","GCPINTIQP")) 
-rba_g1 <- read_abs(series_id = c("A3604510W","A2330530C","A2330575J")) 
+rba_g3 <- read_rba(series_id = c("GBONYLD"))
+#rba_g1 <- read_rba(series_id = c("GCPIOCPMTMQP","GCPITIQP","GCPINTIQP"))
+rba_g1 <- read_abs(series_id = c("A3604510W","A2330530C","A2330575J"))
+
+rba_series_meta <- read_rba_seriesid()
+
+search_cols <- intersect(c("series", "description", "title", "units"), names(rba_series_meta))
+
+if (length(search_cols) > 0) {
+  rba_series_meta$search_text <- str_to_lower(do.call(paste, c(rba_series_meta[search_cols], sep = " ")))
+} else {
+  rba_series_meta$search_text <- ""
+}
+
+lookup_rba_series <- function(keywords, table = NULL, frequency = NULL) {
+  keywords <- as.vector(keywords)
+  results <- rba_series_meta
+
+  if (!is.null(table) && "table_no" %in% names(results)) {
+    results <- results %>% filter(table_no %in% table)
+  }
+
+  if (!is.null(frequency) && "frequency" %in% names(results)) {
+    results <- results %>% filter(frequency %in% frequency)
+  }
+
+  for (kw in keywords) {
+    results <- results %>% filter(str_detect(search_text, str_to_lower(kw)))
+  }
+
+  if (nrow(results) == 0) {
+    stop(sprintf("Unable to find RBA series for keywords: %s", paste(keywords, collapse = ", ")))
+  }
+
+  results$series_id[[1]]
+}
+
+quarterly_average <- function(df) {
+  df %>%
+    mutate(date = zoo::as.yearqtr(date)) %>%
+    group_by(date) %>%
+    summarise(value = mean(value, na.rm = TRUE), .groups = "drop")
+}
+
+log_diff_transform <- function(df, new_name, lag_n = 1) {
+  df <- df %>% arrange(date)
+  lagged <- dplyr::lag(df$value, lag_n)
+  valid <- !is.na(df$value) & !is.na(lagged) & df$value > 0 & lagged > 0
+  df[[new_name]] <- NA_real_
+  df[[new_name]][valid] <- 100 * (log(df$value[valid]) - log(lagged[valid]))
+  df[, c("date", new_name)]
+}
+
+underlying_series_id <- lookup_rba_series(
+  c("trimmed mean", "inflation", "year-ended"),
+  table     = c("G1", "G3"),
+  frequency = "Quarterly"
+)
+underlying_inflation <- read_rba(series_id = underlying_series_id) %>%
+  quarterly_average() %>%
+  rename(UNDERLYING_INFLATION = value)
+
+aena_series_id <- lookup_rba_series(
+  c("average", "earnings", "national accounts"),
+  frequency = "Quarterly"
+)
+aena_quarterly <- read_rba(series_id = aena_series_id) %>%
+  quarterly_average()
+R_aena <- log_diff_transform(aena_quarterly, "DLAENA")
+
+productivity_series_id <- lookup_rba_series(
+  c("labour", "productivity"),
+  frequency = "Quarterly"
+)
+productivity_quarterly <- read_rba(series_id = productivity_series_id) %>%
+  quarterly_average()
+R_productivity <- log_diff_transform(productivity_quarterly, "DLPRODUCTIVITY")
+
+underutilisation_series_id <- lookup_rba_series(c("underutilisation rate"))
+R_underutilisation <- read_rba(series_id = underutilisation_series_id) %>%
+  quarterly_average() %>%
+  rename(UNDERUTILISATION_RATE = value)
+
+unemployment_series_id <- lookup_rba_series(c("unemployment rate"))
+R_unemployment <- read_rba(series_id = unemployment_series_id) %>%
+  quarterly_average() %>%
+  rename(UNEMPLOYMENT_RATE = value)
+
+labour_series_id <- lookup_rba_series(c("participation rate"))
+R_labour <- read_rba(series_id = labour_series_id) %>%
+  quarterly_average() %>%
+  rename(LABOUR_PARTICIPATION = value)
+
+capacity_series_id <- lookup_rba_series(c("capacity utilisation"))
+R_capacity <- read_rba(series_id = capacity_series_id) %>%
+  quarterly_average() %>%
+  rename(CAPACITY_UTILISATION = value)
+
+jobs_ads_series_id <- lookup_rba_series(c("job", "advertisements"))
+jobs_ads_quarterly <- read_rba(series_id = jobs_ads_series_id) %>%
+  quarterly_average()
+R_job_ads <- log_diff_transform(jobs_ads_quarterly, "DLJOBADS")
+
+vacancies_series_id <- lookup_rba_series(
+  c("job", "vacancies"),
+  frequency = "Quarterly"
+)
+vacancies_quarterly <- read_rba(series_id = vacancies_series_id) %>%
+  quarterly_average()
+R_vacancies <- log_diff_transform(vacancies_quarterly, "DLVACANCIES")
 
 #---------------------------------------------------------------------------------------------------------
 # Cleanup ABS Spreadsheets
@@ -113,32 +220,66 @@ R_g3 <- rba_g3 %>%
   select(date, pie_bondq)
 
 
-#RBA inflation expectationsMore actions
+# RBA inflation expectations (quarterly)
 myfile <- file.path("inputs", "PIE_RBAQ.CSV")
 pie_rbaq <- read_csv(myfile)
 pie_rbaq <- pie_rbaq %>%
   rename(date=OBS) %>%
   mutate(date = zoo::as.yearqtr(date))
 
+transformed_inputs <- list(
+  R_5206,
+  R_6345,
+  R_6457,
+  R_6202,
+  R_g1,
+  pie_rbaq,
+  underlying_inflation,
+  R_aena,
+  R_productivity,
+  R_underutilisation,
+  R_unemployment,
+  R_labour,
+  R_capacity,
+  R_job_ads,
+  R_vacancies
+) %>%
+  Reduce(function(dtf1, dtf2) full_join(dtf1, dtf2, by = "date"), .) %>%
+  arrange(date)
 
-  latest_date_df1 <- max(R_5206$date)
-  latest_date_df2 <- max(R_g1$date)
+transformed_plot_data <- transformed_inputs %>%
+  tidyr::pivot_longer(-date, names_to = "series", values_to = "value") %>%
+  filter(!is.na(value)) %>%
+  mutate(date_plot = as.Date(date))
 
-  # Check if the latest date in df2 is one day less than in df1
-  if (latest_date_df2 > latest_date_df1) {
-    # Get the most recent point from df2
-    recent_date <- R_g1 %>% filter(date == latest_date_df2) %>% select(date) 
-    recent_point <- R_5206 %>% filter(date == latest_date_df1) %>% select(DLNULC) 
+transformed_plot <- ggplot(
+  transformed_plot_data,
+  aes(x = date_plot, y = value, colour = series)
+) +
+  geom_line(linewidth = 0.6, alpha = 0.9) +
+  labs(
+    title = "Transformed macroeconomic series",
+    x     = "Date",
+    y     = "Value",
+    colour= "Series"
+  ) +
+  theme_minimal(base_size = 11)
 
-    combined_df <- merge(recent_date, recent_point, all = TRUE)
+plot_path <- file.path(out_dir, "transformed_inputs.png")
 
-    # Append the recent point to df2
-    R_5206 <- bind_rows(R_5206, combined_df)
+ggsave(
+  plot_path,
+  transformed_plot,
+  width = 10,
+  height = 6,
+  dpi = 300
+)
 
-}
+message(glue::glue("💾 Saved transformed series plot to {plot_path}"))
 
 
 # ── Extend pie_rbaq forward to latest_date_df2 ────────────────────────────────
+latest_date_df2 <- max(R_g1$date)
 latest_pie_date <- max(pie_rbaq$date)
 
 if (latest_date_df2 > latest_pie_date) {
@@ -159,20 +300,30 @@ if (latest_date_df2 > latest_pie_date) {
 
 
 
-data_set <- list(R_5206, R_6457, R_6202, R_g1, pie_rbaq) %>%
+data_set <- list(R_5206, R_6457, R_6202, R_g1, pie_rbaq, R_aena, R_6345) %>%
   Reduce(function(dtf1,dtf2) left_join(dtf1,dtf2,by="date"), .)
 
 #data_set$pie_bondq <- replace(data_set$pie_bondq,is.na(data_set$pie_bondq),2.5/4)
 
 
 data_set <- data_set %>%
-  filter(!is.na(date))
+  filter(!is.na(date)) %>%
+  arrange(date)
 
-         data_set <- data_set %>%
-  arrange(date) %>%                           # make sure time is ordered
-  mutate(across(-date,                        # leave the index column alone
-                ~ na.locf(.x, na.rm = FALSE)) # last‑observation‑carried‑forward
-         )
+filled_data_set <- data_set %>%
+  mutate(across(-date, ~ na.locf(.x, na.rm = FALSE)))
+
+latest_data_date <- max(data_set$date, na.rm = TRUE)
+wage_columns <- c("DLNULC", "DLAENA", "DLWPI")
+
+for (w_col in wage_columns) {
+  if (w_col %in% names(filled_data_set)) {
+    reset_mask <- is.na(data_set[[w_col]]) & data_set$date == latest_data_date
+    filled_data_set[[w_col]][reset_mask] <- NA_real_
+  }
+}
+
+data_set <- filled_data_set
 
 # Pick Sample
 est_data <- data_set %>%
@@ -193,192 +344,547 @@ myfile <- file.path(out_dir, "est_data.csv")
 test <- read_csv(myfile)
          
 # Subset Data for Stan
-stan_data <- as.matrix(est_data[ , -1])   # drop the yearqtr column
-
-data_list <- list(
-  T = nrow(stan_data),
-  J = ncol(stan_data),
-  Y = stan_data
-)
-
-# Compile The Model
-compiled_model <- stan_model(file = file.path("stan", "NAIRU_baseline.stan"))
-         
-sampled_model_baseline <- sampling(compiled_model, data = data_list, chains=10,iter = 10000, control = list(max_treedepth = 15))
-
-
-
-
-summarised_state_baseline <- as.data.frame(sampled_model_baseline) %>% 
-  select(contains("NAIRU")) %>%
-  melt() %>% 
-  group_by(variable) %>% 
-  summarise(median = median(value),
-            lowera = quantile(value, 0.05),
-            uppera = quantile(value, 0.95),
-            lowerb = quantile(value, 0.15),
-            upperb = quantile(value, 0.85)) %>%
-  mutate(date = as.Date(est_data$date)) %>%
-  mutate(date = zoo::as.yearqtr(date)) %>%
-  mutate(LUR = est_data$LUR)  %>%
-  mutate(dl4pmcg = est_data$dl4pmcg)
-
-print(summarised_state_baseline)
-
-         
-csv_path <- file.path(out_dir, "NAIRU_baseline.csv")
-readr::write_csv(summarised_state_baseline, csv_path)
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  REBUILD BOTH DECOMPOSITIONS (π & ULC) FROM POSTERIOR MEDIANS
-#  • Assumes `sampled_model_baseline` (rstan fit) and `est_data`
-#    (date + 9-column design matrix) already exist.
-#  • Writes two tidy CSVs:
-#        infl_pi_decomp.csv   – inflation components
-#        ulc_decomp.csv       – ULC components
-# ─────────────────────────────────────────────────────────────────────────────
-library(rstan);   library(dplyr);   library(tibble);  library(readr)
-
-# ---------------------------------------------------------------------------
-# 0.  Housekeeping
-# ---------------------------------------------------------------------------
-Y_mat  <- as.matrix(est_data[, -1])     # remove date col
-dates  <- est_data$date                 # zoo::yearqtr vector
-Tn     <- nrow(Y_mat)
-
-# demeaned series identical to Stan's transformed data
-Y2_demeaned <- Y_mat[, 2] - mean(Y_mat[, 2])
-Y1_demeaned <- Y_mat[, 1] - mean(Y_mat[, 1])
-
-# ---------------------------------------------------------------------------
-# 1.  Extract posterior medians we need
-# ---------------------------------------------------------------------------
-draws <- rstan::extract(sampled_model_baseline)
-
-# NAIRU
-nairu_med <- apply(draws$NAIRU, 2, median)
-
-# π-side coefficients
-delta_pt_0  <- median(draws$delta_pt_0)
-phi_pt_0    <- median(draws$phi_pt_0)
-phi_pt_l    <- apply(draws$phi_pt_lag, 2, median)
-gamma_pt_0  <- median(draws$gamma_pt_0)
-gamma_pt_l  <- apply(draws$gamma_pt_lag, 2, median)
-lambda_pt_0 <- median(draws$lambda_pt_0)
-alpha_pt_0  <- median(draws$alpha_pt_0)
-alpha_pt_l  <- apply(draws$alpha_pt_lag, 2, median)
-xi_pt_med   <- apply(draws$xi_pt, 2, median)
-
-# ULC-side coefficients
-# ── pull ULC-side parameters that *do* exist -------------------------------
-delta_pu_0  <- median(draws$delta_pu_0)                # scalar
-gamma_pu_0  <- median(draws$gamma_pu_0)
-gamma_pu_l  <- apply(draws$gamma_pu_lag, 2, median)
-lambda_pu_0 <- median(draws$lambda_pu_0)
-xi_pu_med   <- apply(draws$xi_pu, 2, median)           # length 2
-
-
-# initialise only what we will keep
-pi_exp <- pi_ulc <- pi_ugap <- pi_mom <- pi_imp <- pi_resid <- pi_dum <- rep(NA, Tn)
-pu_dum <- pu_ugap <- pu_mom <- pu_exp <- pu_resid <- rep(NA, Tn)
-
-for (t in 6:Tn) {
-
-  ## ── Inflation (π) components (unchanged) ────────────────────────────────
-  pi_exp[t] <- delta_pt_0 * Y_mat[t, 5] 
-
-  pi_imp[t] <- alpha_pt_0 * (Y2_demeaned[t-1] - Y2_demeaned[t-2]) +
-               sum(alpha_pt_l *
-                   (Y2_demeaned[t-(2:4)] - Y2_demeaned[t-(3:5)]))
-
-  pi_ugap[t] <- gamma_pt_0 * ((Y_mat[t,3] - nairu_med[t]) / Y_mat[t,3]) +
-                sum(gamma_pt_l *
-                    ((Y_mat[t-(1:3),3] - nairu_med[t-(1:3)]) /
-                      Y_mat[t-(1:3),3]))
-
-  pi_mom[t]  <- lambda_pt_0 * (Y_mat[t-1,3] - Y_mat[t-2,3]) / Y_mat[t,3] 
-
-  pi_ulc[t]  <- phi_pt_0 * Y1_demeaned[t-1] +
-                sum(phi_pt_l * Y1_demeaned[t-(2:4)])
-
-  pi_dum[t]  <- xi_pt_med[1]*Y_mat[t,6] + xi_pt_med[2]*Y_mat[t,7]
-
-  deterministic_pi <- pi_exp[t] + pi_imp[t] + pi_ugap[t] +
-                      pi_mom[t] + pi_ulc[t] + pi_dum[t]
-
-  pi_resid[t] <- Y_mat[t,4] - deterministic_pi
-
-
-  ## ── ULC components (NO lagged-π term) ───────────────────────────────────
-  pu_dum[t] <- xi_pu_med[1]*Y_mat[t,8] + xi_pu_med[2]*Y_mat[t,9]
-
-  pu_ugap[t] <- gamma_pu_0 * (1 - nairu_med[t]/Y_mat[t,3]) +
-                sum(gamma_pu_l * (1 - nairu_med[t-(1:2)] / Y_mat[t-(1:2),3]))
-
-  pu_mom[t]  <- lambda_pu_0 * (Y_mat[t-1,3] - Y_mat[t-2,3]) / Y_mat[t,3] 
-
-  pu_exp[t]  <- delta_pu_0 * Y_mat[t,5] 
-
-  deterministic_pu <- pu_dum[t] + pu_ugap[t] + pu_mom[t] + pu_exp[t]
-  pu_resid[t]      <- Y_mat[t,1] - deterministic_pu
+prepare_single_wage_design <- function(est_df, wage_col) {
+  required_cols <- c(
+    wage_col,
+    "dl4pmcg",
+    "LUR",
+    "DLPTM",
+    "PIE_RBAQ",
+    "dummy1",
+    "dummy2",
+    "dummy3",
+    "dummy4"
+  )
+  est_df %>%
+    select(date, all_of(required_cols))
 }
 
-# build tidy data frames ------------------------------------------------------
-infl_pi_decomp <- tibble(
-  date_qtr      = dates,
-  expectations  = pi_exp,
-  import_price  = pi_imp,
-  unemp_gap     = pi_ugap,
-  momentum      = pi_mom,
-  ulc_demeaned  = pi_ulc,
-  dummies = pi_dum,
-  residuals     = pi_resid
-)
+run_single_wage_inflation_model <- function(
+  est_df,
+  wage_col,
+  wage_label,
+  compiled_model,
+  file_stubs,
+  variant_label
+) {
+  design <- prepare_single_wage_design(est_df, wage_col)
+  wage_values <- design[[wage_col]]
+  obs <- ifelse(is.na(wage_values), 0L, 1L)
+  missing_index <- if (any(obs == 0L)) tail(which(obs == 0L), 1) else 0L
 
-ulc_decomp <- tibble(
-  date_qtr      = dates,
-  dummies       = pu_dum,
-  unemp_gap     = pu_ugap,
-  momentum      = pu_mom,
-  expectations  = pu_exp,
-  residuals     = pu_resid
-)
+  if (missing_index > 0L) {
+    message(glue::glue(
+      "ℹ {variant_label}: missing {wage_label} for the most recent quarter; estimating jointly (row {missing_index})."
+    ))
+  }
 
-write_csv(infl_pi_decomp, file.path(out_dir, "infl_pi_decomp.csv"))
-write_csv(ulc_decomp,       file.path(out_dir, "ulc_decomp.csv"))
-message("✔  Saved updated CSVs without lagged-π term in ULC block")
+  design[[wage_col]] <- ifelse(is.na(wage_values), 0, wage_values)
+  stan_matrix <- design %>%
+    select(-date) %>%
+    as.matrix()
 
-         # ── Save all posterior parameters except NAIRU ──────────────────────────────
-library(dplyr);  library(tidyr);  library(readr)
-
-# (A) full draw matrix  -------------------------------------------------------
-param_draws <- as.data.frame(sampled_model_baseline) %>%
-  select(-starts_with("NAIRU"), -lp__)          # drop latent state & log-post
-
-
-
-# (B) compact summary table ---------------------------------------------------
-param_summary <- param_draws %>%
-  pivot_longer(everything(),
-               names_to  = "parameter",
-               values_to = "value") %>%
-  group_by(parameter) %>%
-  summarise(
-    mean    = mean(value),
-    median  = median(value),
-    sd      = sd(value),
-    lower5  = quantile(value, 0.05),
-    lower15 = quantile(value, 0.15),
-    upper85 = quantile(value, 0.85),
-    upper95 = quantile(value, 0.95),
-    .groups = "drop"
+  data_list <- list(
+    T = nrow(stan_matrix),
+    J = ncol(stan_matrix),
+    Y = stan_matrix,
+    ulc_obs = as.integer(obs),
+    missing_ulc_index = as.integer(missing_index)
   )
 
-write_csv(
-  param_summary,
-  file.path(out_dir, "posterior_summary_params.csv")
+  fit <- sampling(
+    compiled_model,
+    data = data_list,
+    chains = 10,
+    iter = 10000,
+    control = list(max_treedepth = 15)
+  )
+
+  draws <- rstan::extract(fit)
+  wage_missing_median <- median(draws$ulc_missing)
+
+  if (missing_index > 0L) {
+    latest_date <- design$date[missing_index]
+    message(glue::glue(
+      "🔍 {variant_label}: posterior median estimate for {wage_label} in {latest_date} is {round(wage_missing_median, 2)}."
+    ))
+  }
+
+  summarised_state <- as.data.frame(fit) %>%
+    select(contains("NAIRU")) %>%
+    melt() %>%
+    group_by(variable) %>%
+    summarise(
+      median = median(value),
+      lowera = quantile(value, 0.05),
+      uppera = quantile(value, 0.95),
+      lowerb = quantile(value, 0.15),
+      upperb = quantile(value, 0.85),
+      .groups = "drop"
+    ) %>%
+    mutate(
+      date = est_df$date,
+      LUR = est_df$LUR,
+      dl4pmcg = est_df$dl4pmcg
+    )
+
+  wage_estimates <- ifelse(is.na(wage_values), wage_missing_median, wage_values)
+  summarised_state[[paste0(wage_col, "_EST")]] <- wage_estimates
+
+  readr::write_csv(
+    summarised_state,
+    file.path(out_dir, paste0(file_stubs$nairu, ".csv"))
+  )
+
+  Y_mat <- stan_matrix
+  if (missing_index > 0L) {
+    Y_mat[missing_index, 1] <- wage_missing_median
+  }
+
+  Y2_demeaned <- Y_mat[, 2] - mean(Y_mat[, 2])
+  Y1_demeaned <- Y_mat[, 1] - mean(Y_mat[, 1])
+
+  nairu_med <- apply(draws$NAIRU, 2, median)
+
+  delta_pt_0  <- median(draws$delta_pt_0)
+  phi_pt_0    <- median(draws$phi_pt_0)
+  phi_pt_l    <- apply(draws$phi_pt_lag, 2, median)
+  gamma_pt_0  <- median(draws$gamma_pt_0)
+  gamma_pt_l  <- apply(draws$gamma_pt_lag, 2, median)
+  lambda_pt_0 <- median(draws$lambda_pt_0)
+  alpha_pt_0  <- median(draws$alpha_pt_0)
+  alpha_pt_l  <- apply(draws$alpha_pt_lag, 2, median)
+  xi_pt_med   <- apply(draws$xi_pt, 2, median)
+
+  delta_pu_0  <- median(draws$delta_pu_0)
+  gamma_pu_0  <- median(draws$gamma_pu_0)
+  gamma_pu_l  <- apply(draws$gamma_pu_lag, 2, median)
+  lambda_pu_0 <- median(draws$lambda_pu_0)
+  xi_pu_med   <- apply(draws$xi_pu, 2, median)
+
+  Tn <- nrow(Y_mat)
+
+  pi_exp <- pi_imp <- pi_ugap <- pi_mom <- pi_ulc <- pi_resid <- pi_dum <- rep(NA, Tn)
+  pu_dum <- pu_ugap <- pu_mom <- pu_exp <- pu_resid <- rep(NA, Tn)
+
+  for (t in 6:Tn) {
+    if (t >= 8) {
+      pi_exp[t] <- delta_pt_0 * Y_mat[t, 5]
+
+      pi_imp[t] <- alpha_pt_0 * (Y2_demeaned[t-1] - Y2_demeaned[t-2]) +
+        sum(alpha_pt_l *
+              (Y2_demeaned[t-(2:4)] - Y2_demeaned[t-(3:5)]))
+
+      pi_ugap[t] <- gamma_pt_0 * ((Y_mat[t, 3] - nairu_med[t]) / Y_mat[t, 3]) +
+        sum(gamma_pt_l *
+              ((Y_mat[t-(1:3), 3] - nairu_med[t-(1:3)]) /
+                 Y_mat[t-(1:3), 3]))
+
+      pi_mom[t]  <- lambda_pt_0 * (Y_mat[t-1, 3] - Y_mat[t-2, 3]) / Y_mat[t, 3]
+
+      pi_ulc[t]  <- phi_pt_0 * Y1_demeaned[t-1] +
+        sum(phi_pt_l * Y1_demeaned[t-(2:4)])
+
+      pi_dum[t]  <- xi_pt_med[1] * Y_mat[t, 6] + xi_pt_med[2] * Y_mat[t, 7]
+
+      deterministic_pi <- pi_exp[t] + pi_imp[t] + pi_ugap[t] +
+        pi_mom[t] + pi_ulc[t] + pi_dum[t]
+
+      pi_resid[t] <- Y_mat[t, 4] - deterministic_pi
+    }
+
+    pu_dum[t] <- xi_pu_med[1] * Y_mat[t, 8] + xi_pu_med[2] * Y_mat[t, 9]
+
+    pu_ugap[t] <- gamma_pu_0 * (1 - nairu_med[t] / Y_mat[t, 3]) +
+      sum(gamma_pu_l * (1 - nairu_med[t-(1:2)] / Y_mat[t-(1:2), 3]))
+
+    pu_mom[t]  <- lambda_pu_0 * (Y_mat[t-1, 3] - Y_mat[t-2, 3]) / Y_mat[t, 3]
+
+    pu_exp[t]  <- delta_pu_0 * Y_mat[t, 5]
+
+    deterministic_pu <- pu_dum[t] + pu_ugap[t] + pu_mom[t] + pu_exp[t]
+    pu_resid[t]      <- Y_mat[t, 1] - deterministic_pu
+  }
+
+  infl_pi_decomp <- tibble::tibble(
+    date_qtr      = est_df$date,
+    expectations  = pi_exp,
+    import_price  = pi_imp,
+    unemp_gap     = pi_ugap,
+    momentum      = pi_mom,
+    ulc_demeaned  = pi_ulc,
+    dummies       = pi_dum,
+    residuals     = pi_resid
+  )
+
+  wage_decomp <- tibble::tibble(
+    date_qtr      = est_df$date,
+    dummies       = pu_dum,
+    unemp_gap     = pu_ugap,
+    momentum      = pu_mom,
+    expectations  = pu_exp,
+    residuals     = pu_resid
+  )
+
+  readr::write_csv(
+    infl_pi_decomp,
+    file.path(out_dir, paste0(file_stubs$inflation, ".csv"))
+  )
+
+  readr::write_csv(
+    wage_decomp,
+    file.path(out_dir, paste0(file_stubs$wage, ".csv"))
+  )
+
+  param_draws <- as.data.frame(fit) %>%
+    select(-starts_with("NAIRU"), -lp__)
+
+  param_summary <- param_draws %>%
+    pivot_longer(
+      everything(),
+      names_to  = "parameter",
+      values_to = "value"
+    ) %>%
+    group_by(parameter) %>%
+    summarise(
+      mean    = mean(value),
+      median  = median(value),
+      sd      = sd(value),
+      lower5  = quantile(value, 0.05),
+      lower15 = quantile(value, 0.15),
+      upper85 = quantile(value, 0.85),
+      upper95 = quantile(value, 0.95),
+      .groups = "drop"
+    )
+
+  readr::write_csv(
+    param_summary,
+    file.path(out_dir, paste0(file_stubs$params, ".csv"))
+  )
+
+  message(glue::glue(
+    "✔ {variant_label}: parameter draws and summaries written to the output directory."
+  ))
+}
+
+run_dual_wage_model <- function(
+  est_df,
+  wage_cols,
+  compiled_model,
+  file_stubs,
+  variant_label
+) {
+  design <- est_df %>%
+    select(
+      date,
+      all_of(c(
+        wage_cols,
+        "dl4pmcg",
+        "LUR",
+        "DLPTM",
+        "PIE_RBAQ",
+        "dummy1",
+        "dummy2",
+        "dummy3",
+        "dummy4"
+      ))
+    )
+
+  Tn <- nrow(design)
+  wage_obs <- matrix(1L, nrow = Tn, ncol = length(wage_cols))
+  missing_index <- integer(length(wage_cols))
+  wage_values <- vector("list", length(wage_cols))
+
+  for (j in seq_along(wage_cols)) {
+    w <- design[[wage_cols[j]]]
+    wage_values[[j]] <- w
+    obs <- ifelse(is.na(w), 0L, 1L)
+    wage_obs[, j] <- obs
+    missing_index[j] <- if (any(obs == 0L)) tail(which(obs == 0L), 1) else 0L
+    if (missing_index[j] > 0L) {
+      message(glue::glue(
+        "ℹ {variant_label}: missing {wage_cols[j]} for the most recent quarter; estimating jointly (row {missing_index[j]})."
+      ))
+    }
+    design[[wage_cols[j]]] <- ifelse(is.na(w), 0, w)
+  }
+
+  storage.mode(wage_obs) <- "integer"
+  missing_index <- as.integer(missing_index)
+
+  stan_matrix <- design %>%
+    select(-date) %>%
+    as.matrix()
+
+  data_list <- list(
+    T = nrow(stan_matrix),
+    J = ncol(stan_matrix),
+    Y = stan_matrix,
+    wage_obs = wage_obs,
+    missing_wage_index = missing_index
+  )
+
+  fit <- sampling(
+    compiled_model,
+    data = data_list,
+    chains = 10,
+    iter = 10000,
+    control = list(max_treedepth = 15)
+  )
+
+  draws <- rstan::extract(fit)
+  wage_missing_median <- apply(draws$wage_missing, 2, median)
+
+  for (j in seq_along(wage_cols)) {
+    if (missing_index[j] > 0L) {
+      latest_date <- design$date[missing_index[j]]
+      message(glue::glue(
+        "🔍 {variant_label}: posterior median estimate for {wage_cols[j]} in {latest_date} is {round(wage_missing_median[j], 2)}."
+      ))
+    }
+  }
+
+  summarised_state <- as.data.frame(fit) %>%
+    select(contains("NAIRU")) %>%
+    melt() %>%
+    group_by(variable) %>%
+    summarise(
+      median = median(value),
+      lowera = quantile(value, 0.05),
+      uppera = quantile(value, 0.95),
+      lowerb = quantile(value, 0.15),
+      upperb = quantile(value, 0.85),
+      .groups = "drop"
+    ) %>%
+    mutate(
+      date = est_df$date,
+      LUR = est_df$LUR,
+      dl4pmcg = est_df$dl4pmcg
+    )
+
+  for (j in seq_along(wage_cols)) {
+    est_values <- ifelse(is.na(wage_values[[j]]), wage_missing_median[j], wage_values[[j]])
+    summarised_state[[paste0(wage_cols[j], "_EST")]] <- est_values
+  }
+
+  readr::write_csv(
+    summarised_state,
+    file.path(out_dir, paste0(file_stubs$nairu, ".csv"))
+  )
+
+  param_draws <- as.data.frame(fit) %>%
+    select(-starts_with("NAIRU"), -lp__)
+
+  param_summary <- param_draws %>%
+    pivot_longer(
+      everything(),
+      names_to  = "parameter",
+      values_to = "value"
+    ) %>%
+    group_by(parameter) %>%
+    summarise(
+      mean    = mean(value),
+      median  = median(value),
+      sd      = sd(value),
+      lower5  = quantile(value, 0.05),
+      lower15 = quantile(value, 0.15),
+      upper85 = quantile(value, 0.85),
+      upper95 = quantile(value, 0.95),
+      .groups = "drop"
+    )
+
+  readr::write_csv(
+    param_summary,
+    file.path(out_dir, paste0(file_stubs$params, ".csv"))
+  )
+
+  message(glue::glue(
+    "✔ {variant_label}: parameter draws and summaries written to the output directory."
+  ))
+}
+
+run_wage_no_inflation_model <- function(
+  est_df,
+  wage_col,
+  compiled_model,
+  file_stubs,
+  variant_label
+) {
+  design <- est_df %>%
+    select(
+      date,
+      all_of(c(wage_col, "LUR", "PIE_RBAQ", "dummy3", "dummy4"))
+    )
+
+  wage_values <- design[[wage_col]]
+  obs <- ifelse(is.na(wage_values), 0L, 1L)
+  missing_index <- if (any(obs == 0L)) tail(which(obs == 0L), 1) else 0L
+
+  if (missing_index > 0L) {
+    message(glue::glue(
+      "ℹ {variant_label}: missing {wage_col} for the most recent quarter; estimating jointly (row {missing_index})."
+    ))
+  }
+
+  design[[wage_col]] <- ifelse(is.na(wage_values), 0, wage_values)
+
+  stan_matrix <- design %>%
+    select(-date) %>%
+    as.matrix()
+
+  data_list <- list(
+    T = nrow(stan_matrix),
+    J = ncol(stan_matrix),
+    Y = stan_matrix,
+    wage_obs = as.integer(obs),
+    missing_wage_index = as.integer(missing_index)
+  )
+
+  fit <- sampling(
+    compiled_model,
+    data = data_list,
+    chains = 10,
+    iter = 10000,
+    control = list(max_treedepth = 15)
+  )
+
+  draws <- rstan::extract(fit)
+  wage_missing_median <- median(draws$wage_missing)
+
+  if (missing_index > 0L) {
+    latest_date <- design$date[missing_index]
+    message(glue::glue(
+      "🔍 {variant_label}: posterior median estimate for {wage_col} in {latest_date} is {round(wage_missing_median, 2)}."
+    ))
+  }
+
+  summarised_state <- as.data.frame(fit) %>%
+    select(contains("NAIRU")) %>%
+    melt() %>%
+    group_by(variable) %>%
+    summarise(
+      median = median(value),
+      lowera = quantile(value, 0.05),
+      uppera = quantile(value, 0.95),
+      lowerb = quantile(value, 0.15),
+      upperb = quantile(value, 0.85),
+      .groups = "drop"
+    ) %>%
+    mutate(
+      date = est_df$date,
+      LUR = est_df$LUR
+    )
+
+  wage_estimates <- ifelse(is.na(wage_values), wage_missing_median, wage_values)
+  summarised_state[[paste0(wage_col, "_EST")]] <- wage_estimates
+
+  readr::write_csv(
+    summarised_state,
+    file.path(out_dir, paste0(file_stubs$nairu, ".csv"))
+  )
+
+  param_draws <- as.data.frame(fit) %>%
+    select(-starts_with("NAIRU"), -lp__)
+
+  param_summary <- param_draws %>%
+    pivot_longer(
+      everything(),
+      names_to  = "parameter",
+      values_to = "value"
+    ) %>%
+    group_by(parameter) %>%
+    summarise(
+      mean    = mean(value),
+      median  = median(value),
+      sd      = sd(value),
+      lower5  = quantile(value, 0.05),
+      lower15 = quantile(value, 0.15),
+      upper85 = quantile(value, 0.85),
+      upper95 = quantile(value, 0.95),
+      .groups = "drop"
+    )
+
+  readr::write_csv(
+    param_summary,
+    file.path(out_dir, paste0(file_stubs$params, ".csv"))
+  )
+
+  message(glue::glue(
+    "✔ {variant_label}: parameter draws and summaries written to the output directory."
+  ))
+}
+
+compiled_models <- list(
+  baseline = stan_model(file = file.path("stan", "NAIRU_baseline.stan")),
+  dual_wage = stan_model(file = file.path("stan", "NAIRU_dual_wage.stan")),
+  wage_no_inflation = stan_model(file = file.path("stan", "NAIRU_wage_no_inflation.stan"))
 )
 
-message("✔  Parameter draws and summaries written to the output directory.")
+single_wage_variants <- list(
+  list(
+    wage_col = "DLNULC",
+    wage_label = "DLNULC",
+    file_stubs = list(
+      nairu = "NAIRU_baseline",
+      inflation = "infl_pi_decomp",
+      wage = "ulc_decomp",
+      params = "posterior_summary_params"
+    ),
+    variant_label = "Baseline DLNULC model"
+  ),
+  list(
+    wage_col = "DLAENA",
+    wage_label = "DLAENA",
+    file_stubs = list(
+      nairu = "NAIRU_aena",
+      inflation = "infl_pi_decomp_aena",
+      wage = "wage_decomp_aena",
+      params = "posterior_summary_params_aena"
+    ),
+    variant_label = "AENA wage model"
+  ),
+  list(
+    wage_col = "DLWPI",
+    wage_label = "DLWPI",
+    file_stubs = list(
+      nairu = "NAIRU_wpi",
+      inflation = "infl_pi_decomp_wpi",
+      wage = "wage_decomp_wpi",
+      params = "posterior_summary_params_wpi"
+    ),
+    variant_label = "WPI wage model"
+  )
+)
 
+for (variant in single_wage_variants) {
+  run_single_wage_inflation_model(
+    est_df = est_data,
+    wage_col = variant$wage_col,
+    wage_label = variant$wage_label,
+    compiled_model = compiled_models$baseline,
+    file_stubs = variant$file_stubs,
+    variant_label = variant$variant_label
+  )
+}
 
+run_dual_wage_model(
+  est_df = est_data,
+  wage_cols = c("DLAENA", "DLWPI"),
+  compiled_model = compiled_models$dual_wage,
+  file_stubs = list(
+    nairu = "NAIRU_aena_wpi",
+    params = "posterior_summary_params_aena_wpi"
+  ),
+  variant_label = "AENA & WPI wage model"
+)
+
+run_wage_no_inflation_model(
+  est_df = est_data,
+  wage_col = "DLWPI",
+  compiled_model = compiled_models$wage_no_inflation,
+  file_stubs = list(
+    nairu = "NAIRU_wpi_no_inflation",
+    params = "posterior_summary_params_wpi_no_inflation"
+  ),
+  variant_label = "WPI no-inflation model"
+)
