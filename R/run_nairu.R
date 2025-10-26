@@ -24,7 +24,7 @@ if (!Sys.Date() %in% release_calendar) {
   message(
     glue::glue("⏩ {Sys.Date()} is not an ABS CPI/National-Accounts release day – skipping refresh.")
   )
-   quit(save = "no")   # graceful, zero-exit termination
+  # quit(save = "no")   # graceful, zero-exit termination
 }
 
 
@@ -55,105 +55,37 @@ rba_g3 <- read_rba(series_id = c("GBONYLD"))
 #rba_g1 <- read_rba(series_id = c("GCPIOCPMTMQP","GCPITIQP","GCPINTIQP"))
 rba_g1 <- read_abs(series_id = c("A3604510W","A2330530C","A2330575J"))
 
-rba_table_cache <- new.env(parent = emptyenv())
+rba_series_meta <- read_rba_seriesid()
 
-get_rba_table <- function(table_no) {
-  if (!exists(table_no, envir = rba_table_cache, inherits = FALSE)) {
-    tbl <- tryCatch(
-      read_rba(table_no = table_no),
-      error = function(e) {
-        message(glue::glue("⚠️ Unable to download RBA table {table_no}: {e$message}"))
-        NULL
-      }
-    )
-    assign(table_no, tbl, envir = rba_table_cache)
-  }
-  get(table_no, envir = rba_table_cache, inherits = FALSE)
+search_cols <- intersect(c("series", "description", "title", "units"), names(rba_series_meta))
+
+if (length(search_cols) > 0) {
+  rba_series_meta$search_text <- str_to_lower(do.call(paste, c(rba_series_meta[search_cols], sep = " ")))
+} else {
+  rba_series_meta$search_text <- ""
 }
 
-default_rba_tables <- c("A1", "A2", "B1", "B2", "C1", "C2", "D1", "D2",
-                        "D3", "D4", "D5", "D6", "E1", "E2", "F1", "F2",
-                        "G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8",
-                        "H1", "H2", "H3", "H4", "H5", "I1", "I2")
-
 lookup_rba_series <- function(keywords, table = NULL, frequency = NULL) {
-  keywords <- str_to_lower(as.vector(keywords))
-  tables_to_scan <- if (is.null(table) || length(table) == 0) default_rba_tables else table
+  keywords <- as.vector(keywords)
+  results <- rba_series_meta
 
-  table_data <- purrr::map_dfr(tables_to_scan, function(tbl) {
-    df <- get_rba_table(tbl)
-    if (is.null(df) || nrow(df) == 0) {
-      return(tibble::tibble())
-    }
-    df$table_no <- tbl
-    df
-  })
-
-  if (nrow(table_data) == 0) {
-    stop("Unable to download any RBA tables for lookup.")
+  if (!is.null(table) && "table_no" %in% names(results)) {
+    results <- results %>% filter(table_no %in% table)
   }
 
-  search_cols <- intersect(
-    c("series", "description", "title", "series_title", "series_description", "label", "units"),
-    names(table_data)
-  )
-
-  if (length(search_cols) == 0) {
-    stop("Unable to construct search metadata for RBA tables.")
-  }
-
-  table_data <- table_data %>%
-    mutate(
-      search_text = str_to_lower(
-        purrr::pmap_chr(
-          dplyr::select(., dplyr::all_of(search_cols)),
-          ~ paste(c(...), collapse = " ")
-        )
-      )
-    )
-
-  if (!is.null(table) && "table_no" %in% names(table_data)) {
-    table_data <- table_data %>% filter(table_no %in% table)
-  }
-
-  if (!is.null(frequency) && "frequency" %in% names(table_data)) {
-    table_data <- table_data %>% filter(frequency %in% frequency)
+  if (!is.null(frequency) && "frequency" %in% names(results)) {
+    results <- results %>% filter(frequency %in% frequency)
   }
 
   for (kw in keywords) {
-    table_data <- table_data %>% filter(str_detect(search_text, kw))
+    results <- results %>% filter(str_detect(search_text, str_to_lower(kw)))
   }
 
-  if (nrow(table_data) == 0) {
+  if (nrow(results) == 0) {
     stop(sprintf("Unable to find RBA series for keywords: %s", paste(keywords, collapse = ", ")))
   }
 
-  table_data <- table_data %>%
-    filter(!is.na(series_id)) %>%
-    arrange(table_no, series_id)
-
-  if (nrow(table_data) == 0) {
-    stop(sprintf("Unable to find RBA series for keywords: %s", paste(keywords, collapse = ", ")))
-  }
-
-  chosen <- table_data[1, , drop = FALSE]
-  description_col <- intersect(
-    c("series", "series_title", "title", "description", "series_description"),
-    names(chosen)
-  )
-  description <- if (length(description_col) > 0) {
-    chosen[[description_col[1]]]
-  } else {
-    "<no description available>"
-  }
-
-  frequency_msg <- if ("frequency" %in% names(chosen)) chosen$frequency else ""
-  units_msg <- if ("units" %in% names(chosen)) chosen$units else ""
-  message(glue::glue(
-    "✅ Using RBA series {chosen$series_id} (table {chosen$table_no}) for keywords [{paste(keywords, collapse = ', ')}] {frequency_msg} {units_msg} – {description}."
-  ))
-
-  chosen$series_id[[1]]
+  results$series_id[[1]]
 }
 
 quarterly_average <- function(df) {
@@ -443,17 +375,15 @@ run_single_wage_inflation_model <- function(
   design <- prepare_single_wage_design(est_df, wage_col)
   wage_values <- design[[wage_col]]
   obs <- ifelse(is.na(wage_values), 0L, 1L)
-  missing_index <- if (any(obs == 0L)) max(which(obs == 0L)) else 0L
+  missing_index <- if (any(obs == 0L)) tail(which(obs == 0L), 1) else 0L
 
   if (missing_index > 0L) {
-    latest_date <- design$date[missing_index]
     message(glue::glue(
-      "ℹ {variant_label}: missing {wage_label} for the most recent quarter; estimating jointly (row {missing_index}, {latest_date})."
+      "ℹ {variant_label}: missing {wage_label} for the most recent quarter; estimating jointly (row {missing_index})."
     ))
   }
 
-  design[[wage_col]][obs == 0L] <- 0
-
+  design[[wage_col]] <- ifelse(is.na(wage_values), 0, wage_values)
   stan_matrix <- design %>%
     select(-date) %>%
     as.matrix()
@@ -475,10 +405,9 @@ run_single_wage_inflation_model <- function(
   )
 
   draws <- rstan::extract(fit)
-  missing_samples <- draws[[missing_param]]
-  wage_missing_median <- if (!is.null(missing_samples)) median(missing_samples) else NA_real_
+  wage_missing_median <- median(draws[[missing_param]])
 
-  if (missing_index > 0L && !is.na(wage_missing_median)) {
+  if (missing_index > 0L) {
     latest_date <- design$date[missing_index]
     message(glue::glue(
       "🔍 {variant_label}: posterior median estimate for {wage_label} in {latest_date} is {round(wage_missing_median, 2)}."
@@ -486,7 +415,7 @@ run_single_wage_inflation_model <- function(
   }
 
   summarised_state <- as.data.frame(fit) %>%
-    dplyr::select(dplyr::contains("NAIRU")) %>%
+    select(contains("NAIRU")) %>%
     melt() %>%
     group_by(variable) %>%
     summarise(
@@ -503,10 +432,7 @@ run_single_wage_inflation_model <- function(
       dl4pmcg = est_df$dl4pmcg
     )
 
-  wage_estimates <- wage_values
-  if (missing_index > 0L && !is.na(wage_missing_median)) {
-    wage_estimates[missing_index] <- wage_missing_median
-  }
+  wage_estimates <- ifelse(is.na(wage_values), wage_missing_median, wage_values)
   summarised_state[[paste0(wage_col, "_EST")]] <- wage_estimates
 
   readr::write_csv(
@@ -515,7 +441,7 @@ run_single_wage_inflation_model <- function(
   )
 
   Y_mat <- stan_matrix
-  if (missing_index > 0L && !is.na(wage_missing_median)) {
+  if (missing_index > 0L) {
     Y_mat[missing_index, 1] <- wage_missing_median
   }
 
@@ -542,27 +468,31 @@ run_single_wage_inflation_model <- function(
 
   Tn <- nrow(Y_mat)
 
-  pi_exp <- pi_imp <- pi_ugap <- pi_mom <- pi_wage <- pi_resid <- pi_dum <- rep(NA_real_, Tn)
-  pu_dum <- pu_ugap <- pu_mom <- pu_exp <- pu_resid <- rep(NA_real_, Tn)
+  pi_exp <- pi_imp <- pi_ugap <- pi_mom <- pi_wage <- pi_resid <- pi_dum <- rep(NA, Tn)
+  pu_dum <- pu_ugap <- pu_mom <- pu_exp <- pu_resid <- rep(NA, Tn)
 
   for (t in 6:Tn) {
     if (t >= 8) {
       pi_exp[t] <- delta_pt_0 * Y_mat[t, 5]
 
-      pi_imp[t] <- alpha_pt_0 * (Y2_demeaned[t - 1] - Y2_demeaned[t - 2]) +
-        sum(alpha_pt_l * (Y2_demeaned[t - (2:4)] - Y2_demeaned[t - (3:5)]))
+      pi_imp[t] <- alpha_pt_0 * (Y2_demeaned[t-1] - Y2_demeaned[t-2]) +
+        sum(alpha_pt_l *
+              (Y2_demeaned[t-(2:4)] - Y2_demeaned[t-(3:5)]))
 
       pi_ugap[t] <- gamma_pt_0 * ((Y_mat[t, 3] - nairu_med[t]) / Y_mat[t, 3]) +
-        sum(gamma_pt_l * ((Y_mat[t - (1:3), 3] - nairu_med[t - (1:3)]) / Y_mat[t - (1:3), 3]))
+        sum(gamma_pt_l *
+              ((Y_mat[t-(1:3), 3] - nairu_med[t-(1:3)]) /
+                 Y_mat[t-(1:3), 3]))
 
-      pi_mom[t] <- lambda_pt_0 * (Y_mat[t - 1, 3] - Y_mat[t - 2, 3]) / Y_mat[t, 3]
+      pi_mom[t]  <- lambda_pt_0 * (Y_mat[t-1, 3] - Y_mat[t-2, 3]) / Y_mat[t, 3]
 
-      pi_wage[t] <- phi_pt_0 * Y1_demeaned[t - 1] +
-        sum(phi_pt_l * Y1_demeaned[t - (2:4)])
+      pi_wage[t]  <- phi_pt_0 * Y1_demeaned[t-1] +
+        sum(phi_pt_l * Y1_demeaned[t-(2:4)])
 
-      pi_dum[t] <- xi_pt_med[1] * Y_mat[t, 6] + xi_pt_med[2] * Y_mat[t, 7]
+      pi_dum[t]  <- xi_pt_med[1] * Y_mat[t, 6] + xi_pt_med[2] * Y_mat[t, 7]
 
-      deterministic_pi <- pi_exp[t] + pi_imp[t] + pi_ugap[t] + pi_mom[t] + pi_wage[t] + pi_dum[t]
+      deterministic_pi <- pi_exp[t] + pi_imp[t] + pi_ugap[t] +
+        pi_mom[t] + pi_wage[t] + pi_dum[t]
 
       pi_resid[t] <- Y_mat[t, 4] - deterministic_pi
     }
@@ -570,14 +500,14 @@ run_single_wage_inflation_model <- function(
     pu_dum[t] <- xi_pu_med[1] * Y_mat[t, 8] + xi_pu_med[2] * Y_mat[t, 9]
 
     pu_ugap[t] <- gamma_pu_0 * (1 - nairu_med[t] / Y_mat[t, 3]) +
-      sum(gamma_pu_l * (1 - nairu_med[t - (1:2)] / Y_mat[t - (1:2), 3]))
+      sum(gamma_pu_l * (1 - nairu_med[t-(1:2)] / Y_mat[t-(1:2), 3]))
 
-    pu_mom[t] <- lambda_pu_0 * (Y_mat[t - 1, 3] - Y_mat[t - 2, 3]) / Y_mat[t, 3]
+    pu_mom[t]  <- lambda_pu_0 * (Y_mat[t-1, 3] - Y_mat[t-2, 3]) / Y_mat[t, 3]
 
-    pu_exp[t] <- delta_pu_0 * Y_mat[t, 5]
+    pu_exp[t]  <- delta_pu_0 * Y_mat[t, 5]
 
     deterministic_pu <- pu_dum[t] + pu_ugap[t] + pu_mom[t] + pu_exp[t]
-    pu_resid[t] <- Y_mat[t, 1] - deterministic_pu
+    pu_resid[t]      <- Y_mat[t, 1] - deterministic_pu
   }
 
   infl_pi_decomp <- tibble::tibble(
@@ -590,7 +520,6 @@ run_single_wage_inflation_model <- function(
     residuals     = pi_resid,
     wage_component = pi_wage
   )
-
   wage_component_sym <- rlang::sym(wage_component_col)
   infl_pi_decomp <- infl_pi_decomp %>%
     dplyr::rename(!!wage_component_sym := wage_component)
@@ -615,7 +544,7 @@ run_single_wage_inflation_model <- function(
   )
 
   param_draws <- as.data.frame(fit) %>%
-    dplyr::select(-dplyr::starts_with("NAIRU"), -lp__)
+    select(-starts_with("NAIRU"), -lp__)
 
   param_summary <- param_draws %>%
     pivot_longer(
@@ -668,33 +597,27 @@ run_dual_wage_model <- function(
       ))
     )
 
-  n_variants <- length(wage_cols)
   Tn <- nrow(design)
+  wage_obs <- matrix(1L, nrow = Tn, ncol = length(wage_cols))
+  missing_index <- integer(length(wage_cols))
+  wage_values <- vector("list", length(wage_cols))
 
-  wage_obs <- matrix(1L, nrow = Tn, ncol = n_variants)
-  missing_index <- integer(n_variants)
-  wage_values <- vector("list", n_variants)
-
-  for (j in seq_len(n_variants)) {
-    column_name <- wage_cols[j]
-    series_values <- design[[column_name]]
-    wage_values[[j]] <- series_values
-
-    obs <- ifelse(is.na(series_values), 0L, 1L)
+  for (j in seq_along(wage_cols)) {
+    w <- design[[wage_cols[j]]]
+    wage_values[[j]] <- w
+    obs <- ifelse(is.na(w), 0L, 1L)
     wage_obs[, j] <- obs
-    missing_index[j] <- if (any(obs == 0L)) max(which(obs == 0L)) else 0L
-
+    missing_index[j] <- if (any(obs == 0L)) tail(which(obs == 0L), 1) else 0L
     if (missing_index[j] > 0L) {
-      latest_date <- design$date[missing_index[j]]
       message(glue::glue(
-        "ℹ {variant_label}: missing {column_name} for the most recent quarter; estimating jointly (row {missing_index[j]}, {latest_date})."
+        "ℹ {variant_label}: missing {wage_cols[j]} for the most recent quarter; estimating jointly (row {missing_index[j]})."
       ))
     }
-
-    design[[column_name]][obs == 0L] <- 0
+    design[[wage_cols[j]]] <- ifelse(is.na(w), 0, w)
   }
 
   storage.mode(wage_obs) <- "integer"
+  missing_index <- as.integer(missing_index)
 
   stan_matrix <- design %>%
     select(-date) %>%
@@ -705,7 +628,7 @@ run_dual_wage_model <- function(
     J = ncol(stan_matrix),
     Y = stan_matrix,
     wage_obs = wage_obs,
-    missing_wage_index = as.integer(missing_index)
+    missing_wage_index = missing_index
   )
 
   fit <- sampling(
@@ -717,13 +640,9 @@ run_dual_wage_model <- function(
   )
 
   draws <- rstan::extract(fit)
-  missing_draws <- draws$wage_missing
-  if (is.null(dim(missing_draws))) {
-    missing_draws <- matrix(missing_draws, ncol = n_variants)
-  }
-  wage_missing_median <- apply(missing_draws, 2, median)
+  wage_missing_median <- apply(draws$wage_missing, 2, median)
 
-  for (j in seq_len(n_variants)) {
+  for (j in seq_along(wage_cols)) {
     if (missing_index[j] > 0L) {
       latest_date <- design$date[missing_index[j]]
       message(glue::glue(
@@ -733,7 +652,7 @@ run_dual_wage_model <- function(
   }
 
   summarised_state <- as.data.frame(fit) %>%
-    dplyr::select(dplyr::contains("NAIRU")) %>%
+    select(contains("NAIRU")) %>%
     melt() %>%
     group_by(variable) %>%
     summarise(
@@ -750,12 +669,9 @@ run_dual_wage_model <- function(
       dl4pmcg = est_df$dl4pmcg
     )
 
-  for (j in seq_len(n_variants)) {
-    series_values <- wage_values[[j]]
-    if (missing_index[j] > 0L) {
-      series_values[missing_index[j]] <- wage_missing_median[j]
-    }
-    summarised_state[[paste0(wage_cols[j], "_EST")]] <- series_values
+  for (j in seq_along(wage_cols)) {
+    est_values <- ifelse(is.na(wage_values[[j]]), wage_missing_median[j], wage_values[[j]])
+    summarised_state[[paste0(wage_cols[j], "_EST")]] <- est_values
   }
 
   readr::write_csv(
@@ -764,7 +680,7 @@ run_dual_wage_model <- function(
   )
 
   param_draws <- as.data.frame(fit) %>%
-    dplyr::select(-dplyr::starts_with("NAIRU"), -lp__)
+    select(-starts_with("NAIRU"), -lp__)
 
   param_summary <- param_draws %>%
     pivot_longer(
@@ -809,16 +725,15 @@ run_wage_no_inflation_model <- function(
 
   wage_values <- design[[wage_col]]
   obs <- ifelse(is.na(wage_values), 0L, 1L)
-  missing_index <- if (any(obs == 0L)) max(which(obs == 0L)) else 0L
+  missing_index <- if (any(obs == 0L)) tail(which(obs == 0L), 1) else 0L
 
   if (missing_index > 0L) {
-    latest_date <- design$date[missing_index]
     message(glue::glue(
-      "ℹ {variant_label}: missing {wage_col} for the most recent quarter; estimating jointly (row {missing_index}, {latest_date})."
+      "ℹ {variant_label}: missing {wage_col} for the most recent quarter; estimating jointly (row {missing_index})."
     ))
   }
 
-  design[[wage_col]][obs == 0L] <- 0
+  design[[wage_col]] <- ifelse(is.na(wage_values), 0, wage_values)
 
   stan_matrix <- design %>%
     select(-date) %>%
@@ -851,7 +766,7 @@ run_wage_no_inflation_model <- function(
   }
 
   summarised_state <- as.data.frame(fit) %>%
-    dplyr::select(dplyr::contains("NAIRU")) %>%
+    select(contains("NAIRU")) %>%
     melt() %>%
     group_by(variable) %>%
     summarise(
@@ -867,10 +782,7 @@ run_wage_no_inflation_model <- function(
       LUR = est_df$LUR
     )
 
-  wage_estimates <- wage_values
-  if (missing_index > 0L) {
-    wage_estimates[missing_index] <- wage_missing_median
-  }
+  wage_estimates <- ifelse(is.na(wage_values), wage_missing_median, wage_values)
   summarised_state[[paste0(wage_col, "_EST")]] <- wage_estimates
 
   readr::write_csv(
@@ -879,7 +791,7 @@ run_wage_no_inflation_model <- function(
   )
 
   param_draws <- as.data.frame(fit) %>%
-    dplyr::select(-dplyr::starts_with("NAIRU"), -lp__)
+    select(-starts_with("NAIRU"), -lp__)
 
   param_summary <- param_draws %>%
     pivot_longer(
