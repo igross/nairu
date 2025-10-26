@@ -366,7 +366,11 @@ run_single_wage_inflation_model <- function(
   wage_label,
   compiled_model,
   file_stubs,
-  variant_label
+  variant_label,
+  obs_field,
+  missing_index_field,
+  missing_param,
+  wage_component_col
 ) {
   design <- prepare_single_wage_design(est_df, wage_col)
   wage_values <- design[[wage_col]]
@@ -387,10 +391,10 @@ run_single_wage_inflation_model <- function(
   data_list <- list(
     T = nrow(stan_matrix),
     J = ncol(stan_matrix),
-    Y = stan_matrix,
-    ulc_obs = as.integer(obs),
-    missing_ulc_index = as.integer(missing_index)
+    Y = stan_matrix
   )
+  data_list[[obs_field]] <- as.integer(obs)
+  data_list[[missing_index_field]] <- as.integer(missing_index)
 
   fit <- sampling(
     compiled_model,
@@ -401,7 +405,7 @@ run_single_wage_inflation_model <- function(
   )
 
   draws <- rstan::extract(fit)
-  wage_missing_median <- median(draws$ulc_missing)
+  wage_missing_median <- median(draws[[missing_param]])
 
   if (missing_index > 0L) {
     latest_date <- design$date[missing_index]
@@ -464,7 +468,7 @@ run_single_wage_inflation_model <- function(
 
   Tn <- nrow(Y_mat)
 
-  pi_exp <- pi_imp <- pi_ugap <- pi_mom <- pi_ulc <- pi_resid <- pi_dum <- rep(NA, Tn)
+  pi_exp <- pi_imp <- pi_ugap <- pi_mom <- pi_wage <- pi_resid <- pi_dum <- rep(NA, Tn)
   pu_dum <- pu_ugap <- pu_mom <- pu_exp <- pu_resid <- rep(NA, Tn)
 
   for (t in 6:Tn) {
@@ -482,13 +486,13 @@ run_single_wage_inflation_model <- function(
 
       pi_mom[t]  <- lambda_pt_0 * (Y_mat[t-1, 3] - Y_mat[t-2, 3]) / Y_mat[t, 3]
 
-      pi_ulc[t]  <- phi_pt_0 * Y1_demeaned[t-1] +
+      pi_wage[t]  <- phi_pt_0 * Y1_demeaned[t-1] +
         sum(phi_pt_l * Y1_demeaned[t-(2:4)])
 
       pi_dum[t]  <- xi_pt_med[1] * Y_mat[t, 6] + xi_pt_med[2] * Y_mat[t, 7]
 
       deterministic_pi <- pi_exp[t] + pi_imp[t] + pi_ugap[t] +
-        pi_mom[t] + pi_ulc[t] + pi_dum[t]
+        pi_mom[t] + pi_wage[t] + pi_dum[t]
 
       pi_resid[t] <- Y_mat[t, 4] - deterministic_pi
     }
@@ -512,10 +516,13 @@ run_single_wage_inflation_model <- function(
     import_price  = pi_imp,
     unemp_gap     = pi_ugap,
     momentum      = pi_mom,
-    ulc_demeaned  = pi_ulc,
     dummies       = pi_dum,
-    residuals     = pi_resid
+    residuals     = pi_resid,
+    wage_component = pi_wage
   )
+  wage_component_sym <- rlang::sym(wage_component_col)
+  infl_pi_decomp <- infl_pi_decomp %>%
+    dplyr::rename(!!wage_component_sym := wage_component)
 
   wage_decomp <- tibble::tibble(
     date_qtr      = est_df$date,
@@ -815,9 +822,11 @@ run_wage_no_inflation_model <- function(
 }
 
 compiled_models <- list(
-  baseline = stan_model(file = file.path("stan", "NAIRU_baseline.stan")),
-  dual_wage = stan_model(file = file.path("stan", "NAIRU_dual_wage.stan")),
-  wage_no_inflation = stan_model(file = file.path("stan", "NAIRU_wage_no_inflation.stan"))
+  cpi_ulc = stan_model(file = file.path("stan", "NAIRU_cpi_ulc.stan")),
+  cpi_aena = stan_model(file = file.path("stan", "NAIRU_cpi_aena.stan")),
+  cpi_wpi = stan_model(file = file.path("stan", "NAIRU_cpi_wpi.stan")),
+  cpi_aena_wpi = stan_model(file = file.path("stan", "NAIRU_cpi_aena_wpi.stan")),
+  wpi_only = stan_model(file = file.path("stan", "NAIRU_wpi_only.stan"))
 )
 
 single_wage_variants <- list(
@@ -830,7 +839,12 @@ single_wage_variants <- list(
       wage = "ulc_decomp",
       params = "posterior_summary_params"
     ),
-    variant_label = "Baseline DLNULC model"
+    variant_label = "CPI & ULC model",
+    model_key = "cpi_ulc",
+    obs_field = "ulc_obs",
+    missing_index_field = "missing_ulc_index",
+    missing_param = "ulc_missing",
+    wage_component_col = "ulc_demeaned"
   ),
   list(
     wage_col = "DLAENA",
@@ -841,7 +855,12 @@ single_wage_variants <- list(
       wage = "wage_decomp_aena",
       params = "posterior_summary_params_aena"
     ),
-    variant_label = "AENA wage model"
+    variant_label = "CPI & AENA model",
+    model_key = "cpi_aena",
+    obs_field = "aena_obs",
+    missing_index_field = "missing_aena_index",
+    missing_param = "aena_missing",
+    wage_component_col = "aena_demeaned"
   ),
   list(
     wage_col = "DLWPI",
@@ -852,7 +871,12 @@ single_wage_variants <- list(
       wage = "wage_decomp_wpi",
       params = "posterior_summary_params_wpi"
     ),
-    variant_label = "WPI wage model"
+    variant_label = "CPI & WPI model",
+    model_key = "cpi_wpi",
+    obs_field = "wpi_obs",
+    missing_index_field = "missing_wpi_index",
+    missing_param = "wpi_missing",
+    wage_component_col = "wpi_demeaned"
   )
 )
 
@@ -861,16 +885,20 @@ for (variant in single_wage_variants) {
     est_df = est_data,
     wage_col = variant$wage_col,
     wage_label = variant$wage_label,
-    compiled_model = compiled_models$baseline,
+    compiled_model = compiled_models[[variant$model_key]],
     file_stubs = variant$file_stubs,
-    variant_label = variant$variant_label
+    variant_label = variant$variant_label,
+    obs_field = variant$obs_field,
+    missing_index_field = variant$missing_index_field,
+    missing_param = variant$missing_param,
+    wage_component_col = variant$wage_component_col
   )
 }
 
 run_dual_wage_model(
   est_df = est_data,
   wage_cols = c("DLAENA", "DLWPI"),
-  compiled_model = compiled_models$dual_wage,
+  compiled_model = compiled_models$cpi_aena_wpi,
   file_stubs = list(
     nairu = "NAIRU_aena_wpi",
     params = "posterior_summary_params_aena_wpi"
@@ -881,7 +909,7 @@ run_dual_wage_model(
 run_wage_no_inflation_model(
   est_df = est_data,
   wage_col = "DLWPI",
-  compiled_model = compiled_models$wage_no_inflation,
+  compiled_model = compiled_models$wpi_only,
   file_stubs = list(
     nairu = "NAIRU_wpi_no_inflation",
     params = "posterior_summary_params_wpi_no_inflation"
