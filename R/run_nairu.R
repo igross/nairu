@@ -24,7 +24,7 @@ if (!Sys.Date() %in% release_calendar) {
   message(
     glue::glue("⏩ {Sys.Date()} is not an ABS CPI/National-Accounts release day – skipping refresh.")
   )
-   quit(save = "no")   # graceful, zero-exit termination
+  # quit(save = "no")   # graceful, zero-exit termination
 }
 
 
@@ -55,86 +55,37 @@ rba_g3 <- read_rba(series_id = c("GBONYLD"))
 #rba_g1 <- read_rba(series_id = c("GCPIOCPMTMQP","GCPITIQP","GCPINTIQP"))
 rba_g1 <- read_abs(series_id = c("A3604510W","A2330530C","A2330575J"))
 
-rba_table_cache <- new.env(parent = emptyenv())
+rba_series_meta <- read_rba_seriesid()
 
-get_rba_table <- function(table_no) {
-  if (!exists(table_no, envir = rba_table_cache, inherits = FALSE)) {
-    tbl <- tryCatch(
-      read_rba(table_no = table_no),
-      error = function(e) {
-        message(glue::glue("⚠️ Unable to download RBA table {table_no}: {e$message}"))
-        NULL
-      }
-    )
-    assign(table_no, tbl, envir = rba_table_cache)
-  }
-  get(table_no, envir = rba_table_cache, inherits = FALSE)
+search_cols <- intersect(c("series", "description", "title", "units"), names(rba_series_meta))
+
+if (length(search_cols) > 0) {
+  rba_series_meta$search_text <- str_to_lower(do.call(paste, c(rba_series_meta[search_cols], sep = " ")))
+} else {
+  rba_series_meta$search_text <- ""
 }
 
-default_rba_tables <- c("A1", "A2", "B1", "B2", "C1", "C2", "D1", "D2",
-                        "D3", "D4", "D5", "D6", "E1", "E2", "F1", "F2",
-                        "G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8",
-                        "H1", "H2", "H3", "H4", "H5", "I1", "I2")
-
 lookup_rba_series <- function(keywords, table = NULL, frequency = NULL) {
-  keywords <- str_to_lower(as.vector(keywords))
-  tables_to_scan <- if (is.null(table) || length(table) == 0) default_rba_tables else table
+  keywords <- as.vector(keywords)
+  results <- rba_series_meta
 
-  table_data <- purrr::map_dfr(tables_to_scan, function(tbl) {
-    df <- get_rba_table(tbl)
-    if (is.null(df) || nrow(df) == 0) {
-      return(tibble::tibble())
-    }
-    df$table_no <- tbl
-    df
-  })
-
-  if (nrow(table_data) == 0) {
-    stop("Unable to download any RBA tables for lookup.")
+  if (!is.null(table) && "table_no" %in% names(results)) {
+    results <- results %>% filter(table_no %in% table)
   }
 
-  search_cols <- intersect(
-    c("series", "description", "title", "series_title", "series_description", "label", "units"),
-    names(table_data)
-  )
-
-  if (length(search_cols) == 0) {
-    stop("Unable to construct search metadata for RBA tables.")
-  }
-
-  table_data <- table_data %>%
-    mutate(
-      search_text = str_to_lower(
-        purrr::pmap_chr(
-          dplyr::select(., dplyr::all_of(search_cols)),
-          ~ paste(c(...), collapse = " ")
-        )
-      )
-    )
-
-  if (!is.null(table) && "table_no" %in% names(table_data)) {
-    table_data <- table_data %>% filter(table_no %in% table)
-  }
-
-  if (!is.null(frequency) && "frequency" %in% names(table_data)) {
-    table_data <- table_data %>% filter(frequency %in% frequency)
+  if (!is.null(frequency) && "frequency" %in% names(results)) {
+    results <- results %>% filter(frequency %in% frequency)
   }
 
   for (kw in keywords) {
-    table_data <- table_data %>% filter(str_detect(search_text, kw))
+    results <- results %>% filter(str_detect(search_text, str_to_lower(kw)))
   }
 
-  if (nrow(table_data) == 0) {
+  if (nrow(results) == 0) {
     stop(sprintf("Unable to find RBA series for keywords: %s", paste(keywords, collapse = ", ")))
   }
 
-  available_ids <- unique(stats::na.omit(table_data$series_id))
-
-  if (length(available_ids) == 0) {
-    stop(sprintf("Unable to find RBA series for keywords: %s", paste(keywords, collapse = ", ")))
-  }
-
-  available_ids[[1]]
+  results$series_id[[1]]
 }
 
 quarterly_average <- function(df) {
@@ -864,6 +815,7 @@ run_wage_no_inflation_model <- function(
     param_summary,
     file.path(out_dir, paste0(file_stubs$params, ".csv"))
   )
+}
 
   message(glue::glue(
     "✔ {variant_label}: parameter draws and summaries written to the output directory."
