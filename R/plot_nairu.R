@@ -255,40 +255,44 @@ types <- list.files(vintage_dir, pattern = "\\.csv$", full.names = TRUE)
 last8 <- head(types[order(file.info(types)$mtime, decreasing = TRUE)], 8)
 tmp_df <- map_dfr(last8, read_vintage_safe)
 
-summary_df <- tmp_df %>%
-  arrange(max_date) %>%
-  mutate(prev_max = lag(max_date)) %>%
-  mutate(
-    new_qtrs = pmap_chr(list(prev_max, max_date), ~ {
-      prev <- ..1; curr <- ..2
-      if (is.na(curr) || is.na(prev)) fmt_yq(curr)
-      else if (curr <= prev) fmt_yq(curr)
-      else paste(seq(prev + 0.25, curr, 0.25) %>% map_chr(fmt_yq), collapse = ", ")
-    }),
-    release_type = map_chr(pub_date, ~ if (month(.x) %in% table_month$CPI) "CPI" else "GDP")
-  ) %>%
-  ungroup() %>%
-  filter(!is.na(max_date)) %>%
-  distinct(new_qtrs, .keep_all = TRUE) %>%
-  mutate(idx = row_number())
+if (nrow(tmp_df) > 0 && "max_date" %in% names(tmp_df)) {
+  summary_df <- tmp_df %>%
+    arrange(max_date) %>%
+    mutate(prev_max = lag(max_date)) %>%
+    mutate(
+      new_qtrs = pmap_chr(list(prev_max, max_date), ~ {
+        prev <- ..1; curr <- ..2
+        if (is.na(curr) || is.na(prev)) fmt_yq(curr)
+        else if (curr <= prev) fmt_yq(curr)
+        else paste(seq(prev + 0.25, curr, 0.25) %>% map_chr(fmt_yq), collapse = ", ")
+      }),
+      release_type = map_chr(pub_date, ~ if (month(.x) %in% table_month$CPI) "CPI" else "GDP")
+    ) %>%
+    ungroup() %>%
+    filter(!is.na(max_date)) %>%
+    distinct(new_qtrs, .keep_all = TRUE) %>%
+    mutate(idx = row_number())
 
-p3 <- ggplot(
-  summary_df,
-  aes(x = factor(idx), y = nairu_latest, fill = release_type,
-      text = paste0("Release: ", new_qtrs, "<br>NAIRU: ", nairu_latest))
-) +
-  geom_col(width = 0.7) +
-  scale_y_continuous(limits = c(4, 5)) +
-  scale_x_discrete(labels = paste0(summary_df$release_type, "\n", summary_df$new_qtrs)) +
-  labs(title = "Most-recent NAIRU estimates by release type",
-       x = "Release (type and quarter)", y = "NAIRU (%)",
-       fill = "Release") +
-  my_theme
+  p3 <- ggplot(
+    summary_df,
+    aes(x = factor(idx), y = nairu_latest, fill = release_type,
+        text = paste0("Release: ", new_qtrs, "<br>NAIRU: ", nairu_latest))
+  ) +
+    geom_col(width = 0.7) +
+    scale_y_continuous(limits = c(4, 5)) +
+    scale_x_discrete(labels = paste0(summary_df$release_type, "\n", summary_df$new_qtrs)) +
+    labs(title = "Most-recent NAIRU estimates by release type",
+         x = "Release (type and quarter)", y = "NAIRU (%)",
+         fill = "Release") +
+    my_theme
 
-ggsave(file.path(output_dir, "nairu_last8_bar.png"), p3, width = 9, height = 5, dpi = 300)
-saveWidget(ggplotly(p3, tooltip = "text"),
-           file.path(output_dir, "nairu_last8_bar.html"))
-message("Figure 3 saved")
+  ggsave(file.path(output_dir, "nairu_last8_bar.png"), p3, width = 9, height = 5, dpi = 300)
+  saveWidget(ggplotly(p3, tooltip = "text"),
+             file.path(output_dir, "nairu_last8_bar.html"))
+  message("Figure 3 saved")
+} else {
+  message("Skipping Figure 3 – no recent vintage files were found")
+}
 
 # ---- 9. Figure 4: All vintages series colored ---------------------------
 files      <- list.files(vintage_dir, pattern = "\\.csv$", full.names = TRUE)
