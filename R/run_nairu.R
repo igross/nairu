@@ -1,7 +1,7 @@
 # ---- libraries ------------------------------------------------------------
 library(ggthemes); library(reshape2); library(readabs);  library(dplyr)
 library(ggplot2);   library(zoo);      library(rstan);   library(readrba)
-library(lubridate); library(readr);    library(here);     library(stringr)
+library(lubridate); library(readr);    library(here);     library(stringr); library(tidyr)
 
 
 # ---- ABS quarterly release timetable -------------------------------------------------
