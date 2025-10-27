@@ -295,36 +295,54 @@ if (nrow(tmp_df) > 0 && "max_date" %in% names(tmp_df)) {
 }
 
 # ---- 9. Figure 4: All vintages series colored ---------------------------
-files      <- list.files(vintage_dir, pattern = "\\.csv$", full.names = TRUE)
-labels     <- tools::file_path_sans_ext(basename(files))
+files  <- list.files(vintage_dir, pattern = "\\.csv$", full.names = TRUE)
+labels <- tools::file_path_sans_ext(basename(files))
+
 vintages_df <- map2_dfr(files, labels, function(path, label) {
-  df <- suppressMessages(read_csv(path, show_col_types = FALSE)) %>% ensure_dates()
-  df %>% mutate(vintage = label)
+  df <- suppressMessages(read_csv(path, show_col_types = FALSE))
+  if (nrow(df) == 0) {
+    return(tibble::tibble())
+  }
+
+  ensure_dates(df) %>% mutate(vintage = label)
 })
 
-all_vints  <- unique(vintages_df$vintage)
-if ("Baseline" %in% all_vints) {
-  palette   <- rainbow(length(all_vints) - 1)
-  color_map <- setNames(c(palette, "black"), c(setdiff(all_vints, "Baseline"), "Baseline"))
+if (nrow(vintages_df) > 0 && "vintage" %in% names(vintages_df)) {
+  all_vints <- unique(vintages_df$vintage)
+
+  if ("Baseline" %in% all_vints) {
+    palette   <- rainbow(length(all_vints) - 1)
+    color_map <- setNames(c(palette, "black"), c(setdiff(all_vints, "Baseline"), "Baseline"))
+  } else {
+    palette   <- rainbow(length(all_vints))
+    color_map <- setNames(palette, all_vints)
+  }
+
+  p4 <- ggplot(
+    vintages_df,
+    aes(
+      x     = date,
+      y     = median,
+      color = vintage,
+      text  = paste0("Date: ", date, "<br>NAIRU: ", median)
+    )
+  ) +
+    geom_line(linewidth = 0.8) +
+    scale_color_manual(values = color_map) +
+    labs(
+      title = "NAIRU estimates across all vintages",
+      x     = "Year",
+      y     = "NAIRU (%)",
+      color = "Vintage"
+    ) +
+    my_theme
+
+  ggsave(file.path(output_dir, "nairu_all_vintages.png"), p4, width = 8, height = 5, dpi = 300)
+  saveWidget(ggplotly(p4, tooltip = "text"), file.path(output_dir, "nairu_all_vintages.html"))
+  message("Figure 4 saved: all vintages")
 } else {
-  palette   <- rainbow(length(all_vints))
-  color_map <- setNames(palette, all_vints)
+  message("Skipping Figure 4 – no valid vintage files were found")
 }
-
-p4 <- ggplot(
-  vintages_df,
-  aes(x = date, y = median, color = vintage,
-      text = paste0("Date: ", date, "<br>NAIRU: ", median))
-) +
-  geom_line(linewidth = 0.8) +
-  scale_color_manual(values = color_map) +
-  labs(title = "NAIRU estimates across all vintages",
-       x = "Year", y = "NAIRU (%)", color = "Vintage") +
-  my_theme
-
-ggsave(file.path(output_dir, "nairu_all_vintages.png"), p4, width = 8, height = 5, dpi = 300)
-saveWidget(ggplotly(p4, tooltip = "text"), file.path(output_dir, "nairu_all_vintages.html"))
-message("Figure 4 saved: all vintages")
 
 # ---- 10. Figure 5: NAIRU across all regions ------------------------------
 
