@@ -49,7 +49,13 @@ read_vintage_safe <- function(path) {
   file_date <- as.yearqtr(pub_date)
 
   df <- suppressMessages(read_csv(path, show_col_types = FALSE))
-  if (nrow(df) == 0 || !"median" %in% names(df)) return(tibble())
+  if (nrow(df) == 0 || !"median" %in% names(df)) {
+    return(tibble::tibble(
+      pub_date     = as.Date(character()),
+      max_date     = zoo::as.yearqtr(character()),
+      nairu_latest = numeric()
+    ))
+  }
   df <- ensure_dates(df) %>%
       mutate(date = as.Date(date, frac = 0.5))   # ← mid-quarter
 
@@ -57,7 +63,7 @@ read_vintage_safe <- function(path) {
   if (length(idx) == 0) idx <- which.max(df$date)
   nairu_val <- df$median[idx]
 
-  tibble(
+  tibble::tibble(
     pub_date     = pub_date,
     max_date     = file_date,
     nairu_latest = nairu_val
