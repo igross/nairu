@@ -17,7 +17,8 @@ library(htmlwidgets)
 library(lubridate)
 library(scales)      # added for date_breaks & number_format
 library(janitor)
-library(ggforce) 
+library(ggforce)
+library(viridisLite)
 
 # ---- 2. Set up file paths -----------------------------------------------
 target_dir  <- getwd()
@@ -48,7 +49,13 @@ read_vintage_safe <- function(path) {
   file_date <- as.yearqtr(pub_date)
 
   df <- suppressMessages(read_csv(path, show_col_types = FALSE))
-  if (nrow(df) == 0 || !"median" %in% names(df)) return(tibble())
+  if (nrow(df) == 0 || !"median" %in% names(df)) {
+    return(tibble::tibble(
+      pub_date     = as.Date(character()),
+      max_date     = zoo::as.yearqtr(character()),
+      nairu_latest = numeric()
+    ))
+  }
   df <- ensure_dates(df) %>%
       mutate(date = as.Date(date, frac = 0.5))   # ← mid-quarter
 
@@ -56,7 +63,7 @@ read_vintage_safe <- function(path) {
   if (length(idx) == 0) idx <- which.max(df$date)
   nairu_val <- df$median[idx]
 
-  tibble(
+  tibble::tibble(
     pub_date     = pub_date,
     max_date     = file_date,
     nairu_latest = nairu_val
@@ -64,6 +71,60 @@ read_vintage_safe <- function(path) {
 }
 
 fmt_yq <- function(yq) format(yq, "%Y Q%q")
+
+# Load and tidy NAIRU estimates for a given model --------------------------
+read_nairu_model <- function(path, model_label) {
+  suppressMessages(read_csv(path, show_col_types = FALSE)) %>%
+    clean_names() %>%
+    rename(
+      lower = lowera,
+      upper = uppera
+    ) %>%
+    mutate(
+      date_qtr = as.yearqtr(date, "%Y Q%q"),
+      date     = as.Date(date_qtr, frac = 0.5),
+      model    = model_label,
+      qtr_lbl  = format(date_qtr, "%Y-Q%q")
+    ) %>%
+    arrange(date_qtr) %>%
+    filter(!is.na(median))
+}
+
+# Convert a decomposition CSV into a tidy, long format --------------------
+tidy_decomposition <- function(path, series_label, component_labels) {
+  if (!file.exists(path)) return(tibble::tibble())
+
+  df_long <- suppressMessages(read_csv(path, show_col_types = FALSE)) %>%
+    pivot_longer(-date_qtr, names_to = "component", values_to = "value") %>%
+    mutate(
+      component = recode(
+        component,
+        !!!component_labels,
+        .default = tools::toTitleCase(gsub("_", " ", component))
+      ),
+      date_qtr = as.yearqtr(date_qtr, "%Y Q%q"),
+      date     = as.Date(date_qtr, frac = 0.5),
+      series   = series_label
+    ) %>%
+    filter(!is.na(value))
+
+  if (nrow(df_long) == 0) return(df_long)
+
+  preferred_levels <- unique(unname(component_labels))
+  extra_levels     <- setdiff(unique(df_long$component), preferred_levels)
+
+  df_long %>%
+    mutate(
+      component = factor(component, levels = c(preferred_levels, extra_levels)),
+      tooltip   = sprintf(
+        "%s<br>%s<br>%s: %.2f pp",
+        format(date_qtr, "%Y-Q%q"),
+        series,
+        component,
+        value
+      )
+    )
+}
 
 # Custom theme ------------------------------------------------------------
 my_theme <- theme_bw() +
@@ -194,72 +255,94 @@ types <- list.files(vintage_dir, pattern = "\\.csv$", full.names = TRUE)
 last8 <- head(types[order(file.info(types)$mtime, decreasing = TRUE)], 8)
 tmp_df <- map_dfr(last8, read_vintage_safe)
 
-summary_df <- tmp_df %>%
-  arrange(max_date) %>%
-  mutate(prev_max = lag(max_date)) %>%
-  mutate(
-    new_qtrs = pmap_chr(list(prev_max, max_date), ~ {
-      prev <- ..1; curr <- ..2
-      if (is.na(curr) || is.na(prev)) fmt_yq(curr)
-      else if (curr <= prev) fmt_yq(curr)
-      else paste(seq(prev + 0.25, curr, 0.25) %>% map_chr(fmt_yq), collapse = ", ")
-    }),
-    release_type = map_chr(pub_date, ~ if (month(.x) %in% table_month$CPI) "CPI" else "GDP")
-  ) %>%
-  ungroup() %>%
-  filter(!is.na(max_date)) %>%
-  distinct(new_qtrs, .keep_all = TRUE) %>%
-  mutate(idx = row_number())
+if (nrow(tmp_df) > 0 && "max_date" %in% names(tmp_df)) {
+  summary_df <- tmp_df %>%
+    arrange(max_date) %>%
+    mutate(prev_max = lag(max_date)) %>%
+    mutate(
+      new_qtrs = pmap_chr(list(prev_max, max_date), ~ {
+        prev <- ..1; curr <- ..2
+        if (is.na(curr) || is.na(prev)) fmt_yq(curr)
+        else if (curr <= prev) fmt_yq(curr)
+        else paste(seq(prev + 0.25, curr, 0.25) %>% map_chr(fmt_yq), collapse = ", ")
+      }),
+      release_type = map_chr(pub_date, ~ if (month(.x) %in% table_month$CPI) "CPI" else "GDP")
+    ) %>%
+    ungroup() %>%
+    filter(!is.na(max_date)) %>%
+    distinct(new_qtrs, .keep_all = TRUE) %>%
+    mutate(idx = row_number())
 
-p3 <- ggplot(
-  summary_df,
-  aes(x = factor(idx), y = nairu_latest, fill = release_type,
-      text = paste0("Release: ", new_qtrs, "<br>NAIRU: ", nairu_latest))
-) +
-  geom_col(width = 0.7) +
-  scale_y_continuous(limits = c(4, 5)) +
-  scale_x_discrete(labels = paste0(summary_df$release_type, "\n", summary_df$new_qtrs)) +
-  labs(title = "Most-recent NAIRU estimates by release type",
-       x = "Release (type and quarter)", y = "NAIRU (%)",
-       fill = "Release") +
-  my_theme
+  p3 <- ggplot(
+    summary_df,
+    aes(x = factor(idx), y = nairu_latest, fill = release_type,
+        text = paste0("Release: ", new_qtrs, "<br>NAIRU: ", nairu_latest))
+  ) +
+    geom_col(width = 0.7) +
+    scale_y_continuous(limits = c(4, 5)) +
+    scale_x_discrete(labels = paste0(summary_df$release_type, "\n", summary_df$new_qtrs)) +
+    labs(title = "Most-recent NAIRU estimates by release type",
+         x = "Release (type and quarter)", y = "NAIRU (%)",
+         fill = "Release") +
+    my_theme
 
-ggsave(file.path(output_dir, "nairu_last8_bar.png"), p3, width = 9, height = 5, dpi = 300)
-saveWidget(ggplotly(p3, tooltip = "text"),
-           file.path(output_dir, "nairu_last8_bar.html"))
-message("Figure 3 saved")
-
-# ---- 9. Figure 4: All vintages series colored ---------------------------
-files      <- list.files(vintage_dir, pattern = "\\.csv$", full.names = TRUE)
-labels     <- tools::file_path_sans_ext(basename(files))
-vintages_df <- map2_dfr(files, labels, function(path, label) {
-  df <- suppressMessages(read_csv(path, show_col_types = FALSE)) %>% ensure_dates()
-  df %>% mutate(vintage = label)
-})
-
-all_vints  <- unique(vintages_df$vintage)
-if ("Baseline" %in% all_vints) {
-  palette   <- rainbow(length(all_vints) - 1)
-  color_map <- setNames(c(palette, "black"), c(setdiff(all_vints, "Baseline"), "Baseline"))
+  ggsave(file.path(output_dir, "nairu_last8_bar.png"), p3, width = 9, height = 5, dpi = 300)
+  saveWidget(ggplotly(p3, tooltip = "text"),
+             file.path(output_dir, "nairu_last8_bar.html"))
+  message("Figure 3 saved")
 } else {
-  palette   <- rainbow(length(all_vints))
-  color_map <- setNames(palette, all_vints)
+  message("Skipping Figure 3 – no recent vintage files were found")
 }
 
-p4 <- ggplot(
-  vintages_df,
-  aes(x = date, y = median, color = vintage,
-      text = paste0("Date: ", date, "<br>NAIRU: ", median))
-) +
-  geom_line(linewidth = 0.8) +
-  scale_color_manual(values = color_map) +
-  labs(title = "NAIRU estimates across all vintages",
-       x = "Year", y = "NAIRU (%)", color = "Vintage") +
-  my_theme
+# ---- 9. Figure 4: All vintages series colored ---------------------------
+files  <- list.files(vintage_dir, pattern = "\\.csv$", full.names = TRUE)
+labels <- tools::file_path_sans_ext(basename(files))
 
-ggsave(file.path(output_dir, "nairu_all_vintages.png"), p4, width = 8, height = 5, dpi = 300)
-saveWidget(ggplotly(p4, tooltip = "text"), file.path(output_dir, "nairu_all_vintages.html"))
-message("Figure 4 saved: all vintages")
+vintages_df <- map2_dfr(files, labels, function(path, label) {
+  df <- suppressMessages(read_csv(path, show_col_types = FALSE))
+  if (nrow(df) == 0) {
+    return(tibble::tibble())
+  }
+
+  ensure_dates(df) %>% mutate(vintage = label)
+})
+
+if (nrow(vintages_df) > 0 && "vintage" %in% names(vintages_df)) {
+  all_vints <- unique(vintages_df$vintage)
+
+  if ("Baseline" %in% all_vints) {
+    palette   <- rainbow(length(all_vints) - 1)
+    color_map <- setNames(c(palette, "black"), c(setdiff(all_vints, "Baseline"), "Baseline"))
+  } else {
+    palette   <- rainbow(length(all_vints))
+    color_map <- setNames(palette, all_vints)
+  }
+
+  p4 <- ggplot(
+    vintages_df,
+    aes(
+      x     = date,
+      y     = median,
+      color = vintage,
+      text  = paste0("Date: ", date, "<br>NAIRU: ", median)
+    )
+  ) +
+    geom_line(linewidth = 0.8) +
+    scale_color_manual(values = color_map) +
+    labs(
+      title = "NAIRU estimates across all vintages",
+      x     = "Year",
+      y     = "NAIRU (%)",
+      color = "Vintage"
+    ) +
+    my_theme
+
+  ggsave(file.path(output_dir, "nairu_all_vintages.png"), p4, width = 8, height = 5, dpi = 300)
+  saveWidget(ggplotly(p4, tooltip = "text"), file.path(output_dir, "nairu_all_vintages.html"))
+  message("Figure 4 saved: all vintages")
+} else {
+  message("Skipping Figure 4 – no valid vintage files were found")
+}
 
 # ---- 10. Figure 5: NAIRU across all regions ------------------------------
 
@@ -315,82 +398,245 @@ message("✔  Figure 5 saved: regions")
 
 
 
+# ---- 11. NAIRU estimates by model ---------------------------------------
+
+model_specs <- tibble::tribble(
+  ~path,                                      ~label,
+  file.path(output_dir, "NAIRU_baseline.csv"),          "CPI & ULC model",
+  file.path(output_dir, "NAIRU_wpi.csv"),               "CPI & WPI model",
+  file.path(output_dir, "NAIRU_wpi_no_inflation.csv"),  "WPI-only model"
+) %>%
+  filter(file.exists(path))
+
+nairu_models_df <- purrr::map2_dfr(
+  model_specs$path,
+  model_specs$label,
+  read_nairu_model
+)
+
+if (nrow(nairu_models_df) > 0) {
+  latest_points <- nairu_models_df %>%
+    group_by(model) %>%
+    filter(date == max(date)) %>%
+    ungroup()
+
+  p_models <- ggplot(nairu_models_df, aes(x = date, group = 1)) +
+    geom_ribbon(
+      aes(
+        ymin = lower,
+        ymax = upper,
+        text = sprintf(
+          "%s<br>%s credible interval: %.2f – %.2f",
+          qtr_lbl, model, lower, upper
+        )
+      ),
+      fill = "orange", alpha = 0.3, colour = NA
+    ) +
+    geom_line(
+      aes(
+        y = median,
+        text = sprintf("%s<br>%s median NAIRU: %.2f", qtr_lbl, model, median)
+      ),
+      colour = "red", linewidth = 1, na.rm = TRUE
+    ) +
+    geom_line(
+      aes(
+        y = lur,
+        text = sprintf("%s<br>Unemp. rate: %.2f", qtr_lbl, lur)
+      ),
+      colour = "blue", linewidth = 0.8, na.rm = TRUE
+    ) +
+    geom_point(
+      data = latest_points,
+      aes(
+        y = median,
+        text = sprintf("Latest (%s)<br>%s median: %.2f", qtr_lbl, model, median)
+      ),
+      colour = "black", size = 2.5
+    ) +
+    facet_wrap(~ model, ncol = 1) +
+    scale_x_date(date_breaks = "2 years", date_labels = "%Y") +
+    labs(
+      title    = "NAIRU estimates by model",
+      subtitle = "Median estimates with 90% credible intervals",
+      x        = "Year",
+      y        = "Percent"
+    ) +
+    my_theme +
+    theme(legend.position = "none")
+
+  ggsave(
+    file.path(output_dir, "nairu_models.png"),
+    p_models,
+    width = 9, height = 8, dpi = 300
+  )
+
+  htmlwidgets::saveWidget(
+    plotly::ggplotly(p_models, tooltip = "text"),
+    file.path(output_dir, "nairu_models.html")
+  )
+
+  message("✔  Saved NAIRU model comparison plot")
+
+  # ---- 12. Average NAIRU across models ----------------------------------
+
+  model_summary <- nairu_models_df %>%
+    group_by(date, date_qtr) %>%
+    summarise(
+      avg_median = mean(median, na.rm = TRUE),
+      min_median = min(median, na.rm = TRUE),
+      max_median = max(median, na.rm = TRUE),
+      min_lower  = min(lower, na.rm = TRUE),
+      max_upper  = max(upper, na.rm = TRUE),
+      qtr_lbl    = first(qtr_lbl),
+      .groups    = "drop"
+    )
+
+  latest_avg <- slice_tail(model_summary, n = 1)
+
+  p_avg <- ggplot(model_summary, aes(x = date, group = 1)) +
+    geom_ribbon(
+      aes(
+        ymin = min_lower,
+        ymax = max_upper,
+        text = sprintf(
+          "%s<br>Credible band union: %.2f – %.2f",
+          qtr_lbl, min_lower, max_upper
+        )
+      ),
+      fill = "#cce5ff", alpha = 0.4, colour = NA
+    ) +
+    geom_ribbon(
+      aes(
+        ymin = min_median,
+        ymax = max_median,
+        text = sprintf(
+          "%s<br>Median range: %.2f – %.2f",
+          qtr_lbl, min_median, max_median
+        )
+      ),
+      fill = "#99c2ff", alpha = 0.6, colour = NA
+    ) +
+    geom_line(
+      aes(
+        y = avg_median,
+        text = sprintf("%s<br>Average median: %.2f", qtr_lbl, avg_median)
+      ),
+      colour = "red", linewidth = 1
+    ) +
+    geom_point(
+      data = latest_avg,
+      aes(
+        y = avg_median,
+        text = sprintf("Latest (%s)<br>Average median: %.2f", qtr_lbl, avg_median)
+      ),
+      colour = "black", size = 3
+    ) +
+    scale_x_date(date_breaks = "2 years", date_labels = "%Y") +
+    labs(
+      title    = "Average NAIRU estimate across models",
+      subtitle = "Shaded area shows the range of model medians and credible intervals",
+      x        = "Year",
+      y        = "Percent"
+    ) +
+    my_theme +
+    theme(legend.position = "none")
+
+  ggsave(
+    file.path(output_dir, "nairu_model_average.png"),
+    p_avg,
+    width = 8, height = 5, dpi = 300
+  )
+
+  htmlwidgets::saveWidget(
+    plotly::ggplotly(p_avg, tooltip = "text"),
+    file.path(output_dir, "nairu_model_average.html")
+  )
+
+  message("✔  Saved NAIRU model average plot")
+}
+
+
+#  FULL decomposition bar-charts by model
 # ─────────────────────────────────────────────────────────────────────────────
-#  FULL decomposition bar-chart (ordered stack)
-#  • input:  infl_pi_decomp.csv  /  ulc_decomp.csv   in output_dir
-#  • output: infl_ulc_decomp.png /  infl_ulc_decomp.html   in output_dir
-# ─────────────────────────────────────────────────────────────────────────────
-library(dplyr);    library(tidyr);   library(readr);   library(zoo)
-library(ggplot2);  library(plotly);  library(htmlwidgets); library(viridisLite)
 
-# ---- 0. paths ---------------------------------------------------------------
-infl_file <- file.path(output_dir, "infl_pi_decomp.csv")
-ulc_file  <- file.path(output_dir, "ulc_decomp.csv")
-
-# ── Decomposition: read + reshape + relabel ───────────────────────────────
-comp_levels <- c("expectations", "dummies", "import_price",
-                 "ulc_demeaned", "momentum", "unemp_gap", "residuals")
-
-comp_labels <- c(
+base_component_labels <- c(
   expectations = "Inflation expectations",
   dummies      = "Dummy variables",
   import_price = "Import-price shocks",
-  ulc_demeaned = "ΔULC (demeaned)",
   momentum     = "Momentum",
   unemp_gap    = "Unemployment gap",
   residuals    = "Residual"
 )
 
-infl_df <- read_csv(infl_file, show_col_types = FALSE) %>% mutate(series = "Inflation")
-ulc_df  <- read_csv(ulc_file , show_col_types = FALSE) %>% mutate(series = "ULC")
-
-decomp_df <- bind_rows(infl_df, ulc_df) %>%
-  pivot_longer(-c(date_qtr, series),
-               names_to = "component", values_to = "value") %>%
-  mutate(                                     # ❶ relabel right here
-    component = recode(component, !!!comp_labels),
-    component = factor(component, levels = comp_labels),  # legend order
-    date_qtr  = as.yearqtr(date_qtr, "%Y Q%q"),
-    date      = as.Date(date_qtr)
-  ) %>%
-  filter(!is.na(value))
-
-# ── Colour palette keyed by pretty labels ─────────────────────────────────
-palette_cols <- setNames(
-  viridisLite::turbo(length(comp_labels)),
-  comp_labels                                   # names = legend entries
-)
-
-# ── Plot ──────────────────────────────────────────────────────────────────
-p_decomp <- ggplot(
-  decomp_df,
-  aes(
-    x   = date,
-    y   = value,
-    fill= component,
-    text= sprintf("%s<br>%s: %.2f pp",
-                  format(date_qtr, "%Y-Q%q"), component, value)
+decomposition_specs <- list(
+  list(
+    label             = "CPI & ULC model",
+    output_stub       = "infl_ulc_decomp",
+    component_labels  = c(base_component_labels, ulc_demeaned = "ΔULC (demeaned)"),
+    series_files      = list(
+      list(path = file.path(output_dir, "infl_pi_decomp.csv"), label = "Inflation"),
+      list(path = file.path(output_dir, "ulc_decomp.csv"),       label = "Unit labour costs")
+    )
+  ),
+  list(
+    label             = "CPI & WPI model",
+    output_stub       = "infl_wage_decomp_wpi",
+    component_labels  = c(base_component_labels, wpi_demeaned = "ΔWPI (demeaned)"),
+    series_files      = list(
+      list(path = file.path(output_dir, "infl_pi_decomp_wpi.csv"), label = "Inflation"),
+      list(path = file.path(output_dir, "wage_decomp_wpi.csv"),    label = "Wage growth")
+    )
   )
-) +
-  geom_col(width = 90, position = position_stack(reverse = TRUE)) +
-  facet_wrap(~ series, ncol = 1, scales = "free_y") +
-  labs(
-    title = "NAIRU-model decomposition – full component detail",
-    x     = "Year",
-    y     = "Percentage-point contribution (q/q)"
-  ) +
-  scale_fill_manual(name = "Component", values = palette_cols) +  # ❷ legend text & colours
-  my_theme +
-  theme(legend.position = "bottom")
-
-# ── Save ──────────────────────────────────────────────────────────────────
-ggsave(file.path(output_dir, "infl_ulc_decomp.png"),
-       p_decomp, width = 9, height = 6, dpi = 300)
-
-htmlwidgets::saveWidget(
-  plotly::ggplotly(p_decomp, tooltip = "text"),
-  file.path(output_dir, "infl_ulc_decomp.html")
 )
+
+for (spec in decomposition_specs) {
+  series_dfs <- purrr::map(
+    spec$series_files,
+    ~ tidy_decomposition(.x$path, .x$label, spec$component_labels)
+  )
+  decomp_df  <- purrr::list_rbind(series_dfs)
+
+  if (nrow(decomp_df) == 0) {
+    message("⚠  No decomposition data available for ", spec$label)
+    next
+  }
+
+  comp_levels <- levels(decomp_df$component)
+  palette_cols <- setNames(
+    viridisLite::turbo(length(comp_levels)),
+    comp_levels
+  )
+
+  p_decomp <- ggplot(
+    decomp_df,
+    aes(
+      x    = date,
+      y    = value,
+      fill = component,
+      text = tooltip
+    )
+  ) +
+    geom_col(width = 90, position = position_stack(reverse = TRUE)) +
+    facet_wrap(~ series, ncol = 1, scales = "free_y") +
+    labs(
+      title = paste0(spec$label, " – decomposition"),
+      x     = "Year",
+      y     = "Percentage-point contribution (q/q)",
+      fill  = "Component"
+    ) +
+    scale_fill_manual(values = palette_cols) +
+    my_theme +
+    theme(legend.position = "bottom")
+
+  png_path  <- file.path(output_dir, paste0(spec$output_stub, ".png"))
+  html_path <- file.path(output_dir, paste0(spec$output_stub, ".html"))
+
+  ggsave(png_path, p_decomp, width = 9, height = 6, dpi = 300)
+  htmlwidgets::saveWidget(plotly::ggplotly(p_decomp, tooltip = "text"), html_path)
+
+  message("✔  Saved decomposition plot for ", spec$label)
+}
 
 
 # ---- 11. Phillips curve style scatter: inflation vs unemployment gap -----
