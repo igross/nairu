@@ -25,9 +25,11 @@ transformed data {
   vector[T] Y1_demeaned;        // demeaned ΔWPI    (col 1)
 
   real Y2_mean = mean(col(Y, 2));
+  real Y5_mean = mean(col(Y, 5));
   real Y1_mean;
   real Y1_sum = 0;
   int wpi_count = 0;
+  real delta_pu_prior_mean;
 
   for (t in 1:T) {
     if (wpi_obs[t] == 1) {
@@ -40,6 +42,12 @@ transformed data {
     Y1_mean = Y1_sum / wpi_count;
   } else {
     Y1_mean = 0;
+  }
+
+  if (Y1_mean != 0) {
+    delta_pu_prior_mean = Y5_mean / Y1_mean;
+  } else {
+    delta_pu_prior_mean = 0;
   }
 
   for (t in 1:T) {
@@ -112,7 +120,7 @@ model {
   }
 
   // Contemporaneous coefficients (same priors as original model)
-  delta_pt_0  ~ normal(1,0.1);                          // (0,1) on expectations
+  delta_pt_0  ~ normal(1, 0.1);
   phi_pt_0    ~ normal(0.06 , 0.50);
   gamma_pt_0  ~ normal(-0.38, 0.50);
   lambda_pt_0 ~ normal(-0.70, 0.50);
@@ -120,7 +128,7 @@ model {
   xi_pt       ~ normal(0    , 3);
   eps_pt      ~ normal(0.30 , 0.50);
 
-  delta_pu_0  ~ normal(0.30 , 0.50);
+  delta_pu_0  ~ normal(delta_pu_prior_mean, 0.50);
   gamma_pu_0  ~ normal(-2   , 1.00);
   lambda_pu_0 ~ normal(-3   , 1.00);
   xi_pu       ~ normal(0    , 3);
