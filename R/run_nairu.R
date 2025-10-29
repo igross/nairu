@@ -217,6 +217,11 @@ for (w_col in wage_columns) {
 
 data_set <- filled_data_set
 
+data_set <- data_set %>%
+  mutate(dl4pmcg = ifelse(is.na(dl4pmcg) & !is.na(trimmed_mean), 
+                          mean(dl4pmcg, na.rm = TRUE), 
+                          dl4pmcg))
+         
 # Pick Sample
 est_data <- data_set %>%
   filter(date > "1997q3" ) %>%
