@@ -189,7 +189,7 @@ readr::write_csv(panel_long, file.path(out_dir, "est_data_state_long.csv"))
 options(mc.cores = parallel::detectCores())
 Sys.setenv(MAKEFLAGS = "-j4")
 
-compiled <- stan_model(file.path("stan", "NAIRU_baseline.stan"))
+compiled <- stan_model(file.path("stan", "NAIRU_cpi_wpi.stan"))
 
 all_summ <- vector("list", length(regions)); names(all_summ) <- regions
 
@@ -211,16 +211,31 @@ for (r in regions) {
   )
 
   df_r <- panel %>%
-    select(date, all_of(col_order)) %>%
-    drop_na()           # only drop rows with missing in these eight
+    select(date, all_of(col_order))
 
-  
-  Y <- as.matrix(df_r %>% select(-date))  # now a clean T×8 matrix
+  non_wpi_cols <- setdiff(col_order, paste0("DLWPI_", r))
+
+  df_r <- df_r %>%
+    filter(if_all(all_of(non_wpi_cols), ~ !is.na(.x)))
+
+  wpi_values <- df_r[[paste0("DLWPI_", r)]]
+  wpi_obs <- ifelse(is.na(wpi_values), 0L, 1L)
+  missing_wpi_index <- if (any(wpi_obs == 0L)) tail(which(wpi_obs == 0L), 1) else 0L
+
+  df_r[[paste0("DLWPI_", r)]] <- ifelse(is.na(wpi_values), 0, wpi_values)
+
+  Y <- as.matrix(df_r %>% select(-date))  # now a clean T×9 matrix
 
   ## 4.  feed Stan
   fit <- sampling(
     compiled,
-    data = list(T = nrow(Y), J = ncol(Y), Y = Y),
+    data = list(
+      T = nrow(Y),
+      J = ncol(Y),
+      Y = Y,
+      wpi_obs = as.integer(wpi_obs),
+      missing_wpi_index = as.integer(missing_wpi_index)
+    ),
     chains = 4, iter = 10000,
     control = list(max_treedepth = 15)
   )
