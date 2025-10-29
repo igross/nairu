@@ -198,6 +198,8 @@ if (latest_date_df2 > latest_pie_date) {
 data_set <- list(R_5206, R_6457, R_6202, R_g1, pie_rbaq, R_6345) %>%
   Reduce(function(dtf1,dtf2) left_join(dtf1,dtf2,by="date"), .)
 
+         print(as_tibble(data_set), n = Inf, width = Inf)
+
 #data_set$pie_bondq <- replace(data_set$pie_bondq,is.na(data_set$pie_bondq),2.5/4)
 
 
