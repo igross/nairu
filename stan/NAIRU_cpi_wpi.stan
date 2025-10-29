@@ -29,6 +29,7 @@ transformed data {
   real Y1_mean;
   real Y1_sum = 0;
   int wpi_count = 0;
+  real delta_pu_prior_mean;
 
   for (t in 1:T) {
     if (wpi_obs[t] == 1) {
@@ -41,6 +42,12 @@ transformed data {
     Y1_mean = Y1_sum / wpi_count;
   } else {
     Y1_mean = 0;
+  }
+
+  if (fabs(Y5_mean) > 1e-9) {
+    delta_pu_prior_mean = Y1_mean / Y5_mean;
+  } else {
+    delta_pu_prior_mean = 0;
   }
 
 
@@ -122,7 +129,7 @@ model {
   xi_pt       ~ normal(0    , 3);
   eps_pt      ~ normal(0.30 , 0.50);
 
-  delta_pu_0  ~ normal(0.30 , 0.50);
+  delta_pu_0  ~ normal(delta_pu_prior_mean , 0.50);
   gamma_pu_0  ~ normal(-2   , 1.00);
   lambda_pu_0 ~ normal(-3   , 1.00);
   xi_pu       ~ normal(0    , 3);
