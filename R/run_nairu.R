@@ -193,7 +193,7 @@ if (latest_trimmed_mean_date > latest_pie_date) {
 data_set <- list(R_5206, R_6457, R_6202, R_trimmed_mean, pie_rbaq, R_6345) %>%
   Reduce(function(dtf1,dtf2) left_join(dtf1,dtf2,by="date"), .)
 
-         print(as_tibble(data_set), n = Inf, width = Inf)
+print(as_tibble(data_set), n = Inf, width = Inf)
 
 #data_set$pie_bondq <- replace(data_set$pie_bondq,is.na(data_set$pie_bondq),2.5/4)
 
@@ -236,7 +236,31 @@ myfile <- file.path(out_dir, "est_data.csv")
 test <- read_csv(myfile)
          
 # Subset Data for Stan
-prepare_single_wage_design <- function(est_df, wage_col) {
+assert_complete_nonwage <- function(design_df, wage_col, context_label) {
+  non_wage_cols <- setdiff(names(design_df), c("date", wage_col))
+  if (length(non_wage_cols) == 0) {
+    return(invisible(NULL))
+  }
+
+  completeness_matrix <- design_df %>%
+    select(all_of(non_wage_cols)) %>%
+    as.data.frame()
+
+  missing_counts <- vapply(completeness_matrix, function(col) sum(is.na(col)), numeric(1))
+  missing_cols <- names(missing_counts[missing_counts > 0])
+
+  if (length(missing_cols) > 0) {
+    stop(
+      glue::glue(
+        "{context_label}: missing values detected in {paste(missing_cols, collapse = ', ')}. The Stan models require these series to be fully observed when estimating with partial wage data."
+      ),
+      call. = FALSE
+    )
+  }
+  invisible(NULL)
+}
+
+prepare_single_wage_design <- function(est_df, wage_col, context_label) {
   required_cols <- c(
     wage_col,
     "dl4pmcg",
@@ -248,8 +272,11 @@ prepare_single_wage_design <- function(est_df, wage_col) {
     "dummy3",
     "dummy4"
   )
-  est_df %>%
+  design <- est_df %>%
     select(date, all_of(required_cols))
+
+  assert_complete_nonwage(design, wage_col, context_label)
+  design
 }
 
 run_single_wage_inflation_model <- function(
@@ -264,10 +291,28 @@ run_single_wage_inflation_model <- function(
   missing_param,
   wage_component_col
 ) {
-  design <- prepare_single_wage_design(est_df, wage_col)
+  design <- prepare_single_wage_design(est_df, wage_col, variant_label)
   wage_values <- design[[wage_col]]
   obs <- ifelse(is.na(wage_values), 0L, 1L)
   missing_index <- if (any(obs == 0L)) tail(which(obs == 0L), 1) else 0L
+
+  if (sum(obs == 0L) > 1L) {
+    stop(
+      glue::glue(
+        "{variant_label}: Stan model expects at most one missing {wage_label} observation, but found {sum(obs == 0L)}."
+      ),
+      call. = FALSE
+    )
+  }
+
+  if (missing_index > 0L && missing_index != nrow(design)) {
+    stop(
+      glue::glue(
+        "{variant_label}: missing {wage_label} must be the latest quarter (row {nrow(design)}); found NA at row {missing_index}."
+      ),
+      call. = FALSE
+    )
+  }
 
   if (missing_index > 0L) {
     message(glue::glue(
@@ -615,9 +660,29 @@ run_wage_no_inflation_model <- function(
       all_of(c(wage_col, "LUR", "PIE_RBAQ", "dummy3", "dummy4"))
     )
 
+  assert_complete_nonwage(design, wage_col, variant_label)
+
   wage_values <- design[[wage_col]]
   obs <- ifelse(is.na(wage_values), 0L, 1L)
   missing_index <- if (any(obs == 0L)) tail(which(obs == 0L), 1) else 0L
+
+  if (sum(obs == 0L) > 1L) {
+    stop(
+      glue::glue(
+        "{variant_label}: Stan model expects at most one missing {wage_col} observation, but found {sum(obs == 0L)}."
+      ),
+      call. = FALSE
+    )
+  }
+
+  if (missing_index > 0L && missing_index != nrow(design)) {
+    stop(
+      glue::glue(
+        "{variant_label}: missing {wage_col} must be the latest quarter (row {nrow(design)}); found NA at row {missing_index}."
+      ),
+      call. = FALSE
+    )
+  }
 
   if (missing_index > 0L) {
     message(glue::glue(
