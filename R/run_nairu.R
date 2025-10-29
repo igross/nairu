@@ -28,7 +28,7 @@ if (!refresh_override && !Sys.Date() %in% release_calendar) {
     glue::glue("⏩ {Sys.Date()} is not an ABS CPI/National-Accounts release day – skipping refresh."),
     glue::glue(" (set FORCE_REFRESH=true to override)" )
   )
-   quit(save = "no")   # graceful, zero-exit termination
+ #  quit(save = "no")   # graceful, zero-exit termination
 }
 
 if (refresh_override && !Sys.Date() %in% release_calendar) {
@@ -295,7 +295,7 @@ run_single_wage_inflation_model <- function(
     compiled_model,
     data = data_list,
     chains = 10,
-    iter = 10000,
+    iter = 1000,
     control = list(max_treedepth = 15)
   )
 
@@ -530,7 +530,7 @@ run_dual_wage_model <- function(
     compiled_model,
     data = data_list,
     chains = 10,
-    iter = 10000,
+    iter = 1000,
     control = list(max_treedepth = 15)
   )
 
@@ -646,7 +646,7 @@ run_wage_no_inflation_model <- function(
     compiled_model,
     data = data_list,
     chains = 10,
-    iter = 10000,
+    iter = 1000,
     control = list(max_treedepth = 15)
   )
 
