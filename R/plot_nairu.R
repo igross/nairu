@@ -483,16 +483,37 @@ if (nrow(nairu_models_df) > 0) {
   model_summary <- nairu_models_df %>%
     group_by(date, date_qtr) %>%
     summarise(
-      avg_median = mean(median, na.rm = TRUE),
-      min_median = min(median, na.rm = TRUE),
-      max_median = max(median, na.rm = TRUE),
-      min_lower  = min(lower, na.rm = TRUE),
-      max_upper  = max(upper, na.rm = TRUE),
+      avg_median = if (all(is.na(median))) NA_real_ else mean(median, na.rm = TRUE),
+      min_median = if (all(is.na(median))) NA_real_ else min(median, na.rm = TRUE),
+      max_median = if (all(is.na(median))) NA_real_ else max(median, na.rm = TRUE),
+      min_lower  = if (all(is.na(lower)))  NA_real_ else min(lower, na.rm = TRUE),
+      max_upper  = if (all(is.na(upper)))  NA_real_ else max(upper, na.rm = TRUE),
       qtr_lbl    = first(qtr_lbl),
+      n_models   = sum(!is.na(median)),
       .groups    = "drop"
     )
 
   latest_avg <- slice_tail(model_summary, n = 1)
+
+  line_df <- model_summary %>%
+    select(date, qtr_lbl, n_models, avg_median, min_median, max_median) %>%
+    pivot_longer(
+      cols      = c(avg_median, min_median, max_median),
+      names_to  = "series",
+      values_to = "value"
+    ) %>%
+    mutate(
+      series = recode(
+        series,
+        avg_median = "Average median",
+        min_median = "Minimum median",
+        max_median = "Maximum median"
+      ),
+      tooltip = sprintf(
+        "%s<br>%s: %.2f<br>Models: %d",
+        qtr_lbl, series, value, n_models
+      )
+    )
 
   p_avg <- ggplot(model_summary, aes(x = date, group = 1)) +
     geom_ribbon(
@@ -500,8 +521,8 @@ if (nrow(nairu_models_df) > 0) {
         ymin = min_lower,
         ymax = max_upper,
         text = sprintf(
-          "%s<br>Credible band union: %.2f – %.2f",
-          qtr_lbl, min_lower, max_upper
+          "%s<br>Credible band union: %.2f – %.2f<br>Models: %d",
+          qtr_lbl, min_lower, max_upper, n_models
         )
       ),
       fill = "#cce5ff", alpha = 0.4, colour = NA
@@ -511,24 +532,30 @@ if (nrow(nairu_models_df) > 0) {
         ymin = min_median,
         ymax = max_median,
         text = sprintf(
-          "%s<br>Median range: %.2f – %.2f",
-          qtr_lbl, min_median, max_median
+          "%s<br>Median range: %.2f – %.2f<br>Models: %d",
+          qtr_lbl, min_median, max_median, n_models
         )
       ),
       fill = "#99c2ff", alpha = 0.6, colour = NA
     ) +
     geom_line(
+      data = line_df,
       aes(
-        y = avg_median,
-        text = sprintf("%s<br>Average median: %.2f", qtr_lbl, avg_median)
+        y = value,
+        colour = series,
+        linetype = series,
+        text = tooltip
       ),
-      colour = "red", linewidth = 1
+      linewidth = 0.9
     ) +
     geom_point(
       data = latest_avg,
       aes(
         y = avg_median,
-        text = sprintf("Latest (%s)<br>Average median: %.2f", qtr_lbl, avg_median)
+        text = sprintf(
+          "Latest (%s)<br>Average median: %.2f<br>Models: %d",
+          qtr_lbl, avg_median, n_models
+        )
       ),
       colour = "black", size = 3
     ) +
@@ -540,7 +567,23 @@ if (nrow(nairu_models_df) > 0) {
       y        = "Percent"
     ) +
     my_theme +
-    theme(legend.position = "none")
+    scale_colour_manual(
+      values = c(
+        "Average median" = "#d62728",
+        "Minimum median" = "#1f78b4",
+        "Maximum median" = "#1f78b4"
+      )
+    ) +
+    scale_linetype_manual(
+      values = c(
+        "Average median" = "solid",
+        "Minimum median" = "dashed",
+        "Maximum median" = "dashed"
+      )
+    ) +
+    guides(colour = guide_legend(title = "Series"),
+           linetype = guide_legend(title = "Series")) +
+    theme(legend.position = "bottom")
 
   ggsave(
     file.path(output_dir, "nairu_model_average.png"),
