@@ -58,12 +58,12 @@ dir.create(vintage_dir, showWarnings = FALSE, recursive = TRUE)
 #---------------------------------------------------------------------------------------------------------
 # Import Data from ABS Website
 abs_5206 <- read_abs(series_id = c("A2304402X", "A2302915V"))
-abs_6202 <- read_abs(series_id = c("A84423043C", "A84423047L"))
+abs_6202 <- read_abs(series_id = c("A84423050A"))          # ABS 6202.0 Table 1 – unemployment rate (SA)
 abs_6457 <- read_abs(series_id = c("A2298279F"))
 abs_6345 <- read_abs(series_id = c("A2713849C"))
 rba_g3 <- read_rba(series_id = c("GBONYLD"))
 #rba_g1 <- read_rba(series_id = c("GCPIOCPMTMQP","GCPITIQP","GCPINTIQP"))
-rba_g1 <- read_abs(series_id = c("A3604510W","A2330530C","A2330575J"))
+abs_trimmed_mean <- read_abs(series_id = c("A3604510W"))   # ABS 6401.0 Table 7 – trimmed mean CPI (q/q %)
 
 
 #---------------------------------------------------------------------------------------------------------
@@ -98,19 +98,13 @@ R_6457 <- abs_6457 %>%
 
 # 6202.0 Labour Force Data
 R_6202 <- abs_6202 %>%
-  filter(series_id %in% c("A84423043C", "A84423047L")) %>%
-  select(date, series_id, value) %>%
-  distinct(date, series_id, .keep_all = TRUE) %>%
-  dcast(date ~ series_id) %>%
-  group_by(date = floor_date(date, "quarter")) %>%
-  summarize(A84423043C = mean(A84423043C, na.rm = TRUE),
-            A84423047L = mean(A84423047L, na.rm = TRUE)) %>%
-  mutate(date = zoo::as.yearqtr(date),
-         LUR = 100 * (1 - A84423043C / A84423047L)) %>%
-  select(date, LUR)
+  filter(series_id == "A84423050A") %>%
+  mutate(date = zoo::as.yearqtr(date)) %>%
+  group_by(date) %>%
+  summarise(LUR = mean(value, na.rm = TRUE), .groups = "drop")
 
-R_g1 <- rba_g1 %>%
-  filter(series_id %in% c("A3604510W")) %>%
+R_trimmed_mean <- abs_trimmed_mean %>%
+  filter(series_id == "A3604510W") %>%
   mutate(date = zoo::as.yearqtr(date)) %>%
   rename(DLPTM = value) %>%
   select(date, DLPTM)
@@ -136,7 +130,7 @@ transformed_inputs <- list(
   R_6345,
   R_6457,
   R_6202,
-  R_g1,
+  R_trimmed_mean,
   pie_rbaq
 ) %>%
   Reduce(function(dtf1, dtf2) full_join(dtf1, dtf2, by = "date"), .) %>%
@@ -173,15 +167,15 @@ ggsave(
 message(glue::glue("💾 Saved transformed series plot to {plot_path}"))
 
 
-# ── Extend pie_rbaq forward to latest_date_df2 ────────────────────────────────
-latest_date_df2 <- max(R_g1$date)
+# ── Extend pie_rbaq forward to latest_trimmed_mean_date ───────────────────────
+latest_trimmed_mean_date <- max(R_trimmed_mean$date)
 latest_pie_date <- max(pie_rbaq$date)
 
-if (latest_date_df2 > latest_pie_date) {
+if (latest_trimmed_mean_date > latest_pie_date) {
 
   # Quarters we still need (as yearqtr objects)
   new_dates <- seq(from = latest_pie_date + 0.25,  # next quarter
-                   to   = latest_date_df2,
+                   to   = latest_trimmed_mean_date,
                    by   = 0.25)
 
   # Grab the last observed row (all columns) and duplicate for each new date
@@ -195,7 +189,7 @@ if (latest_date_df2 > latest_pie_date) {
 
 
 
-data_set <- list(R_5206, R_6457, R_6202, R_g1, pie_rbaq, R_6345) %>%
+data_set <- list(R_5206, R_6457, R_6202, R_trimmed_mean, pie_rbaq, R_6345) %>%
   Reduce(function(dtf1,dtf2) left_join(dtf1,dtf2,by="date"), .)
 
          print(as_tibble(data_set), n = Inf, width = Inf)
