@@ -18,8 +18,10 @@ transformed data {
   vector[T] wage1_demeaned;
   vector[T] wage2_demeaned;
   real import_mean = 0;
+  real exp_mean = 0;
   real wage_sum[2];
   int wage_count[2];
+  real delta_pt_prior_mean;
 
   for (j in 1:2) {
     wage_sum[j] = 0;
@@ -28,6 +30,7 @@ transformed data {
 
   for (t in 1:T) {
     import_mean += Y[t, 3];
+    exp_mean += Y[t, 6];
     for (j in 1:2) {
       if (wage_obs[t, j] == 1) {
         wage_sum[j] += Y[t, j];
@@ -37,6 +40,7 @@ transformed data {
   }
 
   import_mean /= T;
+  exp_mean /= T;
 
   for (j in 1:2) {
     if (wage_count[j] > 0) {
@@ -45,6 +49,8 @@ transformed data {
       wage_sum[j] = 0;
     }
   }
+
+  delta_pt_prior_mean = wage_sum[1] - exp_mean;
 
   for (t in 1:T) {
     import_demeaned[t] = Y[t, 3] - import_mean;
@@ -110,7 +116,7 @@ model {
     gamma_wage2_lag[k] ~ normal(pow(0.5, k) * -2, 1);
   }
 
-  delta_pt_0  ~ normal(1, 0.1);
+  delta_pt_0  ~ normal(delta_pt_prior_mean, 0.1);
   phi_pt_0    ~ normal(0.06 , 0.50);
   gamma_pt_0  ~ normal(-0.38, 0.50);
   lambda_pt_0 ~ normal(-0.70, 0.50);
