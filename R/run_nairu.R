@@ -65,6 +65,7 @@ rba_g3 <- read_rba(series_id = c("GBONYLD"))
 #rba_g1 <- read_rba(series_id = c("GCPIOCPMTMQP","GCPITIQP","GCPINTIQP"))
 abs_trimmed_mean <- read_abs(series_id = c("A3604510W"))   # ABS 6401.0 Table 7 – trimmed mean CPI (q/q %)
 
+print(abs_trimmed_mean,n=inf)
 
 #---------------------------------------------------------------------------------------------------------
 # Cleanup ABS Spreadsheets
