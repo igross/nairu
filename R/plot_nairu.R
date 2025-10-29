@@ -544,8 +544,7 @@ if (nrow(nairu_models_df) > 0) {
         y = value,
         colour = series,
         linetype = series,
-        text = tooltip,
-        group = series
+        text = tooltip
       ),
       linewidth = 0.9
     ) +
