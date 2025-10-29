@@ -65,6 +65,7 @@ rba_g3 <- read_rba(series_id = c("GBONYLD"))
 #rba_g1 <- read_rba(series_id = c("GCPIOCPMTMQP","GCPITIQP","GCPINTIQP"))
 abs_trimmed_mean <- read_abs(series_id = c("A3604510W"))   # ABS 6401.0 Table 7 – trimmed mean CPI (q/q %)
 
+print(abs_trimmed_mean,n=inf)
 
 #---------------------------------------------------------------------------------------------------------
 # Cleanup ABS Spreadsheets
@@ -190,7 +191,7 @@ if (latest_trimmed_mean_date > latest_pie_date) {
 
 
 data_set <- list(R_5206, R_6457, R_6202, R_trimmed_mean, pie_rbaq, R_6345) %>%
-  Reduce(function(dtf1, dtf2) full_join(dtf1, dtf2, by = "date"), .)
+  Reduce(function(dtf1,dtf2) left_join(dtf1,dtf2,by="date"), .)
 
 print(as_tibble(data_set), n = Inf, width = Inf)
 
