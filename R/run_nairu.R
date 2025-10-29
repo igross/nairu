@@ -58,12 +58,12 @@ dir.create(vintage_dir, showWarnings = FALSE, recursive = TRUE)
 #---------------------------------------------------------------------------------------------------------
 # Import Data from ABS Website
 abs_5206 <- read_abs(series_id = c("A2304402X", "A2302915V"))
-abs_6202 <- read_abs(series_id = c("A84423043C", "A84423047L"))
+abs_6202 <- read_abs(series_id = c("A84423050A"))          # ABS 6202.0 Table 1 – unemployment rate (SA)
 abs_6457 <- read_abs(series_id = c("A2298279F"))
 abs_6345 <- read_abs(series_id = c("A2713849C"))
 rba_g3 <- read_rba(series_id = c("GBONYLD"))
 #rba_g1 <- read_rba(series_id = c("GCPIOCPMTMQP","GCPITIQP","GCPINTIQP"))
-rba_g1 <- read_abs(series_id = c("A3604510W","A2330530C","A2330575J"))
+abs_trimmed_mean <- read_abs(series_id = c("A3604510W"))   # ABS 6401.0 Table 7 – trimmed mean CPI (q/q %)
 
 
 #---------------------------------------------------------------------------------------------------------
@@ -98,19 +98,13 @@ R_6457 <- abs_6457 %>%
 
 # 6202.0 Labour Force Data
 R_6202 <- abs_6202 %>%
-  filter(series_id %in% c("A84423043C", "A84423047L")) %>%
-  select(date, series_id, value) %>%
-  distinct(date, series_id, .keep_all = TRUE) %>%
-  dcast(date ~ series_id) %>%
-  group_by(date = floor_date(date, "quarter")) %>%
-  summarize(A84423043C = mean(A84423043C, na.rm = TRUE),
-            A84423047L = mean(A84423047L, na.rm = TRUE)) %>%
-  mutate(date = zoo::as.yearqtr(date),
-         LUR = 100 * (1 - A84423043C / A84423047L)) %>%
-  select(date, LUR)
+  filter(series_id == "A84423050A") %>%
+  mutate(date = zoo::as.yearqtr(date)) %>%
+  group_by(date) %>%
+  summarise(LUR = mean(value, na.rm = TRUE), .groups = "drop")
 
-R_g1 <- rba_g1 %>%
-  filter(series_id %in% c("A3604510W")) %>%
+R_trimmed_mean <- abs_trimmed_mean %>%
+  filter(series_id == "A3604510W") %>%
   mutate(date = zoo::as.yearqtr(date)) %>%
   rename(DLPTM = value) %>%
   select(date, DLPTM)
@@ -136,7 +130,7 @@ transformed_inputs <- list(
   R_6345,
   R_6457,
   R_6202,
-  R_g1,
+  R_trimmed_mean,
   pie_rbaq
 ) %>%
   Reduce(function(dtf1, dtf2) full_join(dtf1, dtf2, by = "date"), .) %>%
@@ -173,15 +167,15 @@ ggsave(
 message(glue::glue("💾 Saved transformed series plot to {plot_path}"))
 
 
-# ── Extend pie_rbaq forward to latest_date_df2 ────────────────────────────────
-latest_date_df2 <- max(R_g1$date)
+# ── Extend pie_rbaq forward to latest_trimmed_mean_date ───────────────────────
+latest_trimmed_mean_date <- max(R_trimmed_mean$date)
 latest_pie_date <- max(pie_rbaq$date)
 
-if (latest_date_df2 > latest_pie_date) {
+if (latest_trimmed_mean_date > latest_pie_date) {
 
   # Quarters we still need (as yearqtr objects)
   new_dates <- seq(from = latest_pie_date + 0.25,  # next quarter
-                   to   = latest_date_df2,
+                   to   = latest_trimmed_mean_date,
                    by   = 0.25)
 
   # Grab the last observed row (all columns) and duplicate for each new date
@@ -195,10 +189,10 @@ if (latest_date_df2 > latest_pie_date) {
 
 
 
-data_set <- list(R_5206, R_6457, R_6202, R_g1, pie_rbaq, R_6345) %>%
-  Reduce(function(dtf1,dtf2) left_join(dtf1,dtf2,by="date"), .)
+data_set <- list(R_5206, R_6457, R_6202, R_trimmed_mean, pie_rbaq, R_6345) %>%
+  Reduce(function(dtf1, dtf2) full_join(dtf1, dtf2, by = "date"), .)
 
-         print(as_tibble(data_set), n = Inf, width = Inf)
+print(as_tibble(data_set), n = Inf, width = Inf)
 
 #data_set$pie_bondq <- replace(data_set$pie_bondq,is.na(data_set$pie_bondq),2.5/4)
 
@@ -241,7 +235,31 @@ myfile <- file.path(out_dir, "est_data.csv")
 test <- read_csv(myfile)
          
 # Subset Data for Stan
-prepare_single_wage_design <- function(est_df, wage_col) {
+assert_complete_nonwage <- function(design_df, wage_col, context_label) {
+  non_wage_cols <- setdiff(names(design_df), c("date", wage_col))
+  if (length(non_wage_cols) == 0) {
+    return(invisible(NULL))
+  }
+
+  completeness_matrix <- design_df %>%
+    select(all_of(non_wage_cols)) %>%
+    as.data.frame()
+
+  missing_counts <- vapply(completeness_matrix, function(col) sum(is.na(col)), numeric(1))
+  missing_cols <- names(missing_counts[missing_counts > 0])
+
+  if (length(missing_cols) > 0) {
+    stop(
+      glue::glue(
+        "{context_label}: missing values detected in {paste(missing_cols, collapse = ', ')}. The Stan models require these series to be fully observed when estimating with partial wage data."
+      ),
+      call. = FALSE
+    )
+  }
+  invisible(NULL)
+}
+
+prepare_single_wage_design <- function(est_df, wage_col, context_label) {
   required_cols <- c(
     wage_col,
     "dl4pmcg",
@@ -253,8 +271,11 @@ prepare_single_wage_design <- function(est_df, wage_col) {
     "dummy3",
     "dummy4"
   )
-  est_df %>%
+  design <- est_df %>%
     select(date, all_of(required_cols))
+
+  assert_complete_nonwage(design, wage_col, context_label)
+  design
 }
 
 run_single_wage_inflation_model <- function(
@@ -269,10 +290,28 @@ run_single_wage_inflation_model <- function(
   missing_param,
   wage_component_col
 ) {
-  design <- prepare_single_wage_design(est_df, wage_col)
+  design <- prepare_single_wage_design(est_df, wage_col, variant_label)
   wage_values <- design[[wage_col]]
   obs <- ifelse(is.na(wage_values), 0L, 1L)
   missing_index <- if (any(obs == 0L)) tail(which(obs == 0L), 1) else 0L
+
+  if (sum(obs == 0L) > 1L) {
+    stop(
+      glue::glue(
+        "{variant_label}: Stan model expects at most one missing {wage_label} observation, but found {sum(obs == 0L)}."
+      ),
+      call. = FALSE
+    )
+  }
+
+  if (missing_index > 0L && missing_index != nrow(design)) {
+    stop(
+      glue::glue(
+        "{variant_label}: missing {wage_label} must be the latest quarter (row {nrow(design)}); found NA at row {missing_index}."
+      ),
+      call. = FALSE
+    )
+  }
 
   if (missing_index > 0L) {
     message(glue::glue(
@@ -620,9 +659,29 @@ run_wage_no_inflation_model <- function(
       all_of(c(wage_col, "LUR", "PIE_RBAQ", "dummy3", "dummy4"))
     )
 
+  assert_complete_nonwage(design, wage_col, variant_label)
+
   wage_values <- design[[wage_col]]
   obs <- ifelse(is.na(wage_values), 0L, 1L)
   missing_index <- if (any(obs == 0L)) tail(which(obs == 0L), 1) else 0L
+
+  if (sum(obs == 0L) > 1L) {
+    stop(
+      glue::glue(
+        "{variant_label}: Stan model expects at most one missing {wage_col} observation, but found {sum(obs == 0L)}."
+      ),
+      call. = FALSE
+    )
+  }
+
+  if (missing_index > 0L && missing_index != nrow(design)) {
+    stop(
+      glue::glue(
+        "{variant_label}: missing {wage_col} must be the latest quarter (row {nrow(design)}); found NA at row {missing_index}."
+      ),
+      call. = FALSE
+    )
+  }
 
   if (missing_index > 0L) {
     message(glue::glue(
