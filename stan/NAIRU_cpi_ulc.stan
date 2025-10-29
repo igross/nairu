@@ -29,7 +29,6 @@ transformed data {
   real Y1_mean;
   real Y1_sum = 0;
   int ulc_count = 0;
-  real delta_pt_prior_mean;
 
   for (t in 1:T) {
     if (ulc_obs[t] == 1) {
@@ -44,7 +43,6 @@ transformed data {
     Y1_mean = 0;
   }
 
-  delta_pt_prior_mean = Y1_mean - Y5_mean;
 
   for (t in 1:T) {
     Y2_demeaned[t] = Y[t, 2] - Y2_mean;
@@ -116,7 +114,7 @@ model {
   }
 
   // Contemporaneous coefficients (same priors as original model)
-  delta_pt_0  ~ normal(delta_pt_prior_mean,0.1);         // centred on wage-exp mean diff
+  delta_pt_0  ~ normal(1, 0.1);
   phi_pt_0    ~ normal(0.06 , 0.50);
   gamma_pt_0  ~ normal(-0.38, 0.50);
   lambda_pt_0 ~ normal(-0.70, 0.50);

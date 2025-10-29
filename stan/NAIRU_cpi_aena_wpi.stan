@@ -21,7 +21,6 @@ transformed data {
   real exp_mean = 0;
   real wage_sum[2];
   int wage_count[2];
-  real delta_pt_prior_mean;
 
   for (j in 1:2) {
     wage_sum[j] = 0;
@@ -50,7 +49,6 @@ transformed data {
     }
   }
 
-  delta_pt_prior_mean = wage_sum[1] - exp_mean;
 
   for (t in 1:T) {
     import_demeaned[t] = Y[t, 3] - import_mean;
@@ -116,7 +114,7 @@ model {
     gamma_wage2_lag[k] ~ normal(pow(0.5, k) * -2, 1);
   }
 
-  delta_pt_0  ~ normal(delta_pt_prior_mean, 0.1);
+  delta_pt_0  ~ normal(1, 0.1);
   phi_pt_0    ~ normal(0.06 , 0.50);
   gamma_pt_0  ~ normal(-0.38, 0.50);
   lambda_pt_0 ~ normal(-0.70, 0.50);
