@@ -20,11 +20,21 @@ na_dates  <- as.Date(c(           # Nat. Accounts – first Wed of Mar/Jun/Sep/D
 release_calendar <- c(cpi_dates, na_dates)
 
 # ---- Short-circuit if today isn’t a release day --------------------------------------
-if (!Sys.Date() %in% release_calendar) {
+override_flag <- tolower(Sys.getenv("FORCE_REFRESH", unset = ""))
+refresh_override <- override_flag %in% c("1", "true", "yes", "force")
+
+if (!refresh_override && !Sys.Date() %in% release_calendar) {
   message(
-    glue::glue("⏩ {Sys.Date()} is not an ABS CPI/National-Accounts release day – skipping refresh.")
+    glue::glue("⏩ {Sys.Date()} is not an ABS CPI/National-Accounts release day – skipping refresh."),
+    glue::glue(" (set FORCE_REFRESH=true to override)" )
   )
    quit(save = "no")   # graceful, zero-exit termination
+}
+
+if (refresh_override && !Sys.Date() %in% release_calendar) {
+  message(
+    glue::glue("🔁 FORCE_REFRESH override active – continuing refresh even though {Sys.Date()} is not a scheduled release day.")
+  )
 }
 
 
