@@ -542,6 +542,7 @@ if (nrow(nairu_models_df) > 0) {
       data = line_df,
       aes(
         y = value,
+        group = series,
         colour = series,
         linetype = series,
         text = tooltip
