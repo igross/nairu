@@ -137,7 +137,11 @@ jobs:
           git config --global user.email "igross@users.noreply.github.com"
 
           # ── Stage everything that might change ───────────────────────────
-          git add -A output docs || true   # add other paths if your scripts write elsewhere
+          # Stage generated content when the directories exist
+          if [ -d output ]; then
+            git add -A output
+          fi
+          git add -A docs || true   # add other paths if your scripts write elsewhere
 
           # ── Skip commit if nothing is staged ─────────────────────────────
           if git diff --cached --quiet; then
