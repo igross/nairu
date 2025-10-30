@@ -478,7 +478,66 @@ if (nrow(nairu_models_df) > 0) {
 
   message("✔  Saved NAIRU model comparison plot")
 
-  # ---- 12. Average NAIRU across models ----------------------------------
+  # ---- 12. Change in NAIRU estimates by model --------------------------
+
+  model_levels  <- unique(nairu_models_df$model)
+  model_palette <- setNames(viridisLite::viridis(length(model_levels)), model_levels)
+
+  nairu_changes <- nairu_models_df %>%
+    arrange(model, date) %>%
+    group_by(model) %>%
+    mutate(
+      median_change = median - dplyr::lag(median),
+      tooltip       = sprintf(
+        "%s<br>%s change in median NAIRU: %+0.2f",
+        qtr_lbl, model, median_change
+      )
+    ) %>%
+    ungroup() %>%
+    filter(!is.na(median_change))
+
+  if (nrow(nairu_changes) > 0) {
+    p_change <- ggplot(
+      nairu_changes,
+      aes(
+        x     = date,
+        y     = median_change,
+        colour = model,
+        text  = tooltip
+      )
+    ) +
+      geom_hline(yintercept = 0, colour = "grey50", linetype = "dashed") +
+      geom_line(linewidth = 0.9) +
+      scale_colour_manual(values = model_palette) +
+      scale_x_date(date_breaks = "2 years", date_labels = "%Y") +
+      scale_y_continuous(labels = scales::number_format(accuracy = 0.1)) +
+      labs(
+        title    = "Quarterly change in NAIRU estimates by model",
+        subtitle = "Difference in median NAIRU relative to the previous quarter",
+        x        = "Year",
+        y        = "Percentage points",
+        colour   = "Model"
+      ) +
+      my_theme +
+      theme(legend.position = "bottom")
+
+    ggsave(
+      file.path(output_dir, "nairu_model_change.png"),
+      p_change,
+      width = 8, height = 5, dpi = 300
+    )
+
+    htmlwidgets::saveWidget(
+      plotly::ggplotly(p_change, tooltip = "text"),
+      file.path(output_dir, "nairu_model_change.html")
+    )
+
+    message("✔  Saved NAIRU model change plot")
+  } else {
+    message("⚠  Not enough observations to compute NAIRU changes")
+  }
+
+  # ---- 13. Average NAIRU across models ----------------------------------
 
   model_summary <- nairu_models_df %>%
     group_by(date, date_qtr) %>%
