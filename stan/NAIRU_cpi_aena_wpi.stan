@@ -87,7 +87,7 @@ parameters {
   real<lower = 0,    upper = 0.90>       eps_pt;
 
   // Wage equation for AENA
-  real<lower = -0.30, upper = 0.90>      delta_wage1_0;
+  real<lower = -0.30, upper = 1.90>      delta_wage1_0;
   real<lower = -5,   upper = 1>          gamma_wage1_0;
   vector<lower = -4,   upper = 2>[2]     gamma_wage1_lag;
   real<lower = -6,   upper = 0>          lambda_wage1_0;
@@ -95,7 +95,7 @@ parameters {
   real<lower = 0,    upper = 4.17>       eps_wage1;
 
   // Wage equation for WPI
-  real<lower = -0.30, upper = 0.90>      delta_wage2_0;
+  real<lower = -0.30, upper = 1.90>      delta_wage2_0;
   real<lower = -5,   upper = 1>          gamma_wage2_0;
   vector<lower = -4,   upper = 2>[2]     gamma_wage2_lag;
   real<lower = -6,   upper = 0>          lambda_wage2_0;
@@ -122,13 +122,13 @@ model {
   xi_pt       ~ normal(0    , 3);
   eps_pt      ~ normal(0.30 , 0.50);
 
-  delta_wage1_0  ~ normal(0.30 , 0.10);
+  delta_wage1_0  ~ normal(1 , 1.0);
   gamma_wage1_0  ~ normal(-2   , 1.00);
   lambda_wage1_0 ~ normal(-3   , 1.00);
   xi_wage1       ~ normal(0    , 3);
   eps_wage1      ~ normal(2    , 1.00);
 
-  delta_wage2_0  ~ normal(0.30 , 0.10);
+  delta_wage2_0  ~ normal(1.23 , 0.10);
   gamma_wage2_0  ~ normal(-2   , 1.00);
   lambda_wage2_0 ~ normal(-3   , 1.00);
   xi_wage2       ~ normal(0    , 3);
