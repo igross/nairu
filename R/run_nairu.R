@@ -341,7 +341,7 @@ run_single_wage_inflation_model <- function(
   fit <- sampling(
     compiled_model,
     data = data_list,
-    chains = 4,     iter = 100,
+    chains = 4,     iter = 1000,
     control = list(max_treedepth = 15)
   )
 
@@ -575,7 +575,7 @@ run_dual_wage_model <- function(
   fit <- sampling(
     compiled_model,
     data = data_list,
-    chains = 4,     iter = 100,
+    chains = 4,     iter = 1000,
     control = list(max_treedepth = 15)
   )
 
@@ -710,7 +710,7 @@ run_wage_no_inflation_model <- function(
   fit <- sampling(
     compiled_model,
     data = data_list,
-    chains = 4,     iter = 100,
+    chains = 4,     iter = 1000,
     control = list(max_treedepth = 15)
   )
 
