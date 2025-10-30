@@ -57,7 +57,12 @@ dir.create(vintage_dir, showWarnings = FALSE, recursive = TRUE)
 # Download Most Recent ABS and RBA Data
 #---------------------------------------------------------------------------------------------------------
 # Import Data from ABS Website
-abs_5206 <- read_abs(series_id = c("A2304402X", "A2302915V"))
+aena_series_id <- Sys.getenv("AENA_SERIES_ID", unset = "A2304316K")
+if (!nzchar(aena_series_id)) {
+  stop("AENA_SERIES_ID environment variable is set but empty. Please provide a valid ABS series ID for AENA.")
+}
+
+abs_5206 <- read_abs(series_id = unique(c("A2304402X", "A2302915V", aena_series_id)))
 abs_6202 <- read_abs(series_id = c("A84423050A"))          # ABS 6202.0 Table 1 – unemployment rate (SA)
 abs_6457 <- read_abs(series_id = c("A2298279F"))
 abs_6345 <- read_abs(series_id = c("A2713849C"))
@@ -71,15 +76,21 @@ abs_trimmed_mean <- read_abs(series_id = c("A3604510W"))   # ABS 6401.0 Table 7 
 # Cleanup ABS Spreadsheets
 #---------------------------------------------------------------------------------------------------------
 # 5206.0 Australian National Accounts
+if (!aena_series_id %in% unique(abs_5206$series_id)) {
+  stop(glue::glue("ABS dataset does not include the requested AENA series id ({aena_series_id}). Set AENA_SERIES_ID to a valid identifier."))
+}
+
 R_5206 <- abs_5206 %>%
-  filter(series_id %in% c("A2304402X", "A2302915V")) %>%
+  filter(series_id %in% c("A2304402X", "A2302915V", aena_series_id)) %>%
   mutate(date = zoo::as.yearqtr(date)) %>%
   dplyr::select(date, series_id, value) %>%
   distinct(date, series_id, .keep_all = TRUE) %>%
   dcast(date ~ series_id) %>%
+  rename_with(~ "AENA_LEVEL", all_of(aena_series_id)) %>%
   mutate(NULC = A2302915V / A2304402X,
-         DLNULC = 100 * (log(NULC) - log(lag(NULC, 1)))) %>%
-  select(date, DLNULC)
+         DLNULC = 100 * (log(NULC) - log(lag(NULC, 1))),
+         DLAENA = 100 * (log(AENA_LEVEL) - log(lag(AENA_LEVEL, 1)))) %>%
+  select(date, DLNULC, DLAENA)
 
 # 6345.0 WPI Data
 R_6345 <- abs_6345 %>%
@@ -206,7 +217,7 @@ filled_data_set <- data_set %>%
   mutate(across(-date, ~ na.locf(.x, na.rm = FALSE)))
 
 latest_data_date <- max(data_set$date, na.rm = TRUE)
-wage_columns <- c("DLNULC", "DLWPI")
+wage_columns <- c("DLNULC", "DLWPI", "DLAENA")
 
 for (w_col in wage_columns) {
   if (w_col %in% names(filled_data_set)) {
@@ -781,8 +792,10 @@ run_wage_no_inflation_model <- function(
 }
 
 compiled_models <- list(
+  cpi_aena = stan_model(file = file.path("stan", "NAIRU_cpi_aena.stan")),
   cpi_ulc = stan_model(file = file.path("stan", "NAIRU_cpi_ulc.stan")),
   cpi_wpi = stan_model(file = file.path("stan", "NAIRU_cpi_wpi.stan")),
+  cpi_aena_wpi = stan_model(file = file.path("stan", "NAIRU_cpi_aena_wpi.stan")),
   wpi_only = stan_model(file = file.path("stan", "NAIRU_wpi_only.stan"))
 )
 
@@ -802,6 +815,22 @@ single_wage_variants <- list(
     missing_index_field = "missing_ulc_index",
     missing_param = "ulc_missing",
     wage_component_col = "ulc_demeaned"
+  ),
+  list(
+    wage_col = "DLAENA",
+    wage_label = "DLAENA",
+    file_stubs = list(
+      nairu = "NAIRU_aena",
+      inflation = "infl_pi_decomp_aena",
+      wage = "aena_decomp",
+      params = "posterior_summary_params_aena"
+    ),
+    variant_label = "CPI & AENA model",
+    model_key = "cpi_aena",
+    obs_field = "aena_obs",
+    missing_index_field = "missing_aena_index",
+    missing_param = "aena_missing",
+    wage_component_col = "aena_demeaned"
   ),
   list(
     wage_col = "DLWPI",
@@ -835,6 +864,17 @@ for (variant in single_wage_variants) {
     wage_component_col = variant$wage_component_col
   )
 }
+
+run_dual_wage_model(
+  est_df = est_data,
+  wage_cols = c("DLAENA", "DLWPI"),
+  compiled_model = compiled_models$cpi_aena_wpi,
+  file_stubs = list(
+    nairu = "NAIRU_aena_wpi",
+    params = "posterior_summary_params_aena_wpi"
+  ),
+  variant_label = "CPI with AENA & WPI model"
+)
 
 run_wage_no_inflation_model(
   est_df = est_data,
