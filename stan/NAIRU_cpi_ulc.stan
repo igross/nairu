@@ -122,7 +122,7 @@ model {
   xi_pt       ~ normal(0    , 3);
   eps_pt      ~ normal(0.30 , 0.50);
 
-  delta_pu_0  ~ normal(1.15 , 0.50);
+  delta_pu_0  ~ normal(1.15 , 0.10);
   gamma_pu_0  ~ normal(-2   , 1.00);
   lambda_pu_0 ~ normal(-3   , 1.00);
   xi_pu       ~ normal(0    , 3);
