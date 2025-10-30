@@ -138,7 +138,7 @@ jobs:
           git config --global user.email "igross@users.noreply.github.com"
 
           # ── Ensure we are up to date with the latest remote changes ──────
-          git pull --rebase --autostash origin main
+          git pull --rebase origin main
 
           # ── Stage everything that might change ───────────────────────────
           # Stage generated content when the directories exist
