@@ -420,50 +420,67 @@ if (nrow(nairu_models_df) > 0) {
     filter(date == max(date)) %>%
     ungroup()
 
-  p_models <- ggplot(nairu_models_df, aes(x = date, group = 1)) +
+  model_levels  <- unique(nairu_models_df$model)
+  model_palette <- viridisLite::viridis(length(model_levels), end = 0.85)
+  lur_df <- nairu_models_df %>% distinct(date, lur, qtr_lbl) %>% arrange(date)
+
+  p_models <- ggplot(nairu_models_df, aes(x = date)) +
     geom_ribbon(
       aes(
         ymin = lower,
         ymax = upper,
+        fill = model,
+        group = model,
         text = sprintf(
           "%s<br>%s credible interval: %.2f – %.2f",
           qtr_lbl, model, lower, upper
         )
       ),
-      fill = "orange", alpha = 0.3, colour = NA
+      alpha = 0.25, colour = NA
     ) +
     geom_line(
       aes(
         y = median,
+        colour = model,
+        group = model,
         text = sprintf("%s<br>%s median NAIRU: %.2f", qtr_lbl, model, median)
       ),
-      colour = "red", linewidth = 1, na.rm = TRUE
-    ) +
-    geom_line(
-      aes(
-        y = lur,
-        text = sprintf("%s<br>Unemp. rate: %.2f", qtr_lbl, lur)
-      ),
-      colour = "blue", linewidth = 0.8, na.rm = TRUE
+      linewidth = 1, na.rm = TRUE
     ) +
     geom_point(
       data = latest_points,
       aes(
         y = median,
+        colour = model,
         text = sprintf("Latest (%s)<br>%s median: %.2f", qtr_lbl, model, median)
       ),
-      colour = "black", size = 2.5
+      size = 2.5
     ) +
-    facet_wrap(~ model, ncol = 1) +
+    geom_line(
+      data = lur_df,
+      aes(
+        x = date,
+        y = lur,
+        text = sprintf("%s<br>Unemp. rate: %.2f", qtr_lbl, lur)
+      ),
+      inherit.aes = FALSE,
+      colour = "#2c3e50",
+      linewidth = 0.8,
+      linetype = "dashed"
+    ) +
     scale_x_date(date_breaks = "2 years", date_labels = "%Y") +
+    scale_colour_manual(values = setNames(model_palette, model_levels)) +
+    scale_fill_manual(values = setNames(model_palette, model_levels)) +
     labs(
       title    = "NAIRU estimates by model",
       subtitle = "Median estimates with 90% credible intervals",
       x        = "Year",
-      y        = "Percent"
+      y        = "Percent",
+      colour   = "Model",
+      fill     = "Model"
     ) +
     my_theme +
-    theme(legend.position = "none")
+    theme(legend.position = "bottom")
 
   ggsave(
     file.path(output_dir, "nairu_models.png"),
