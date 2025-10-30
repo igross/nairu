@@ -90,7 +90,7 @@ parameters {
   real<lower = 0,    upper = 0.90>       eps_pt;
 
   // ── WPI equation (wpi_t) ──────────────────────────────────────────
-  real<lower = -0.30, upper = 0.90>      delta_pu_0;
+  real<lower = 0.30, upper = 1.90>      delta_pu_0;
 
   real<lower = -5,   upper = 1>          gamma_pu_0;
   vector<lower = -4,   upper = 2>[2]     gamma_pu_lag;
