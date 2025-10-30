@@ -836,13 +836,13 @@ for (variant in single_wage_variants) {
   )
 }
 
-#run_wage_no_inflation_model(
-#  est_df = est_data,
-#  wage_col = "DLWPI",
-#  compiled_model = compiled_models$wpi_only,
-#  file_stubs = list(
-#    nairu = "NAIRU_wpi_no_inflation",
-#    params = "posterior_summary_params_wpi_no_inflation"
-#  ),
-#  variant_label = "WPI no-inflation model"
-#)
+run_wage_no_inflation_model(
+  est_df = est_data,
+  wage_col = "DLWPI",
+  compiled_model = compiled_models$wpi_only,
+  file_stubs = list(
+    nairu = "NAIRU_wpi_no_inflation",
+    params = "posterior_summary_params_wpi_no_inflation"
+  ),
+  variant_label = "WPI no-inflation model"
+)
