@@ -76,15 +76,15 @@ parameters {
 
   // Inflation equation
   real<lower = 0,    upper = 2>          delta_pt_0;
-  real<lower = -0.54, upper = 0.66>      phi_pt_0;
-  vector<lower = -0.60, upper = 0.60>[4] phi_pt_lag;
-  real<lower = -0.98, upper = 0.22>      gamma_pt_0;
-  vector<lower = -1.18, upper = 0.02>[4] gamma_pt_lag;
-  real<lower = -1.30, upper = -0.10>     lambda_pt_0;
-  real<lower = -0.50, upper = 0.70>      alpha_pt_0;
-  vector<lower = -0.60, upper = 0.60>[4] alpha_pt_lag;
+  real<lower = -1.50, upper = 1.50>      phi_pt_0;
+  vector<lower = -1.50, upper = 1.50>[4] phi_pt_lag;
+  real<lower = -1.90, upper = 1.10>      gamma_pt_0;
+  vector<lower = -2.00, upper = 1.00>[4] gamma_pt_lag;
+  real<lower = -2.50, upper = 1.00>      lambda_pt_0;
+  real<lower = -1.50, upper = 1.50>      alpha_pt_0;
+  vector<lower = -1.50, upper = 1.50>[4] alpha_pt_lag;
   vector<lower = -9,   upper = 9>[2]     xi_pt;
-  real<lower = 0,    upper = 0.90>       eps_pt;
+  real<lower = 0,    upper = 1.50>       eps_pt;
 
   // Wage equation for AENA
   real<lower = -0.30, upper = 1.90>      delta_wage1_0;
