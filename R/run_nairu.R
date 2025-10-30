@@ -65,7 +65,7 @@ rba_g3 <- read_rba(series_id = c("GBONYLD"))
 #rba_g1 <- read_rba(series_id = c("GCPIOCPMTMQP","GCPITIQP","GCPINTIQP"))
 abs_trimmed_mean <- read_abs(series_id = c("A3604510W"))   # ABS 6401.0 Table 7 – trimmed mean CPI (q/q %)
 
-print(abs_trimmed_mean, n = Inf, width = Inf)
+# print(abs_trimmed_mean, n = Inf, width = Inf)
 
 #---------------------------------------------------------------------------------------------------------
 # Cleanup ABS Spreadsheets
@@ -193,7 +193,7 @@ if (latest_trimmed_mean_date > latest_pie_date) {
 data_set <- list(R_5206, R_6457, R_6202, R_trimmed_mean, pie_rbaq, R_6345) %>%
   Reduce(function(dtf1, dtf2) full_join(dtf1, dtf2, by = "date"), .)
 
-print(as_tibble(data_set), n = Inf, width = Inf)
+# print(as_tibble(data_set), n = Inf, width = Inf)
 
 #data_set$pie_bondq <- replace(data_set$pie_bondq,is.na(data_set$pie_bondq),2.5/4)
 
@@ -232,7 +232,7 @@ est_data <- data_set %>%
 
          
 
-print(as_tibble(est_data), n = Inf, width = Inf)
+# print(as_tibble(est_data), n = Inf, width = Inf)
          
 csv_path <- file.path(out_dir, "est_data.csv")
 readr::write_csv(est_data, csv_path)
@@ -836,13 +836,13 @@ for (variant in single_wage_variants) {
   )
 }
 
-run_wage_no_inflation_model(
-  est_df = est_data,
-  wage_col = "DLWPI",
-  compiled_model = compiled_models$wpi_only,
-  file_stubs = list(
-    nairu = "NAIRU_wpi_no_inflation",
-    params = "posterior_summary_params_wpi_no_inflation"
-  ),
-  variant_label = "WPI no-inflation model"
-)
+#run_wage_no_inflation_model(
+#  est_df = est_data,
+#  wage_col = "DLWPI",
+#  compiled_model = compiled_models$wpi_only,
+#  file_stubs = list(
+#    nairu = "NAIRU_wpi_no_inflation",
+#    params = "posterior_summary_params_wpi_no_inflation"
+#  ),
+#  variant_label = "WPI no-inflation model"
+#)
