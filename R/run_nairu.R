@@ -57,7 +57,7 @@ dir.create(vintage_dir, showWarnings = FALSE, recursive = TRUE)
 # Download Most Recent ABS and RBA Data
 #---------------------------------------------------------------------------------------------------------
 # Import Data from ABS Website
-aena_series_id <- Sys.getenv("AENA_SERIES_ID", unset = "A2303385R")
+aena_series_id <- Sys.getenv("AENA_SERIES_ID", unset = "A129552326F")
 if (!nzchar(aena_series_id)) {
   stop("AENA_SERIES_ID environment variable is set but empty. Please provide a valid ABS series ID for AENA.")
 }
