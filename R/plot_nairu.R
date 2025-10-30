@@ -556,124 +556,131 @@ if (nrow(nairu_models_df) > 0) {
 
   # ---- 13. Average NAIRU across models ----------------------------------
 
-  model_summary <- nairu_models_df %>%
-    group_by(date, date_qtr) %>%
-    summarise(
-      avg_median = if (all(is.na(median))) NA_real_ else mean(median, na.rm = TRUE),
-      min_median = if (all(is.na(median))) NA_real_ else min(median, na.rm = TRUE),
-      max_median = if (all(is.na(median))) NA_real_ else max(median, na.rm = TRUE),
-      min_lower  = if (all(is.na(lower)))  NA_real_ else min(lower, na.rm = TRUE),
-      max_upper  = if (all(is.na(upper)))  NA_real_ else max(upper, na.rm = TRUE),
-      qtr_lbl    = first(qtr_lbl),
-      n_models   = sum(!is.na(median)),
-      .groups    = "drop"
+  models_for_average <- nairu_models_df %>%
+    filter(model != "WPI-only model")
+
+  if (nrow(models_for_average) == 0) {
+    message("⚠  Not enough models (after excluding WPI-only) to compute NAIRU average")
+  } else {
+    model_summary <- models_for_average %>%
+      group_by(date, date_qtr) %>%
+      summarise(
+        avg_median = if (all(is.na(median))) NA_real_ else mean(median, na.rm = TRUE),
+        min_median = if (all(is.na(median))) NA_real_ else min(median, na.rm = TRUE),
+        max_median = if (all(is.na(median))) NA_real_ else max(median, na.rm = TRUE),
+        min_lower  = if (all(is.na(lower)))  NA_real_ else min(lower, na.rm = TRUE),
+        max_upper  = if (all(is.na(upper)))  NA_real_ else max(upper, na.rm = TRUE),
+        qtr_lbl    = first(qtr_lbl),
+        n_models   = sum(!is.na(median)),
+        .groups    = "drop"
+      )
+
+    latest_avg <- slice_tail(model_summary, n = 1)
+
+    line_df <- model_summary %>%
+      select(date, qtr_lbl, n_models, avg_median, min_median, max_median) %>%
+      pivot_longer(
+        cols      = c(avg_median, min_median, max_median),
+        names_to  = "series",
+        values_to = "value"
+      ) %>%
+      mutate(
+        series = recode(
+          series,
+          avg_median = "Average median",
+          min_median = "Minimum median",
+          max_median = "Maximum median"
+        ),
+        tooltip = sprintf(
+          "%s<br>%s: %.2f<br>Models: %d",
+          qtr_lbl, series, value, n_models
+        )
+      )
+
+    p_avg <- ggplot(model_summary, aes(x = date, group = 1)) +
+      geom_ribbon(
+        aes(
+          ymin = min_lower,
+          ymax = max_upper,
+          text = sprintf(
+            "%s<br>Credible band union: %.2f – %.2f<br>Models: %d",
+            qtr_lbl, min_lower, max_upper, n_models
+          )
+        ),
+        fill = "#cce5ff", alpha = 0.4, colour = NA
+      ) +
+      geom_ribbon(
+        aes(
+          ymin = min_median,
+          ymax = max_median,
+          text = sprintf(
+            "%s<br>Median range: %.2f – %.2f<br>Models: %d",
+            qtr_lbl, min_median, max_median, n_models
+          )
+        ),
+        fill = "#99c2ff", alpha = 0.6, colour = NA
+      ) +
+      geom_line(
+        data = line_df,
+        aes(
+          y = value,
+          group = series,
+          colour = series,
+          linetype = series,
+          text = tooltip
+        ),
+        linewidth = 0.9
+      ) +
+      geom_point(
+        data = latest_avg,
+        aes(
+          y = avg_median,
+          text = sprintf(
+            "Latest (%s)<br>Average median: %.2f<br>Models: %d",
+            qtr_lbl, avg_median, n_models
+          )
+        ),
+        colour = "black", size = 3
+      ) +
+      scale_x_date(date_breaks = "2 years", date_labels = "%Y") +
+      labs(
+        title    = "Average NAIRU estimate across models",
+        subtitle = "Shaded area shows the range of model medians and credible intervals",
+        x        = "Year",
+        y        = "Percent"
+      ) +
+      my_theme +
+      scale_colour_manual(
+        values = c(
+          "Average median" = "#d62728",
+          "Minimum median" = "#1f78b4",
+          "Maximum median" = "#1f78b4"
+        )
+      ) +
+      scale_linetype_manual(
+        values = c(
+          "Average median" = "solid",
+          "Minimum median" = "dashed",
+          "Maximum median" = "dashed"
+        )
+      ) +
+      guides(colour = guide_legend(title = "Series"),
+             linetype = guide_legend(title = "Series")) +
+      theme(legend.position = "bottom")
+
+    ggsave(
+      file.path(output_dir, "nairu_model_average.png"),
+      p_avg,
+      width = 8, height = 5, dpi = 300
     )
 
-  latest_avg <- slice_tail(model_summary, n = 1)
-
-  line_df <- model_summary %>%
-    select(date, qtr_lbl, n_models, avg_median, min_median, max_median) %>%
-    pivot_longer(
-      cols      = c(avg_median, min_median, max_median),
-      names_to  = "series",
-      values_to = "value"
-    ) %>%
-    mutate(
-      series = recode(
-        series,
-        avg_median = "Average median",
-        min_median = "Minimum median",
-        max_median = "Maximum median"
-      ),
-      tooltip = sprintf(
-        "%s<br>%s: %.2f<br>Models: %d",
-        qtr_lbl, series, value, n_models
-      )
+    htmlwidgets::saveWidget(
+      plotly::ggplotly(p_avg, tooltip = "text"),
+      file.path(output_dir, "nairu_model_average.html")
     )
 
-  p_avg <- ggplot(model_summary, aes(x = date, group = 1)) +
-    geom_ribbon(
-      aes(
-        ymin = min_lower,
-        ymax = max_upper,
-        text = sprintf(
-          "%s<br>Credible band union: %.2f – %.2f<br>Models: %d",
-          qtr_lbl, min_lower, max_upper, n_models
-        )
-      ),
-      fill = "#cce5ff", alpha = 0.4, colour = NA
-    ) +
-    geom_ribbon(
-      aes(
-        ymin = min_median,
-        ymax = max_median,
-        text = sprintf(
-          "%s<br>Median range: %.2f – %.2f<br>Models: %d",
-          qtr_lbl, min_median, max_median, n_models
-        )
-      ),
-      fill = "#99c2ff", alpha = 0.6, colour = NA
-    ) +
-    geom_line(
-      data = line_df,
-      aes(
-        y = value,
-        group = series,
-        colour = series,
-        linetype = series,
-        text = tooltip
-      ),
-      linewidth = 0.9
-    ) +
-    geom_point(
-      data = latest_avg,
-      aes(
-        y = avg_median,
-        text = sprintf(
-          "Latest (%s)<br>Average median: %.2f<br>Models: %d",
-          qtr_lbl, avg_median, n_models
-        )
-      ),
-      colour = "black", size = 3
-    ) +
-    scale_x_date(date_breaks = "2 years", date_labels = "%Y") +
-    labs(
-      title    = "Average NAIRU estimate across models",
-      subtitle = "Shaded area shows the range of model medians and credible intervals",
-      x        = "Year",
-      y        = "Percent"
-    ) +
-    my_theme +
-    scale_colour_manual(
-      values = c(
-        "Average median" = "#d62728",
-        "Minimum median" = "#1f78b4",
-        "Maximum median" = "#1f78b4"
-      )
-    ) +
-    scale_linetype_manual(
-      values = c(
-        "Average median" = "solid",
-        "Minimum median" = "dashed",
-        "Maximum median" = "dashed"
-      )
-    ) +
-    guides(colour = guide_legend(title = "Series"),
-           linetype = guide_legend(title = "Series")) +
-    theme(legend.position = "bottom")
-
-  ggsave(
-    file.path(output_dir, "nairu_model_average.png"),
-    p_avg,
-    width = 8, height = 5, dpi = 300
-  )
-
-  htmlwidgets::saveWidget(
-    plotly::ggplotly(p_avg, tooltip = "text"),
-    file.path(output_dir, "nairu_model_average.html")
-  )
-
-  message("✔  Saved NAIRU model average plot")
+    message("✔  Saved NAIRU model average plot")
+  }
 }
 
 
