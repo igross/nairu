@@ -634,6 +634,16 @@ decomposition_specs <- list(
   )
 )
 
+biennial_decomp_scale <- scale_x_date(
+  date_breaks = "2 years",
+  date_labels = "%Y"
+)
+
+plotly_biennial_axis <- list(
+  dtick     = "M24",
+  tickformat = "%Y"
+)
+
 for (spec in decomposition_specs) {
   series_dfs <- purrr::map(
     spec$series_files,
@@ -669,6 +679,7 @@ for (spec in decomposition_specs) {
       y     = "Percentage-point contribution (q/q)",
       fill  = "Component"
     ) +
+    biennial_decomp_scale +
     scale_fill_manual(values = palette_cols) +
     my_theme +
     theme(legend.position = "bottom")
@@ -677,7 +688,9 @@ for (spec in decomposition_specs) {
   html_path <- file.path(output_dir, paste0(spec$output_stub, ".html"))
 
   ggsave(png_path, p_decomp, width = 9, height = 6, dpi = 300)
-  htmlwidgets::saveWidget(plotly::ggplotly(p_decomp, tooltip = "text"), html_path)
+  p_decomp_interactive <- plotly::ggplotly(p_decomp, tooltip = "text") %>%
+    plotly::layout(xaxis = plotly_biennial_axis)
+  htmlwidgets::saveWidget(p_decomp_interactive, html_path)
 
   message("✔  Saved decomposition plot for ", spec$label)
 }

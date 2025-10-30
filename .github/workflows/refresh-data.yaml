@@ -137,6 +137,9 @@ jobs:
           git config --global user.name  "igross"
           git config --global user.email "igross@users.noreply.github.com"
 
+          # ── Ensure we are on a branch (checkout@v2 leaves us detached) ───
+          git checkout -B main origin/main
+
           # ── Ensure we are up to date with the latest remote changes ──────
           git pull --rebase --autostash origin main
 
