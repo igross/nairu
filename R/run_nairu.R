@@ -342,7 +342,7 @@ run_single_wage_inflation_model <- function(
     compiled_model,
     data = data_list,
     chains = 10,
-    iter = 10000,
+    iter = 500,
     control = list(max_treedepth = 15)
   )
 
@@ -577,7 +577,7 @@ run_dual_wage_model <- function(
     compiled_model,
     data = data_list,
     chains = 10,
-    iter = 10000,
+    iter = 500,
     control = list(max_treedepth = 15)
   )
 
@@ -713,7 +713,7 @@ run_wage_no_inflation_model <- function(
     compiled_model,
     data = data_list,
     chains = 10,
-    iter = 10000,
+    iter = 500,
     control = list(max_treedepth = 15)
   )
 
