@@ -32,7 +32,7 @@ model {
     gamma_wage_lag[k] ~ normal(pow(0.5, k) * -2, 1);
   }
 
-  delta_wage_0  ~ normal(0.30 , 0.50);
+  delta_wage_0  ~ normal(0.30 , 0.10);
   gamma_wage_0  ~ normal(-2   , 1.00);
   lambda_wage_0 ~ normal(-3   , 1.00);
   xi_wage       ~ normal(0    , 3);

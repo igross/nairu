@@ -122,13 +122,13 @@ model {
   xi_pt       ~ normal(0    , 3);
   eps_pt      ~ normal(0.30 , 0.50);
 
-  delta_wage1_0  ~ normal(0.30 , 0.50);
+  delta_wage1_0  ~ normal(0.30 , 0.10);
   gamma_wage1_0  ~ normal(-2   , 1.00);
   lambda_wage1_0 ~ normal(-3   , 1.00);
   xi_wage1       ~ normal(0    , 3);
   eps_wage1      ~ normal(2    , 1.00);
 
-  delta_wage2_0  ~ normal(0.30 , 0.50);
+  delta_wage2_0  ~ normal(0.30 , 0.10);
   gamma_wage2_0  ~ normal(-2   , 1.00);
   lambda_wage2_0 ~ normal(-3   , 1.00);
   xi_wage2       ~ normal(0    , 3);
