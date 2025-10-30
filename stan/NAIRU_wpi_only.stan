@@ -19,7 +19,7 @@ parameters {
   real<lower = 0,   upper = 0.40>        tau;
   real<lower = -2.3, upper = 3.7>        wage_missing;
 
-  real<lower = -0.30, upper = 0.90>      delta_wage_0;
+  real<lower = 0.70, upper = 1.50>      delta_wage_0;
   real<lower = -5,   upper = 1>          gamma_wage_0;
   vector<lower = -4,   upper = 2>[2]     gamma_wage_lag;
   real<lower = -6,   upper = 0>          lambda_wage_0;
