@@ -245,12 +245,6 @@ est_data <- data_set %>%
 
 # print(as_tibble(est_data), n = Inf, width = Inf)
          
-csv_path <- file.path(out_dir, "est_data.csv")
-readr::write_csv(est_data, csv_path)
-
-myfile <- file.path(out_dir, "est_data.csv")
-test <- read_csv(myfile)
-         
 # Subset Data for Stan
 assert_complete_nonwage <- function(design_df, wage_col, context_label) {
   non_wage_cols <- setdiff(names(design_df), c("date", wage_col))
@@ -523,6 +517,16 @@ run_single_wage_inflation_model <- function(
 
   message(glue::glue(
     "✔ {variant_label}: parameter draws and summaries written to the output directory."
+  ))
+
+  invisible(list(
+    wage_col = wage_col,
+    estimated_series = tibble::tibble(
+      date = design$date,
+      value = wage_estimates
+    ),
+    missing_index = missing_index,
+    missing_estimate = if (missing_index > 0L) wage_missing_median else NA_real_
   ))
 }
 
@@ -850,8 +854,11 @@ single_wage_variants <- list(
   )
 )
 
-for (variant in single_wage_variants) {
-  run_single_wage_inflation_model(
+wage_series_results <- vector("list", length(single_wage_variants))
+
+for (i in seq_along(single_wage_variants)) {
+  variant <- single_wage_variants[[i]]
+  wage_series_results[[i]] <- run_single_wage_inflation_model(
     est_df = est_data,
     wage_col = variant$wage_col,
     wage_label = variant$wage_label,
@@ -886,3 +893,23 @@ run_wage_no_inflation_model(
   ),
   variant_label = "WPI no-inflation model"
 )
+
+est_data_completed <- est_data
+
+for (series_result in wage_series_results) {
+  if (is.null(series_result)) {
+    next
+  }
+
+  col_name <- series_result$wage_col
+  if (!col_name %in% names(est_data_completed)) {
+    next
+  }
+
+  replacement <- series_result$estimated_series
+  match_idx <- match(replacement$date, est_data_completed$date)
+  est_data_completed[[col_name]][match_idx] <- replacement$value
+}
+
+csv_path <- file.path(out_dir, "est_data.csv")
+readr::write_csv(est_data_completed, csv_path)
