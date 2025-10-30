@@ -122,7 +122,7 @@ model {
   xi_pt       ~ normal(0    , 3);
   eps_pt      ~ normal(0.30 , 0.50);
 
-  delta_pu_0  ~ normal(0.30 , 0.50);
+  delta_pu_0  ~ normal(1.15 , 0.50);
   gamma_pu_0  ~ normal(-2   , 1.00);
   lambda_pu_0 ~ normal(-3   , 1.00);
   xi_pu       ~ normal(0    , 3);
@@ -181,12 +181,12 @@ model {
     // ulc_t equation (t ≥ 3)
     for (t in 6:T) {
       real exp_now  = delta_pu_0 * Y[t,5];
-      real ugap_now = gamma_pu_0 * (1 - NAIRU[t] / Y[t,3]);
+      real ugap_now = gamma_pu_0 * (Y[t,3] - NAIRU[t] / Y[t,3]);
       real mom_now  = lambda_pu_0 * (Y[t-1,3] - Y[t-2,3]) / Y[t,3];
 
       for (k in 1:2) {
 //        exp_now  += delta_pu_lag[k] * Y[t-k,5];
-        ugap_now += gamma_pu_lag[k] * (1 - NAIRU[t-k] / Y[t-k,3]);
+        ugap_now += gamma_pu_lag[k] * (Y[t-k,3] - NAIRU[t-k] / Y[t-k,3]);
 //        mom_now  += lambda_pu_lag[k] *
 //                    (Y[t-1-k,3] - Y[t-2-k,3]) / Y[t-k,3];
       }
