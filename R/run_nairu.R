@@ -86,10 +86,9 @@ R_5206 <- abs_5206 %>%
   dplyr::select(date, series_id, value) %>%
   distinct(date, series_id, .keep_all = TRUE) %>%
   dcast(date ~ series_id) %>%
-  rename_with(~ "AENA_LEVEL", all_of(aena_series_id)) %>%
+  rename_with(~ "DLAENA", all_of(aena_series_id)) %>%
   mutate(NULC = A2302915V / A2304402X,
-         DLNULC = 100 * (log(NULC) - log(lag(NULC, 1))),
-         DLAENA = 100 * (log(AENA_LEVEL) - log(lag(AENA_LEVEL, 1)))) %>%
+         DLNULC = 100 * (log(NULC) - log(lag(NULC, 1)))) %>%
   select(date, DLNULC, DLAENA)
 
 print(R_5206)
