@@ -92,6 +92,8 @@ R_5206 <- abs_5206 %>%
          DLAENA = 100 * (log(AENA_LEVEL) - log(lag(AENA_LEVEL, 1)))) %>%
   select(date, DLNULC, DLAENA)
 
+print(R_5206)
+
 # 6345.0 WPI Data
 R_6345 <- abs_6345 %>%
   filter(series_id == "A2713849C") %>%
