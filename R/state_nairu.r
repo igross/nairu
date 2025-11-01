@@ -42,7 +42,7 @@ if (!Sys.Date() %in% release_calendar) {
   message(glue("⏩ {Sys.Date()} is not a CPI or WPI release day – skipping refresh."))
   quit(save = "no")   # graceful exit for CI pipelines
 }
-quit(save = "no")
+
 # ---- 2. Constants: ABS series IDs ----------------------------------------
 
 ## CPI headline index (original)
