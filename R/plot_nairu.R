@@ -405,6 +405,9 @@ model_specs <- tibble::tribble(
   file.path(output_dir, "NAIRU_baseline.csv"),          "CPI & ULC model",
   file.path(output_dir, "NAIRU_aena.csv"),              "CPI & AENA model",
   file.path(output_dir, "NAIRU_aena_wpi.csv"),          "CPI with AENA & WPI model",
+  file.path(output_dir, "NAIRU_ulc_aena.csv"),          "CPI with ULC & AENA model",
+  file.path(output_dir, "NAIRU_ulc_wpi.csv"),           "CPI with ULC & WPI model",
+  file.path(output_dir, "NAIRU_ulc_aena_wpi.csv"),      "CPI with ULC, AENA & WPI model",
   file.path(output_dir, "NAIRU_wpi.csv"),               "CPI & WPI model",
   file.path(output_dir, "NAIRU_wpi_no_inflation.csv"),  "WPI-only model"
 ) %>%
