@@ -403,6 +403,8 @@ message("✔  Figure 5 saved: regions")
 model_specs <- tibble::tribble(
   ~path,                                      ~label,
   file.path(output_dir, "NAIRU_baseline.csv"),          "CPI & ULC model",
+  file.path(output_dir, "NAIRU_aena.csv"),              "CPI & AENA model",
+  file.path(output_dir, "NAIRU_aena_wpi.csv"),          "CPI with AENA & WPI model",
   file.path(output_dir, "NAIRU_wpi.csv"),               "CPI & WPI model",
   file.path(output_dir, "NAIRU_wpi_no_inflation.csv"),  "WPI-only model"
 ) %>%
