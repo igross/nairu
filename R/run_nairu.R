@@ -46,6 +46,9 @@ Sys.setenv(MAKEFLAGS = "-j4")          # speed up C++ build
 root    <- Sys.getenv("GITHUB_WORKSPACE", unset = here::here())
 out_dir <- file.path(root, "docs")
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
+
+data_dir <- file.path(out_dir, "data")
+dir.create(data_dir, showWarnings = FALSE, recursive = TRUE)
 setwd(root)
 
 vintage_dir <- file.path(out_dir, "vintages")
@@ -384,7 +387,7 @@ run_single_wage_inflation_model <- function(
 
   readr::write_csv(
     summarised_state,
-    file.path(out_dir, paste0(file_stubs$nairu, ".csv"))
+    file.path(data_dir, paste0(file_stubs$nairu, ".csv"))
   )
 
   Y_mat <- stan_matrix
@@ -482,12 +485,12 @@ run_single_wage_inflation_model <- function(
 
   readr::write_csv(
     infl_pi_decomp,
-    file.path(out_dir, paste0(file_stubs$inflation, ".csv"))
+    file.path(data_dir, paste0(file_stubs$inflation, ".csv"))
   )
 
   readr::write_csv(
     wage_decomp,
-    file.path(out_dir, paste0(file_stubs$wage, ".csv"))
+    file.path(data_dir, paste0(file_stubs$wage, ".csv"))
   )
 
   param_draws <- as.data.frame(fit) %>%
@@ -513,7 +516,7 @@ run_single_wage_inflation_model <- function(
 
   readr::write_csv(
     param_summary,
-    file.path(out_dir, paste0(file_stubs$params, ".csv"))
+    file.path(data_dir, paste0(file_stubs$params, ".csv"))
   )
 
   message(glue::glue(
@@ -632,7 +635,7 @@ run_dual_wage_model <- function(
 
   readr::write_csv(
     summarised_state,
-    file.path(out_dir, paste0(file_stubs$nairu, ".csv"))
+    file.path(data_dir, paste0(file_stubs$nairu, ".csv"))
   )
 
   param_draws <- as.data.frame(fit) %>%
@@ -658,7 +661,7 @@ run_dual_wage_model <- function(
 
   readr::write_csv(
     param_summary,
-    file.path(out_dir, paste0(file_stubs$params, ".csv"))
+    file.path(data_dir, paste0(file_stubs$params, ".csv"))
   )
 
   message(glue::glue(
@@ -762,7 +765,7 @@ run_wage_no_inflation_model <- function(
 
   readr::write_csv(
     summarised_state,
-    file.path(out_dir, paste0(file_stubs$nairu, ".csv"))
+    file.path(data_dir, paste0(file_stubs$nairu, ".csv"))
   )
 
   param_draws <- as.data.frame(fit) %>%
@@ -788,7 +791,7 @@ run_wage_no_inflation_model <- function(
 
   readr::write_csv(
     param_summary,
-    file.path(out_dir, paste0(file_stubs$params, ".csv"))
+    file.path(data_dir, paste0(file_stubs$params, ".csv"))
   )
 
   message(glue::glue(
@@ -948,5 +951,5 @@ for (series_result in wage_series_results) {
   est_data_completed[[col_name]][match_idx] <- replacement$value
 }
 
-csv_path <- file.path(out_dir, "est_data.csv")
+csv_path <- file.path(data_dir, "est_data.csv")
 readr::write_csv(est_data_completed, csv_path)
