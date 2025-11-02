@@ -426,6 +426,19 @@ if (nrow(nairu_models_df) > 0) {
   model_palette <- viridisLite::viridis(length(model_levels), end = 0.85)
   lur_df <- nairu_models_df %>% distinct(date, lur, qtr_lbl) %>% arrange(date)
 
+  readr::write_csv(
+    nairu_models_df %>%
+      arrange(date, model) %>%
+      transmute(
+        date    = format(date, "%Y-%m-%d"),
+        quarter = qtr_lbl,
+        model,
+        median
+      ),
+    file.path(output_dir, "nairu_model_medians.csv")
+  )
+  message("✔  Saved NAIRU model medians CSV")
+
   p_models <- ggplot(nairu_models_df, aes(x = date)) +
     geom_ribbon(
       aes(
