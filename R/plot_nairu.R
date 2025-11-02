@@ -445,7 +445,10 @@ if (nrow(nairu_models_df) > 0) {
 
   model_levels  <- unique(nairu_models_df$model)
   model_palette <- setNames(viridisLite::viridis(length(model_levels), end = 0.85), model_levels)
-  lur_df <- nairu_models_df %>% distinct(date, lur, qtr_lbl) %>% arrange(date)
+  lur_df <- nairu_df %>%
+    semi_join(nairu_models_df %>% distinct(date), by = "date") %>%
+    select(date, lur, qtr_lbl) %>%
+    arrange(date)
   actual_label <- "Observed unemployment rate"
   colour_palette <- c(model_palette, setNames("#2c3e50", actual_label))
 
@@ -507,7 +510,10 @@ if (nrow(nairu_models_df) > 0) {
     ) +
     scale_x_date(date_breaks = "2 years", date_labels = "%Y") +
     scale_colour_manual(values = colour_palette) +
-    scale_fill_manual(values = model_palette) +
+    scale_fill_manual(values = model_palette, guide = "none") +
+    guides(
+      colour = guide_legend(override.aes = list(fill = NA))
+    ) +
     labs(
       title    = "NAIRU estimates by model",
       subtitle = "Median estimates with 90% credible intervals",
