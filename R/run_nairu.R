@@ -801,6 +801,9 @@ compiled_models <- list(
   cpi_ulc = stan_model(file = file.path("stan", "NAIRU_cpi_ulc.stan")),
   cpi_wpi = stan_model(file = file.path("stan", "NAIRU_cpi_wpi.stan")),
   cpi_aena_wpi = stan_model(file = file.path("stan", "NAIRU_cpi_aena_wpi.stan")),
+  cpi_ulc_wpi = stan_model(file = file.path("stan", "NAIRU_cpi_ulc_wpi.stan")),
+  cpi_ulc_aena = stan_model(file = file.path("stan", "NAIRU_cpi_ulc_aena.stan")),
+  cpi_ulc_aena_wpi = stan_model(file = file.path("stan", "NAIRU_cpi_ulc_aena_wpi.stan")),
   wpi_only = stan_model(file = file.path("stan", "NAIRU_wpi_only.stan"))
 )
 
@@ -882,6 +885,39 @@ run_dual_wage_model(
     params = "posterior_summary_params_aena_wpi"
   ),
   variant_label = "CPI with AENA & WPI model"
+)
+
+run_dual_wage_model(
+  est_df = est_data,
+  wage_cols = c("DLNULC", "DLWPI"),
+  compiled_model = compiled_models$cpi_ulc_wpi,
+  file_stubs = list(
+    nairu = "NAIRU_ulc_wpi",
+    params = "posterior_summary_params_ulc_wpi"
+  ),
+  variant_label = "CPI with ULC & WPI model"
+)
+
+run_dual_wage_model(
+  est_df = est_data,
+  wage_cols = c("DLNULC", "DLAENA"),
+  compiled_model = compiled_models$cpi_ulc_aena,
+  file_stubs = list(
+    nairu = "NAIRU_ulc_aena",
+    params = "posterior_summary_params_ulc_aena"
+  ),
+  variant_label = "CPI with ULC & AENA model"
+)
+
+run_dual_wage_model(
+  est_df = est_data,
+  wage_cols = c("DLNULC", "DLAENA", "DLWPI"),
+  compiled_model = compiled_models$cpi_ulc_aena_wpi,
+  file_stubs = list(
+    nairu = "NAIRU_ulc_aena_wpi",
+    params = "posterior_summary_params_ulc_aena_wpi"
+  ),
+  variant_label = "CPI with ULC, AENA & WPI model"
 )
 
 run_wage_no_inflation_model(
