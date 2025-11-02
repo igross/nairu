@@ -525,8 +525,22 @@ if (nrow(nairu_models_df) > 0) {
     width = 9, height = 8, dpi = 300
   )
 
+  p_models_plotly <- plotly::ggplotly(p_models, tooltip = "text")
+
+  p_models_plotly$x$data <- purrr::map(
+    p_models_plotly$x$data,
+    ~ {
+      if (!is.null(.x$name)) {
+        cleaned_name <- gsub("^\\((.*)\\)$", "\\1", .x$name)
+        cleaned_name <- gsub(",[0-9]+$", "", cleaned_name)
+        .x$name <- cleaned_name
+      }
+      .x
+    }
+  )
+
   htmlwidgets::saveWidget(
-    plotly::ggplotly(p_models, tooltip = "text"),
+    p_models_plotly,
     file.path(output_dir, "nairu_models.html")
   )
 
