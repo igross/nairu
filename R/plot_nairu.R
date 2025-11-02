@@ -22,10 +22,14 @@ library(viridisLite)
 
 # ---- 2. Set up file paths -----------------------------------------------
 target_dir  <- getwd()
-csv_in      <- file.path(target_dir, "docs", "NAIRU_baseline.csv")
-vintage_dir <- file.path(target_dir, "docs", "vintages")
 output_dir  <- file.path(target_dir, "docs")
 dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
+
+data_dir    <- file.path(output_dir, "data")
+dir.create(data_dir, showWarnings = FALSE, recursive = TRUE)
+
+csv_in      <- file.path(data_dir, "NAIRU_baseline.csv")
+vintage_dir <- file.path(output_dir, "vintages")
 
 # ---- 3. ABS release months (approximate) ---------------------------------
 table_month <- list(
@@ -346,7 +350,7 @@ if (nrow(vintages_df) > 0 && "vintage" %in% names(vintages_df)) {
 
 # ---- 10. Figure 5: NAIRU across all regions ------------------------------
 
-regions_file <- file.path(output_dir, "NAIRU_all_regions.csv")
+regions_file <- file.path(data_dir, "NAIRU_all_regions.csv")
 
 # 10.1 Read raw CSV
 nairu_regions_raw <- read_csv(regions_file, show_col_types = FALSE)
@@ -402,14 +406,14 @@ message("✔  Figure 5 saved: regions")
 
 model_specs <- tibble::tribble(
   ~path,                                      ~label,
-  file.path(output_dir, "NAIRU_baseline.csv"),          "CPI & ULC model",
-  file.path(output_dir, "NAIRU_aena.csv"),              "CPI & AENA model",
-  file.path(output_dir, "NAIRU_aena_wpi.csv"),          "CPI with AENA & WPI model",
-  file.path(output_dir, "NAIRU_ulc_aena.csv"),          "CPI with ULC & AENA model",
-  file.path(output_dir, "NAIRU_ulc_wpi.csv"),           "CPI with ULC & WPI model",
-  file.path(output_dir, "NAIRU_ulc_aena_wpi.csv"),      "CPI with ULC, AENA & WPI model",
-  file.path(output_dir, "NAIRU_wpi.csv"),               "CPI & WPI model",
-  file.path(output_dir, "NAIRU_wpi_no_inflation.csv"),  "WPI-only model"
+  file.path(data_dir, "NAIRU_baseline.csv"),          "CPI & ULC model",
+  file.path(data_dir, "NAIRU_aena.csv"),              "CPI & AENA model",
+  file.path(data_dir, "NAIRU_aena_wpi.csv"),          "CPI with AENA & WPI model",
+  file.path(data_dir, "NAIRU_ulc_aena.csv"),          "CPI with ULC & AENA model",
+  file.path(data_dir, "NAIRU_ulc_wpi.csv"),           "CPI with ULC & WPI model",
+  file.path(data_dir, "NAIRU_ulc_aena_wpi.csv"),      "CPI with ULC, AENA & WPI model",
+  file.path(data_dir, "NAIRU_wpi.csv"),               "CPI & WPI model",
+  file.path(data_dir, "NAIRU_wpi_no_inflation.csv"),  "WPI-only model"
 ) %>%
   filter(file.exists(path))
 
@@ -438,7 +442,7 @@ if (nrow(nairu_models_df) > 0) {
         model,
         median
       ),
-    file.path(output_dir, "nairu_model_medians.csv")
+    file.path(data_dir, "nairu_model_medians.csv")
   )
   message("✔  Saved NAIRU model medians CSV")
 
@@ -720,8 +724,8 @@ decomposition_specs <- list(
     output_stub       = "infl_ulc_decomp",
     component_labels  = c(base_component_labels, ulc_demeaned = "ΔULC (demeaned)"),
     series_files      = list(
-      list(path = file.path(output_dir, "infl_pi_decomp.csv"), label = "Inflation"),
-      list(path = file.path(output_dir, "ulc_decomp.csv"),       label = "Unit labour costs")
+      list(path = file.path(data_dir, "infl_pi_decomp.csv"), label = "Inflation"),
+      list(path = file.path(data_dir, "ulc_decomp.csv"),       label = "Unit labour costs")
     )
   ),
   list(
@@ -729,8 +733,8 @@ decomposition_specs <- list(
     output_stub       = "infl_wage_decomp_wpi",
     component_labels  = c(base_component_labels, wpi_demeaned = "ΔWPI (demeaned)"),
     series_files      = list(
-      list(path = file.path(output_dir, "infl_pi_decomp_wpi.csv"), label = "Inflation"),
-      list(path = file.path(output_dir, "wage_decomp_wpi.csv"),    label = "Wage growth")
+      list(path = file.path(data_dir, "infl_pi_decomp_wpi.csv"), label = "Inflation"),
+      list(path = file.path(data_dir, "wage_decomp_wpi.csv"),    label = "Wage growth")
     )
   )
 )
