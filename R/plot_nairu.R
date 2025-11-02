@@ -404,17 +404,31 @@ message("✔  Figure 5 saved: regions")
 
 # ---- 11. NAIRU estimates by model ---------------------------------------
 
-model_specs <- tibble::tribble(
-  ~path,                                      ~label,
-  file.path(data_dir, "NAIRU_baseline.csv"),          "CPI & ULC model",
-  file.path(data_dir, "NAIRU_aena.csv"),              "CPI & AENA model",
-  file.path(data_dir, "NAIRU_aena_wpi.csv"),          "CPI with AENA & WPI model",
-  file.path(data_dir, "NAIRU_ulc_aena.csv"),          "CPI with ULC & AENA model",
-  file.path(data_dir, "NAIRU_ulc_wpi.csv"),           "CPI with ULC & WPI model",
-  file.path(data_dir, "NAIRU_ulc_aena_wpi.csv"),      "CPI with ULC, AENA & WPI model",
-  file.path(data_dir, "NAIRU_wpi.csv"),               "CPI & WPI model",
-  file.path(data_dir, "NAIRU_wpi_no_inflation.csv"),  "WPI-only model"
+model_lookup <- tibble::tribble(
+  ~file_stub,                       ~label,                                 ~contains_cpi,
+  "NAIRU_baseline",                "CPI & ULC model",                     TRUE,
+  "NAIRU_aena",                    "CPI & AENA model",                    TRUE,
+  "NAIRU_aena_wpi",                "CPI with AENA & WPI model",           TRUE,
+  "NAIRU_ulc_aena",                "CPI with ULC & AENA model",           TRUE,
+  "NAIRU_ulc_wpi",                 "CPI with ULC & WPI model",            TRUE,
+  "NAIRU_ulc_aena_wpi",            "CPI with ULC, AENA & WPI model",      TRUE,
+  "NAIRU_wpi",                     "CPI & WPI model",                     TRUE,
+  "NAIRU_wpi_no_inflation",        "WPI-only model",                      FALSE
+)
+
+model_specs <- tibble::tibble(
+  path = list.files(data_dir, pattern = "^NAIRU_.*\\.csv$", full.names = TRUE)
 ) %>%
+  mutate(file_stub = tools::file_path_sans_ext(basename(path))) %>%
+  left_join(model_lookup, by = "file_stub") %>%
+  mutate(
+    contains_cpi = dplyr::coalesce(contains_cpi, grepl("cpi", file_stub, ignore.case = TRUE)),
+    label = dplyr::coalesce(
+      label,
+      tools::toTitleCase(gsub("_", " ", gsub("^NAIRU_", "", file_stub)))
+    )
+  ) %>%
+  filter(contains_cpi) %>%
   filter(file.exists(path))
 
 nairu_models_df <- purrr::map2_dfr(
@@ -430,8 +444,10 @@ if (nrow(nairu_models_df) > 0) {
     ungroup()
 
   model_levels  <- unique(nairu_models_df$model)
-  model_palette <- viridisLite::viridis(length(model_levels), end = 0.85)
+  model_palette <- setNames(viridisLite::viridis(length(model_levels), end = 0.85), model_levels)
   lur_df <- nairu_models_df %>% distinct(date, lur, qtr_lbl) %>% arrange(date)
+  actual_label <- "Observed unemployment rate"
+  colour_palette <- c(model_palette, setNames("#2c3e50", actual_label))
 
   readr::write_csv(
     nairu_models_df %>%
@@ -458,7 +474,7 @@ if (nrow(nairu_models_df) > 0) {
           qtr_lbl, model, lower, upper
         )
       ),
-      alpha = 0.25, colour = NA
+      alpha = 0.08, colour = NA
     ) +
     geom_line(
       aes(
@@ -483,22 +499,21 @@ if (nrow(nairu_models_df) > 0) {
       aes(
         x = date,
         y = lur,
+        colour = actual_label,
         text = sprintf("%s<br>Unemp. rate: %.2f", qtr_lbl, lur)
       ),
       inherit.aes = FALSE,
-      colour = "#2c3e50",
-      linewidth = 0.8,
-      linetype = "dashed"
+      linewidth = 1.1
     ) +
     scale_x_date(date_breaks = "2 years", date_labels = "%Y") +
-    scale_colour_manual(values = setNames(model_palette, model_levels)) +
-    scale_fill_manual(values = setNames(model_palette, model_levels)) +
+    scale_colour_manual(values = colour_palette) +
+    scale_fill_manual(values = model_palette) +
     labs(
       title    = "NAIRU estimates by model",
       subtitle = "Median estimates with 90% credible intervals",
       x        = "Year",
       y        = "Percent",
-      colour   = "Model",
+      colour   = "Series",
       fill     = "Model"
     ) +
     my_theme +
