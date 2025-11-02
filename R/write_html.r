@@ -52,7 +52,7 @@ decomp_html <- if (file.exists(interactive_html)) {
 models_static      <- file.path(output_dir, "nairu_models.png")
 models_interactive <- file.path(output_dir, "nairu_models.html")
 
-model_avg_html <- if (file.exists(models_interactive)) {
+model_comparison_html <- if (file.exists(models_interactive)) {
   sprintf('
     <h2 style="text-align:center;">NAIRU estimates by model</h2>
     <div style="display:flex;justify-content:center;margin:40px 0;">
@@ -69,7 +69,28 @@ model_avg_html <- if (file.exists(models_interactive)) {
 } else ""
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 4.  HTML scaffold -----------------------------------------------------------
+# 4.  Model average ------------------------------------------------------------
+model_avg_static      <- file.path(output_dir, "nairu_model_average.png")
+model_avg_interactive <- file.path(output_dir, "nairu_model_average.html")
+
+model_average_html <- if (file.exists(model_avg_interactive)) {
+  sprintf('
+    <h2 style="text-align:center;">Average NAIRU estimate across models</h2>
+    <div style="display:flex;justify-content:center;margin:40px 0;">
+      <iframe src="%s"
+              style="width:95%%;height:750px;border:none;border-radius:15px;"
+              title="Average NAIRU estimate"></iframe>
+    </div>', basename(model_avg_interactive))
+} else if (file.exists(model_avg_static)) {
+  sprintf('
+    <h2 style="text-align:center;">Average NAIRU estimate across models</h2>
+    <div class="chart-card" style="max-width:1000px;margin:0 auto;">
+      <img src="%s" alt="Average NAIRU estimate across models">
+    </div>', basename(model_avg_static))
+} else ""
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 5.  HTML scaffold -----------------------------------------------------------
 intro_paragraph <- '
   <p style="max-width:800px;margin:0 auto 30px auto;text-align:center;
             font-size:1.1rem;color:#444;">
@@ -98,11 +119,13 @@ html <- sprintf('
 %s  <!-- intro -->
 %s  <!-- NAIRU -->
 %s  <!-- decomposition -->
+%s  <!-- model comparison -->
 %s  <!-- model average -->
 
 </body>
 </html>', format(Sys.Date(), "%d %b %Y"),
-   intro_paragraph, spark_html, decomp_html, model_avg_html)
+   intro_paragraph, spark_html, decomp_html, model_comparison_html,
+   model_average_html)
 
 writeLines(html, file.path(docs_dir, "index.html"))
 message("✅ docs/index.html written (interactive NAIRU plus comparison charts).")
