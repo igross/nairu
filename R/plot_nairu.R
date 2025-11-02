@@ -403,6 +403,8 @@ message("✔  Figure 5 saved: regions")
 model_specs <- tibble::tribble(
   ~path,                                      ~label,
   file.path(output_dir, "NAIRU_baseline.csv"),          "CPI & ULC model",
+  file.path(output_dir, "NAIRU_aena.csv"),              "CPI & AENA model",
+  file.path(output_dir, "NAIRU_aena_wpi.csv"),          "CPI with AENA & WPI model",
   file.path(output_dir, "NAIRU_wpi.csv"),               "CPI & WPI model",
   file.path(output_dir, "NAIRU_wpi_no_inflation.csv"),  "WPI-only model"
 ) %>%
@@ -423,6 +425,19 @@ if (nrow(nairu_models_df) > 0) {
   model_levels  <- unique(nairu_models_df$model)
   model_palette <- viridisLite::viridis(length(model_levels), end = 0.85)
   lur_df <- nairu_models_df %>% distinct(date, lur, qtr_lbl) %>% arrange(date)
+
+  readr::write_csv(
+    nairu_models_df %>%
+      arrange(date, model) %>%
+      transmute(
+        date    = format(date, "%Y-%m-%d"),
+        quarter = qtr_lbl,
+        model,
+        median
+      ),
+    file.path(output_dir, "nairu_model_medians.csv")
+  )
+  message("✔  Saved NAIRU model medians CSV")
 
   p_models <- ggplot(nairu_models_df, aes(x = date)) +
     geom_ribbon(
