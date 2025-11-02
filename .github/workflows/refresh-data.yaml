@@ -104,6 +104,12 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install xquartz --cask
 
+      - name: Prepare git branch
+        run: |
+          git fetch origin main
+          git checkout main
+          git pull --rebase --autostash origin main
+
       - name: Install vctrs
         run: Rscript -e 'install.packages("vctrs")'
 
@@ -136,9 +142,6 @@ jobs:
         run: |
           git config --global user.name  "igross"
           git config --global user.email "igross@users.noreply.github.com"
-
-          # ── Ensure we are on a branch (checkout@v2 leaves us detached) ───
-          git checkout -B main origin/main
 
           # ── Ensure we are up to date with the latest remote changes ──────
           git pull --rebase --autostash origin main
