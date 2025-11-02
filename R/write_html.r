@@ -48,24 +48,24 @@ decomp_html <- if (file.exists(interactive_html)) {
 } else ""
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 3.  Average NAIRU across models ---------------------------------------------
-avg_static      <- file.path(output_dir, "nairu_model_average.png")
-avg_interactive <- file.path(output_dir, "nairu_model_average.html")
+# 3.  NAIRU estimates by model -------------------------------------------------
+models_static      <- file.path(output_dir, "nairu_models.png")
+models_interactive <- file.path(output_dir, "nairu_models.html")
 
-model_avg_html <- if (file.exists(avg_interactive)) {
+model_avg_html <- if (file.exists(models_interactive)) {
   sprintf('
-    <h2 style="text-align:center;">Average NAIRU across models</h2>
+    <h2 style="text-align:center;">NAIRU estimates by model</h2>
     <div style="display:flex;justify-content:center;margin:40px 0;">
       <iframe src="%s"
               style="width:95%%;height:750px;border:none;border-radius:15px;"
-              title="Average NAIRU plot"></iframe>
-    </div>', basename(avg_interactive))
-} else if (file.exists(avg_static)) {
+              title="NAIRU model comparison"></iframe>
+    </div>', basename(models_interactive))
+} else if (file.exists(models_static)) {
   sprintf('
-    <h2 style="text-align:center;">Average NAIRU across models</h2>
+    <h2 style="text-align:center;">NAIRU estimates by model</h2>
     <div class="chart-card" style="max-width:1000px;margin:0 auto;">
-      <img src="%s" alt="Average NAIRU across models">
-    </div>', basename(avg_static))
+      <img src="%s" alt="NAIRU estimates by model">
+    </div>', basename(models_static))
 } else ""
 
 # ─────────────────────────────────────────────────────────────────────────────
