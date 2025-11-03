@@ -143,17 +143,40 @@ jobs:
           git config --global user.name  "igross"
           git config --global user.email "igross@users.noreply.github.com"
 
-          # ── Ensure we are up to date with the latest remote changes ──────
-          git pull --rebase --autostash origin main
+          # ── Nothing to do when the workspace is clean ────────────────────
+          if git diff --quiet && git diff --cached --quiet; then
+            echo "🟢 No changes to commit"
+            exit 0
+          fi
+
+          # ── Stash changes before syncing with remote ─────────────────────
+          git stash push -u
+          STASH_NAME=$(git stash list | head -n1 | cut -d: -f1)
+
+          # ── Rebase onto the latest remote main ───────────────────────────
+          if ! git pull --rebase origin main; then
+            echo "⚠️  git pull --rebase failed; aborting rebase and restoring stash"
+            git rebase --abort || true
+            git stash pop --index || true
+            exit 1
+          fi
+
+          # ── Reapply stashed updates, preferring freshly generated outputs ─
+          if [ -n "$STASH_NAME" ]; then
+            if ! git stash pop --index "$STASH_NAME"; then
+              echo "ℹ️  Conflicts while reapplying stash; preferring generated files"
+              git checkout --theirs -- .
+              git add -A
+              git stash drop "$STASH_NAME" || true
+            fi
+          fi
 
           # ── Stage everything that might change ───────────────────────────
-          # Stage generated content when the directories exist
           if [ -d output ]; then
             git add -A output
           fi
-          git add -A docs || true   # add other paths if your scripts write elsewhere
+          git add -A docs || true
 
-          # ── Skip commit if nothing is staged ─────────────────────────────
           if git diff --cached --quiet; then
             echo "🟢 No changes to commit"
             exit 0
