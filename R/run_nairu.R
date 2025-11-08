@@ -419,6 +419,7 @@ run_single_wage_inflation_model <- function(
   Tn <- nrow(Y_mat)
 
   pi_exp <- pi_imp <- pi_ugap <- pi_mom <- pi_wage <- pi_resid <- pi_dum <- rep(NA, Tn)
+  pi_hat <- rep(NA_real_, Tn)
   pu_dum <- pu_ugap <- pu_mom <- pu_exp <- pu_resid <- rep(NA, Tn)
 
   for (t in 6:Tn) {
@@ -445,6 +446,7 @@ run_single_wage_inflation_model <- function(
         pi_mom[t] + pi_wage[t] + pi_dum[t]
 
       pi_resid[t] <- Y_mat[t, 4] - deterministic_pi
+      pi_hat[t] <- deterministic_pi
     }
 
     pu_dum[t] <- xi_pu_med[1] * Y_mat[t, 8] + xi_pu_med[2] * Y_mat[t, 9]
@@ -460,6 +462,8 @@ run_single_wage_inflation_model <- function(
     pu_resid[t]      <- Y_mat[t, 1] - deterministic_pu
   }
 
+  pi_actual <- Y_mat[, 4]
+
   infl_pi_decomp <- tibble::tibble(
     date_qtr      = est_df$date,
     expectations  = pi_exp,
@@ -467,12 +471,43 @@ run_single_wage_inflation_model <- function(
     unemp_gap     = pi_ugap,
     momentum      = pi_mom,
     dummies       = pi_dum,
-    residuals     = pi_resid,
-    wage_component = pi_wage
+    wage_component = pi_wage,
+    fitted        = pi_hat,
+    actual        = pi_actual,
+    residuals     = pi_resid
   )
   wage_component_sym <- rlang::sym(wage_component_col)
   infl_pi_decomp <- infl_pi_decomp %>%
     dplyr::rename(!!wage_component_sym := wage_component)
+
+  infl_pi_decomp <- infl_pi_decomp %>%
+    mutate(
+      forecast_error_h1 = dplyr::lead(actual, 1) - fitted,
+      forecast_error_h2 = dplyr::lead(actual, 2) - fitted,
+      forecast_error_h3 = dplyr::lead(actual, 3) - fitted,
+      forecast_error_h4 = dplyr::lead(actual, 4) - fitted
+    )
+
+  calc_rmse <- function(h) {
+    if (h == 0) {
+      errors <- infl_pi_decomp$residuals
+    } else {
+      errors <- dplyr::lead(pi_actual, h) - pi_hat
+    }
+    errors <- errors[!is.na(errors)]
+    if (length(errors) == 0) {
+      return(NA_real_)
+    }
+    sqrt(mean(errors^2))
+  }
+
+  inflation_rmse <- tibble::tibble(
+    horizon = 0:4,
+    rmse    = purrr::map_dbl(0:4, calc_rmse)
+  )
+
+  inflation_rmse_for_return <- inflation_rmse %>%
+    mutate(variant = variant_label)
 
   wage_decomp <- tibble::tibble(
     date_qtr      = est_df$date,
@@ -486,6 +521,11 @@ run_single_wage_inflation_model <- function(
   readr::write_csv(
     infl_pi_decomp,
     file.path(data_dir, paste0(file_stubs$inflation, ".csv"))
+  )
+
+  readr::write_csv(
+    inflation_rmse,
+    file.path(data_dir, paste0(file_stubs$inflation, "_forecast_rmse.csv"))
   )
 
   readr::write_csv(
@@ -525,12 +565,14 @@ run_single_wage_inflation_model <- function(
 
   invisible(list(
     wage_col = wage_col,
+    variant_label = variant_label,
     estimated_series = tibble::tibble(
       date = design$date,
       value = wage_estimates
     ),
     missing_index = missing_index,
-    missing_estimate = if (missing_index > 0L) wage_missing_median else NA_real_
+    missing_estimate = if (missing_index > 0L) wage_missing_median else NA_real_,
+    rmse = inflation_rmse_for_return
   ))
 }
 
@@ -877,6 +919,49 @@ for (i in seq_along(single_wage_variants)) {
     missing_param = variant$missing_param,
     wage_component_col = variant$wage_component_col
   )
+}
+
+rmse_plot_data_list <- purrr::map(wage_series_results, function(result) {
+  if (is.null(result) || is.null(result$rmse)) {
+    return(NULL)
+  }
+  result$rmse
+})
+
+rmse_plot_data_list <- rmse_plot_data_list %>%
+  purrr::discard(is.null)
+
+if (length(rmse_plot_data_list) > 0) {
+  rmse_plot_data <- dplyr::bind_rows(rmse_plot_data_list)
+  rmse_plot <- ggplot(
+    rmse_plot_data,
+    aes(x = horizon, y = rmse, colour = variant, group = variant)
+  ) +
+    geom_line(linewidth = 0.8, alpha = 0.9) +
+    geom_point(size = 2) +
+    scale_x_continuous(breaks = 0:4) +
+    labs(
+      title = "Inflation forecast RMSE by model variant",
+      x = "Forecast horizon (quarters ahead)",
+      y = "RMSE (percentage points)",
+      colour = "Model variant"
+    ) +
+    theme_minimal(base_size = 11)
+
+  rmse_plot_path <- file.path(out_dir, "inflation_forecast_rmse.png")
+  ggsave(
+    rmse_plot_path,
+    rmse_plot,
+    width = 10,
+    height = 6,
+    dpi = 300
+  )
+
+  message(glue::glue("💾 Saved inflation forecast RMSE comparison plot to {rmse_plot_path}"))
+
+  combined_rmse_path <- file.path(data_dir, "inflation_forecast_rmse_all_models.csv")
+  readr::write_csv(rmse_plot_data, combined_rmse_path)
+  message(glue::glue("💾 Saved inflation forecast RMSE diagnostics to {combined_rmse_path}"))
 }
 
 run_dual_wage_model(
