@@ -863,8 +863,52 @@ nairu_df <- nairu_df %>%
     trimmed_mean_lead4 = dplyr::lead(trimmed_mean, 4)
   )  # fade old → new
 
+# Prepare unemployment gap ratios for scatter plots -----------------------
+scatter_columns <- c(
+  "trimmed_mean",
+  paste0("trimmed_mean_lead", 1:4)
+)
 
-                           nairu_df <- nairu_df %>% 
+nairu_scatter_df <- if (exists("nairu_models_df") && nrow(nairu_models_df) > 0) {
+  nairu_models_df %>%
+    left_join(
+      nairu_df %>%
+        select(date, qtr_lbl, lur, dplyr::any_of(scatter_columns)),
+      by = c("date", "qtr_lbl")
+    ) %>%
+    arrange(date, model) %>%
+    mutate(
+      model = factor(model, levels = unique(model)),
+      unemp_gap_ratio = dplyr::if_else(
+        is.na(lur) | lur == 0,
+        NA_real_,
+        (median - lur) / lur
+      )
+    )
+} else {
+  nairu_df %>%
+    mutate(
+      model = factor("Baseline"),
+      unemp_gap_ratio = dplyr::if_else(
+        is.na(lur) | lur == 0,
+        NA_real_,
+        (median - lur) / lur
+      )
+    )
+}
+
+model_levels_scatter <- levels(nairu_scatter_df$model)
+if (length(model_levels_scatter) == 0) {
+  model_levels_scatter <- "Baseline"
+}
+
+scatter_palette <- setNames(
+  viridisLite::viridis(length(model_levels_scatter), end = 0.85),
+  model_levels_scatter
+)
+
+
+                           nairu_df <- nairu_df %>%
   mutate(alpha_val = scales::rescale(date, to = c(0.1, 1)))
 
 # Set limits symmetric around the central cross (0 for x, 2.5 for y)
@@ -1060,8 +1104,16 @@ scatter_specs <- tibble::tribble(
   "4-quarters ahead",   "trimmed_mean_lead4",   "nairu_trimmed_mean_h4"
 )
 
-x_limits_scatter <- range(nairu_df$median, na.rm = TRUE)
-y_values_scatter <- nairu_df %>%
+x_values_scatter <- nairu_scatter_df$unemp_gap_ratio
+x_values_scatter <- x_values_scatter[is.finite(x_values_scatter)]
+
+if (length(x_values_scatter) == 0) {
+  x_limits_scatter <- c(NA_real_, NA_real_)
+} else {
+  x_limits_scatter <- range(x_values_scatter)
+}
+
+y_values_scatter <- nairu_scatter_df %>%
   select(all_of(scatter_specs$column)) %>%
   unlist(use.names = FALSE) %>%
   stats::na.omit()
@@ -1072,22 +1124,26 @@ if (length(y_values_scatter) == 0) {
   y_limits_scatter <- range(y_values_scatter)
 }
 
-plot_nairu_vs_trimmed <- function(data, column, horizon, file_stub, x_limits, y_limits) {
+plot_nairu_vs_trimmed <- function(data, column, horizon, file_stub, x_limits, y_limits, palette) {
   if (any(!is.finite(c(x_limits, y_limits)))) {
     message("Skipping ", horizon, " scatter – axis limits not available.")
     return(NULL)
   }
 
   df_plot <- data %>%
-    filter(!is.na(median), !is.na(.data[[column]]))
+    filter(!is.na(unemp_gap_ratio), !is.na(.data[[column]]))
 
   if (nrow(df_plot) < 3) {
     message("Skipping ", horizon, " scatter – insufficient data.")
     return(NULL)
   }
 
-  corr_val <- cor(df_plot$median, df_plot[[column]], use = "complete.obs")
-  text_label <- sprintf("Correlation: %.2f", corr_val)
+  corr_val <- suppressWarnings(cor(df_plot$unemp_gap_ratio, df_plot[[column]], use = "complete.obs"))
+  text_label <- if (is.finite(corr_val)) {
+    sprintf("Correlation (all models): %.2f", corr_val)
+  } else {
+    "Correlation unavailable"
+  }
 
   x_span <- diff(x_limits)
   y_span <- diff(y_limits)
@@ -1095,22 +1151,25 @@ plot_nairu_vs_trimmed <- function(data, column, horizon, file_stub, x_limits, y_
   x_text <- x_limits[1] + 0.05 * x_span
   y_text <- y_limits[2] - 0.05 * y_span
 
-  p_scatter <- ggplot(df_plot, aes(x = median, y = .data[[column]])) +
-    geom_point(colour = "steelblue", alpha = 0.6) +
-    geom_smooth(method = "lm", se = FALSE, colour = "firebrick", linewidth = 0.8) +
+  p_scatter <- ggplot(df_plot, aes(x = unemp_gap_ratio, y = .data[[column]], colour = model)) +
+    geom_point(alpha = 0.6) +
+    geom_smooth(aes(group = model), method = "lm", se = FALSE, linewidth = 0.8) +
     annotate("text", x = x_text, y = y_text, label = text_label,
              hjust = 0, vjust = 1, size = 4, colour = "black") +
     scale_x_continuous(limits = x_limits) +
     scale_y_continuous(limits = y_limits) +
+    scale_colour_manual(values = palette) +
     labs(
-      title = paste("NAIRU vs Trimmed-Mean Inflation –", horizon),
-      x = "NAIRU estimate (%)",
-      y = "Trimmed-mean inflation (%, y/y)"
+      title = paste("Unemployment Gap vs Trimmed-Mean Inflation –", horizon),
+      x = "Unemployment gap ((NAIRU – unemployment rate) / unemployment rate)",
+      y = "Trimmed-mean inflation (%, y/y)",
+      colour = "NAIRU model"
     ) +
     theme_minimal(base_size = 13) +
     theme(
       panel.border = element_rect(colour = "black", fill = NA, linewidth = 0.6),
-      panel.grid.minor = element_blank()
+      panel.grid.minor = element_blank(),
+      legend.position = "bottom"
     )
 
   ggsave(
@@ -1127,11 +1186,12 @@ plot_nairu_vs_trimmed <- function(data, column, horizon, file_stub, x_limits, y_
 purrr::pwalk(
   scatter_specs,
   ~ plot_nairu_vs_trimmed(
-    data = nairu_df,
+    data = nairu_scatter_df,
     column = ..2,
     horizon = ..1,
     file_stub = ..3,
     x_limits = x_limits_scatter,
-    y_limits = y_limits_scatter
+    y_limits = y_limits_scatter,
+    palette = scatter_palette
   )
 )
