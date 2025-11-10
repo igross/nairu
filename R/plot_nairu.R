@@ -852,9 +852,16 @@ trim_infl <- read_rba(series_id = "GCPIOCPMTMYP") %>%
 # Ensure unemployment gap is available
 nairu_df <- nairu_df %>%
   left_join(trim_infl, by = "date") %>%
-  mutate(unemp_gap = lur - median,
-         age = as.numeric(date - min(date)),          # age in days
-         alpha_val = scales::rescale(date, to = c(0.1, 1)))  # fade old → new
+  arrange(date) %>%
+  mutate(
+    unemp_gap = lur - median,
+    age = as.numeric(date - min(date)),          # age in days
+    alpha_val = scales::rescale(date, to = c(0.1, 1)),
+    trimmed_mean_lead1 = dplyr::lead(trimmed_mean, 1),
+    trimmed_mean_lead2 = dplyr::lead(trimmed_mean, 2),
+    trimmed_mean_lead3 = dplyr::lead(trimmed_mean, 3),
+    trimmed_mean_lead4 = dplyr::lead(trimmed_mean, 4)
+  )  # fade old → new
 
 
                            nairu_df <- nairu_df %>% 
@@ -1041,3 +1048,90 @@ p_pc <- ggplot() +
 
 # --- Save ---
 ggsave(file.path(output_dir, "phillips_gap_forecasts.png"), p_pc, width = 7, height = 5, dpi = 300)
+
+# ---- 12. NAIRU vs trimmed-mean inflation scatter plots -------------------
+
+scatter_specs <- tibble::tribble(
+  ~horizon,             ~column,                ~file_stub,
+  "Current quarter",    "trimmed_mean",         "nairu_trimmed_mean_h0",
+  "1-quarter ahead",    "trimmed_mean_lead1",   "nairu_trimmed_mean_h1",
+  "2-quarters ahead",   "trimmed_mean_lead2",   "nairu_trimmed_mean_h2",
+  "3-quarters ahead",   "trimmed_mean_lead3",   "nairu_trimmed_mean_h3",
+  "4-quarters ahead",   "trimmed_mean_lead4",   "nairu_trimmed_mean_h4"
+)
+
+x_limits_scatter <- range(nairu_df$median, na.rm = TRUE)
+y_values_scatter <- nairu_df %>%
+  select(all_of(scatter_specs$column)) %>%
+  unlist(use.names = FALSE) %>%
+  stats::na.omit()
+
+if (length(y_values_scatter) == 0) {
+  y_limits_scatter <- c(NA_real_, NA_real_)
+} else {
+  y_limits_scatter <- range(y_values_scatter)
+}
+
+plot_nairu_vs_trimmed <- function(data, column, horizon, file_stub, x_limits, y_limits) {
+  if (any(!is.finite(c(x_limits, y_limits)))) {
+    message("Skipping ", horizon, " scatter – axis limits not available.")
+    return(NULL)
+  }
+
+  df_plot <- data %>%
+    filter(!is.na(median), !is.na(.data[[column]]))
+
+  if (nrow(df_plot) < 3) {
+    message("Skipping ", horizon, " scatter – insufficient data.")
+    return(NULL)
+  }
+
+  corr_val <- cor(df_plot$median, df_plot[[column]], use = "complete.obs")
+  text_label <- sprintf("Correlation: %.2f", corr_val)
+
+  x_span <- diff(x_limits)
+  y_span <- diff(y_limits)
+
+  x_text <- x_limits[1] + 0.05 * x_span
+  y_text <- y_limits[2] - 0.05 * y_span
+
+  p_scatter <- ggplot(df_plot, aes(x = median, y = .data[[column]])) +
+    geom_point(colour = "steelblue", alpha = 0.6) +
+    geom_smooth(method = "lm", se = FALSE, colour = "firebrick", linewidth = 0.8) +
+    annotate("text", x = x_text, y = y_text, label = text_label,
+             hjust = 0, vjust = 1, size = 4, colour = "black") +
+    scale_x_continuous(limits = x_limits) +
+    scale_y_continuous(limits = y_limits) +
+    labs(
+      title = paste("NAIRU vs Trimmed-Mean Inflation –", horizon),
+      x = "NAIRU estimate (%)",
+      y = "Trimmed-mean inflation (%, y/y)"
+    ) +
+    theme_minimal(base_size = 13) +
+    theme(
+      panel.border = element_rect(colour = "black", fill = NA, linewidth = 0.6),
+      panel.grid.minor = element_blank()
+    )
+
+  ggsave(
+    filename = file.path(output_dir, paste0(file_stub, ".png")),
+    plot = p_scatter,
+    width = 7,
+    height = 5,
+    dpi = 300
+  )
+
+  invisible(p_scatter)
+}
+
+purrr::pwalk(
+  scatter_specs,
+  ~ plot_nairu_vs_trimmed(
+    data = nairu_df,
+    column = ..2,
+    horizon = ..1,
+    file_stub = ..3,
+    x_limits = x_limits_scatter,
+    y_limits = y_limits_scatter
+  )
+)
