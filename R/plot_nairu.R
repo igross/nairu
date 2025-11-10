@@ -874,17 +874,27 @@ nairu_scatter_df <- if (exists("nairu_models_df") && nrow(nairu_models_df) > 0) 
     left_join(
       nairu_df %>%
         select(date, qtr_lbl, lur, dplyr::any_of(scatter_columns)),
-      by = c("date", "qtr_lbl")
+      by = c("date", "qtr_lbl"),
+      suffix = c("", "_nairu")
     ) %>%
     arrange(date, model) %>%
     mutate(
       model = factor(model, levels = unique(model)),
+      lur = {
+        lur_cols <- dplyr::pick(dplyr::matches("^lur"))
+        if (ncol(lur_cols) == 0) {
+          rep(NA_real_, dplyr::n())
+        } else {
+          dplyr::coalesce(!!!lur_cols)
+        }
+      },
       unemp_gap_ratio = dplyr::if_else(
         is.na(lur) | lur == 0,
         NA_real_,
         (median - lur) / lur
       )
-    )
+    ) %>%
+    select(-dplyr::matches("^lur_[a-zA-Z]"))
 } else {
   nairu_df %>%
     mutate(
