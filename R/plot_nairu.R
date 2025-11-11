@@ -1148,9 +1148,32 @@ plot_nairu_vs_trimmed <- function(data, column, horizon, file_stub, x_limits, y_
     return(NULL)
   }
 
-  corr_val <- suppressWarnings(cor(df_plot$unemp_gap_ratio, df_plot[[column]], use = "complete.obs"))
-  text_label <- if (is.finite(corr_val)) {
-    sprintf("Correlation (all models): %.2f", corr_val)
+  corr_table <- df_plot %>%
+    group_by(model) %>%
+    summarise(
+      corr = {
+        complete_idx <- stats::complete.cases(unemp_gap_ratio, .data[[column]])
+        if (sum(complete_idx) < 2) {
+          NA_real_
+        } else {
+          suppressWarnings(stats::cor(unemp_gap_ratio[complete_idx], .data[[column]][complete_idx]))
+        }
+      },
+      .groups = "drop"
+    )
+
+  corr_lines <- corr_table %>%
+    mutate(
+      label = ifelse(
+        is.finite(corr),
+        sprintf("%s: %.2f", model, corr),
+        sprintf("%s: N/A", model)
+      )
+    ) %>%
+    pull(label)
+
+  text_label <- if (length(corr_lines) > 0) {
+    paste(c("Correlation by model:", corr_lines), collapse = "\n")
   } else {
     "Correlation unavailable"
   }
