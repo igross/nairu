@@ -98,8 +98,14 @@ read_nairu_model <- function(path, model_label) {
 tidy_decomposition <- function(path, series_label, component_labels) {
   if (!file.exists(path)) return(tibble::tibble())
 
+  component_keys <- names(component_labels)
+
   df_long <- suppressMessages(read_csv(path, show_col_types = FALSE)) %>%
-    pivot_longer(-date_qtr, names_to = "component", values_to = "value") %>%
+    pivot_longer(
+      cols = tidyselect::any_of(component_keys),
+      names_to = "component",
+      values_to = "value"
+    ) %>%
     mutate(
       component = recode(
         component,
