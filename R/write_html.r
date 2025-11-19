@@ -94,7 +94,7 @@ model_average_html <- if (file.exists(model_avg_interactive)) {
 intro_paragraph <- '
   <p style="max-width:800px;margin:0 auto 30px auto;text-align:center;
             font-size:1.1rem;color:#444;">
-    Below is the latest results from a state-space NAIRU model.
+    Below is the latest results from a state-space NAIRU model. Thanks to David Stephan whose code was used as the basis for this model.
   </p>'
 
 html <- sprintf('
