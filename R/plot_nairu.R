@@ -1237,3 +1237,161 @@ purrr::pwalk(
     palette = scatter_palette
   )
 )
+
+# ------------------------------------------------------------
+# Parameter posterior comparisons across all model variants
+# ------------------------------------------------------------
+
+create_parameter_posterior_plots <- function(output_dir_param = file.path(output_dir, "parameter_posteriors")) {
+  posterior_models <- list(
+    ulc = list(
+      name = "CPI & ULC model",
+      param_file = file.path(output_dir, "data", "posterior_summary_params.csv"),
+      color = "#1f77b4"
+    ),
+    aena = list(
+      name = "CPI & AENA model",
+      param_file = file.path(output_dir, "data", "posterior_summary_params_aena.csv"),
+      color = "#d62728"
+    ),
+    wpi = list(
+      name = "CPI & WPI model",
+      param_file = file.path(output_dir, "data", "posterior_summary_params_wpi.csv"),
+      color = "#2ca02c"
+    ),
+    aena_wpi = list(
+      name = "CPI with AENA & WPI model",
+      param_file = file.path(output_dir, "data", "posterior_summary_params_aena_wpi.csv"),
+      color = "#9467bd"
+    ),
+    ulc_wpi = list(
+      name = "CPI with ULC & WPI model",
+      param_file = file.path(output_dir, "data", "posterior_summary_params_ulc_wpi.csv"),
+      color = "#8c564b"
+    ),
+    ulc_aena = list(
+      name = "CPI with ULC & AENA model",
+      param_file = file.path(output_dir, "data", "posterior_summary_params_ulc_aena.csv"),
+      color = "#e377c2"
+    ),
+    ulc_aena_wpi = list(
+      name = "CPI with ULC, AENA & WPI model",
+      param_file = file.path(output_dir, "data", "posterior_summary_params_ulc_aena_wpi.csv"),
+      color = "#7f7f7f"
+    ),
+    wpi_only = list(
+      name = "WPI no-inflation model",
+      param_file = file.path(output_dir, "data", "posterior_summary_params_wpi_no_inflation.csv"),
+      color = "#bcbd22"
+    )
+  )
+
+  numeric_columns <- c("mean", "median", "sd", "lower5", "lower15", "upper85", "upper95")
+
+  to_numeric <- function(x) suppressWarnings(as.numeric(x))
+
+  read_param_summary <- function(info) {
+    if (!file.exists(info$param_file)) return(NULL)
+
+    df <- read.csv(info$param_file, stringsAsFactors = FALSE)
+    for (col in numeric_columns) {
+      if (col %in% names(df)) {
+        df[[col]] <- to_numeric(df[[col]])
+      }
+    }
+    df$model <- info$name
+    df$model_key <- info$model_key
+    df
+  }
+
+  sanitize_filename <- function(name) {
+    cleaned <- gsub("[^A-Za-z0-9_-]+", "_", name)
+    gsub("_+", "_", cleaned)
+  }
+
+  all_params <- do.call(rbind, lapply(names(posterior_models), function(key) {
+    info <- posterior_models[[key]]
+    info$model_key <- key
+    read_param_summary(info)
+  }))
+
+  if (is.null(all_params) || nrow(all_params) == 0) {
+    warning("No parameter summaries available for plotting")
+    return(invisible(NULL))
+  }
+
+  model_levels <- vapply(posterior_models, function(x) x$name, character(1))
+  model_colors <- setNames(vapply(posterior_models, function(x) x$color, character(1)), model_levels)
+
+  dir.create(output_dir_param, showWarnings = FALSE, recursive = TRUE)
+
+  unique_params <- sort(unique(all_params$parameter))
+
+  for (param in unique_params) {
+    subset <- all_params[all_params$parameter == param, ]
+    subset <- subset[!is.na(subset$median), ]
+    if (nrow(subset) == 0) next
+
+    subset$model <- factor(subset$model, levels = model_levels)
+    subset <- subset[order(subset$model), ]
+
+    y_pos <- seq_len(nrow(subset))
+    y_labels <- as.character(subset$model)
+
+    x_vals <- c(subset$lower5, subset$upper95, subset$median)
+    x_vals <- x_vals[!is.na(x_vals)]
+    if (length(x_vals) == 0) next
+
+    x_range <- range(x_vals)
+    padding <- if (diff(x_range) > 0) diff(x_range) * 0.1 else 0.1
+    x_limits <- c(x_range[1] - padding, x_range[2] + padding)
+
+    height <- max(3, 1.2 + 0.45 * nrow(subset))
+    filename <- file.path(output_dir_param, paste0(sanitize_filename(param), ".svg"))
+
+    svg(filename, width = 9, height = height, pointsize = 10)
+    on.exit(dev.off(), add = TRUE)
+
+    par(mar = c(4, 10, 3, 2))
+    plot(
+      NA,
+      xlim = x_limits,
+      ylim = c(0.5, nrow(subset) + 0.5),
+      yaxt = "n",
+      xlab = "Parameter value",
+      ylab = "",
+      main = sprintf("%s posterior across models", param)
+    )
+
+    axis(2, at = y_pos, labels = y_labels, las = 2, cex.axis = 0.8)
+    abline(h = y_pos, col = "#EEEEEE", lwd = 0.8)
+
+    for (i in seq_len(nrow(subset))) {
+      model_name <- as.character(subset$model[i])
+      color <- model_colors[[model_name]]
+
+      segments(subset$lower5[i], y_pos[i], subset$upper95[i], y_pos[i], col = color, lwd = 1.2)
+      segments(subset$lower15[i], y_pos[i], subset$upper85[i], y_pos[i], col = color, lwd = 3.0)
+      points(subset$median[i], y_pos[i], pch = 21, bg = color, col = "#333333", cex = 1.2)
+    }
+
+    legend(
+      "topright",
+      legend = c("Median", "70% interval", "90% interval"),
+      pch = c(21, NA, NA),
+      pt.bg = c("#333333", NA, NA),
+      col = c("#333333", "#333333", "#333333"),
+      lty = c(NA, 1, 1),
+      lwd = c(NA, 3.0, 1.2),
+      bty = "n",
+      pt.cex = 1.1,
+      seg.len = 2
+    )
+
+    message(sprintf("Saved %s", filename))
+  }
+
+  invisible(NULL)
+}
+
+create_parameter_posterior_plots()
