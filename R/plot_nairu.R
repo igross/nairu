@@ -98,18 +98,21 @@ read_nairu_model <- function(path, model_label) {
 tidy_decomposition <- function(path, series_label, component_labels) {
   if (!file.exists(path)) return(tibble::tibble())
 
-  component_keys <- names(component_labels)
+  raw_df <- suppressMessages(read_csv(path, show_col_types = FALSE))
 
-  df_long <- suppressMessages(read_csv(path, show_col_types = FALSE)) %>%
-    pivot_longer(
-      cols = tidyselect::any_of(component_keys),
-      names_to = "component",
-      values_to = "value"
-    ) %>%
+  allowed_components <- names(component_labels)[names(component_labels) %in% names(raw_df)]
+
+  if (length(allowed_components) == 0) return(tibble::tibble())
+
+  filtered_labels <- component_labels[allowed_components]
+
+  df_long <- raw_df %>%
+    select(date_qtr, tidyselect::all_of(allowed_components)) %>%
+    pivot_longer(-date_qtr, names_to = "component", values_to = "value") %>%
     mutate(
       component = recode(
         component,
-        !!!component_labels,
+        !!!filtered_labels,
         .default = tools::toTitleCase(gsub("_", " ", component))
       ),
       date_qtr = as.yearqtr(date_qtr, "%Y Q%q"),
@@ -120,7 +123,7 @@ tidy_decomposition <- function(path, series_label, component_labels) {
 
   if (nrow(df_long) == 0) return(df_long)
 
-  preferred_levels <- unique(unname(component_labels))
+  preferred_levels <- unique(unname(filtered_labels))
   extra_levels     <- setdiff(unique(df_long$component), preferred_levels)
 
   df_long %>%
