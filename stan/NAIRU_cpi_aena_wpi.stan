@@ -134,7 +134,7 @@ model {
   xi_wage2       ~ normal(0    , 3);
   eps_wage2      ~ normal(2    , 1.00);
 
-  tau         ~ normal(0.05 , 0.02);
+  tau         ~ normal(0.03 , 0.02);
 
   nhat_init   ~ normal(5.5  , 0.2);
   pthat_init  ~ normal(1.5  , 2);
