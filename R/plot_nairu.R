@@ -1349,46 +1349,49 @@ create_parameter_posterior_plots <- function(output_dir_param = file.path(output
     height <- max(3, 1.2 + 0.45 * nrow(subset))
     filename <- file.path(output_dir_param, paste0(sanitize_filename(param), ".svg"))
 
-    svg(filename, width = 9, height = height, pointsize = 10)
-    on.exit(dev.off(), add = TRUE)
+    tryCatch({
+      svg(filename, width = 9, height = height, pointsize = 10)
 
-    par(mar = c(4, 10, 3, 2))
-    plot(
-      NA,
-      xlim = x_limits,
-      ylim = c(0.5, nrow(subset) + 0.5),
-      yaxt = "n",
-      xlab = "Parameter value",
-      ylab = "",
-      main = sprintf("%s posterior across models", param)
-    )
+      par(mar = c(4, 10, 3, 2))
+      plot(
+        NA,
+        xlim = x_limits,
+        ylim = c(0.5, nrow(subset) + 0.5),
+        yaxt = "n",
+        xlab = "Parameter value",
+        ylab = "",
+        main = sprintf("%s posterior across models", param)
+      )
 
-    axis(2, at = y_pos, labels = y_labels, las = 2, cex.axis = 0.8)
-    abline(h = y_pos, col = "#EEEEEE", lwd = 0.8)
+      axis(2, at = y_pos, labels = y_labels, las = 2, cex.axis = 0.8)
+      abline(h = y_pos, col = "#EEEEEE", lwd = 0.8)
 
-    for (i in seq_len(nrow(subset))) {
-      model_name <- as.character(subset$model[i])
-      color <- model_colors[[model_name]]
+      for (i in seq_len(nrow(subset))) {
+        model_name <- as.character(subset$model[i])
+        color <- model_colors[[model_name]]
 
-      segments(subset$lower5[i], y_pos[i], subset$upper95[i], y_pos[i], col = color, lwd = 1.2)
-      segments(subset$lower15[i], y_pos[i], subset$upper85[i], y_pos[i], col = color, lwd = 3.0)
-      points(subset$median[i], y_pos[i], pch = 21, bg = color, col = "#333333", cex = 1.2)
-    }
+        segments(subset$lower5[i], y_pos[i], subset$upper95[i], y_pos[i], col = color, lwd = 1.2)
+        segments(subset$lower15[i], y_pos[i], subset$upper85[i], y_pos[i], col = color, lwd = 3.0)
+        points(subset$median[i], y_pos[i], pch = 21, bg = color, col = "#333333", cex = 1.2)
+      }
 
-    legend(
-      "topright",
-      legend = c("Median", "70% interval", "90% interval"),
-      pch = c(21, NA, NA),
-      pt.bg = c("#333333", NA, NA),
-      col = c("#333333", "#333333", "#333333"),
-      lty = c(NA, 1, 1),
-      lwd = c(NA, 3.0, 1.2),
-      bty = "n",
-      pt.cex = 1.1,
-      seg.len = 2
-    )
+      legend(
+        "topright",
+        legend = c("Median", "70% interval", "90% interval"),
+        pch = c(21, NA, NA),
+        pt.bg = c("#333333", NA, NA),
+        col = c("#333333", "#333333", "#333333"),
+        lty = c(NA, 1, 1),
+        lwd = c(NA, 3.0, 1.2),
+        bty = "n",
+        pt.cex = 1.1,
+        seg.len = 2
+      )
 
-    message(sprintf("Saved %s", filename))
+      message(sprintf("Saved %s", filename))
+    }, finally = {
+      if (dev.cur() > 1) dev.off()
+    })
   }
 
   invisible(NULL)
