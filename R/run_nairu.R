@@ -369,6 +369,7 @@ run_single_wage_inflation_model <- function(
     melt() %>%
     group_by(variable) %>%
     summarise(
+      mean    = mean(value),
       median = median(value),
       lowera = quantile(value, 0.05),
       uppera = quantile(value, 0.95),
@@ -657,6 +658,7 @@ run_dual_wage_model <- function(
     melt() %>%
     group_by(variable) %>%
     summarise(
+      mean    = mean(value),
       median = median(value),
       lowera = quantile(value, 0.05),
       uppera = quantile(value, 0.95),
@@ -790,6 +792,7 @@ run_wage_no_inflation_model <- function(
     melt() %>%
     group_by(variable) %>%
     summarise(
+      mean    = mean(value),
       median = median(value),
       lowera = quantile(value, 0.05),
       uppera = quantile(value, 0.95),
@@ -844,6 +847,7 @@ run_wage_no_inflation_model <- function(
 compiled_models <- list(
   cpi_aena = stan_model(file = file.path("stan", "NAIRU_cpi_aena.stan")),
   cpi_ulc = stan_model(file = file.path("stan", "NAIRU_cpi_ulc.stan")),
+  cpi_ulc_counterfactual = stan_model(file = file.path("stan", "NAIRU_cpi_ulc_counterfactual.stan")),
   cpi_wpi = stan_model(file = file.path("stan", "NAIRU_cpi_wpi.stan")),
   cpi_aena_wpi = stan_model(file = file.path("stan", "NAIRU_cpi_aena_wpi.stan")),
   cpi_ulc_wpi = stan_model(file = file.path("stan", "NAIRU_cpi_ulc_wpi.stan")),
@@ -964,6 +968,24 @@ if (length(rmse_plot_data_list) > 0) {
   message(glue::glue("💾 Saved inflation forecast RMSE diagnostics to {combined_rmse_path}"))
 }
 
+counterfactual_result <- run_single_wage_inflation_model(
+  est_df = est_data,
+  wage_col = "DLNULC",
+  wage_label = "DLNULC",
+  compiled_model = compiled_models$cpi_ulc_counterfactual,
+  file_stubs = list(
+    nairu = "NAIRU_counterfactual",
+    inflation = "infl_pi_decomp_counterfactual",
+    wage = "ulc_decomp_counterfactual",
+    params = "posterior_summary_params_counterfactual"
+  ),
+  variant_label = "CPI & ULC counterfactual (high NAIRU volatility)",
+  obs_field = "ulc_obs",
+  missing_index_field = "missing_ulc_index",
+  missing_param = "ulc_missing",
+  wage_component_col = "ulc_demeaned"
+)
+
 run_dual_wage_model(
   est_df = est_data,
   wage_cols = c("DLAENA", "DLWPI"),
@@ -1018,6 +1040,59 @@ run_wage_no_inflation_model(
   ),
   variant_label = "WPI no-inflation model"
 )
+
+load_nairu_means <- function(path, model_label) {
+  if (!file.exists(path)) {
+    return(tibble::tibble())
+  }
+
+  df <- suppressMessages(readr::read_csv(path, show_col_types = FALSE))
+  mean_col <- if ("mean" %in% names(df)) "mean" else "median"
+
+  df %>%
+    mutate(
+      date_qtr = zoo::as.yearqtr(date, "%Y Q%q"),
+      date = as.Date(date_qtr, frac = 0.5),
+      mean_value = .data[[mean_col]],
+      model = model_label
+    ) %>%
+    select(date, mean_value, model) %>%
+    filter(!is.na(mean_value))
+}
+
+baseline_path <- file.path(data_dir, "NAIRU_baseline.csv")
+counterfactual_path <- file.path(data_dir, "NAIRU_counterfactual.csv")
+
+nairu_comparison <- bind_rows(
+  load_nairu_means(baseline_path, "Baseline"),
+  load_nairu_means(counterfactual_path, "Counterfactual (high volatility)")
+)
+
+if (nrow(nairu_comparison) > 0) {
+  nairu_comparison_plot <- ggplot(
+    nairu_comparison,
+    aes(x = date, y = mean_value, colour = model)
+  ) +
+    geom_line(linewidth = 0.9, alpha = 0.9) +
+    labs(
+      title = "NAIRU mean comparison: baseline vs counterfactual",
+      x = "Date",
+      y = "NAIRU (mean)",
+      colour = "Model"
+    ) +
+    theme_minimal(base_size = 11)
+
+  nairu_comparison_path <- file.path(out_dir, "nairu_baseline_vs_counterfactual_means.png")
+  ggsave(
+    nairu_comparison_path,
+    nairu_comparison_plot,
+    width = 10,
+    height = 6,
+    dpi = 300
+  )
+
+  message(glue::glue("💾 Saved NAIRU baseline vs counterfactual mean comparison to {nairu_comparison_path}"))
+}
 
 est_data_completed <- est_data
 
