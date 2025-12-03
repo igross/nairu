@@ -71,7 +71,14 @@ abs_6457 <- read_abs(series_id = c("A2298279F"))
 abs_6345 <- read_abs(series_id = c("A2713849C"))
 rba_g3 <- read_rba(series_id = c("GBONYLD"))
 #rba_g1 <- read_rba(series_id = c("GCPIOCPMTMQP","GCPITIQP","GCPINTIQP"))
-abs_trimmed_mean <- read_abs(series_id = c("A3604510W"))   # ABS 6401.0 Table 7 – trimmed mean CPI (q/q %)
+trimmed_mean_series_ids <- c("A3604510W", "GCPIOCPMTMQP")  # ABS trimmed mean CPI (ABS) and RBA fallback (q/q %)
+abs_trimmed_mean <- tryCatch(
+  read_abs(series_id = trimmed_mean_series_ids[1]),
+  error = function(err) {
+    message("read_abs failed for trimmed mean CPI – falling back to read_rba: ", conditionMessage(err))
+    read_rba(series_id = trimmed_mean_series_ids[2])
+  }
+)
 
 # print(abs_trimmed_mean, n = Inf, width = Inf)
 
@@ -120,7 +127,7 @@ R_6202 <- abs_6202 %>%
   summarise(LUR = mean(value, na.rm = TRUE), .groups = "drop")
 
 R_trimmed_mean <- abs_trimmed_mean %>%
-  filter(series_id == "A3604510W") %>%
+  filter(series_id %in% trimmed_mean_series_ids) %>%
   mutate(date = zoo::as.yearqtr(date)) %>%
   rename(DLPTM = value) %>%
   select(date, DLPTM)
