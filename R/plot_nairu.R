@@ -37,6 +37,13 @@ table_month <- list(
   NA_month = c(3, 6, 9, 12)
 )
 
+# The latest *complete* quarter (to avoid plotting the in-progress quarter)
+latest_complete_quarter <- function(ref_date = Sys.Date()) {
+  as.yearqtr(ref_date) - 0.25
+}
+
+latest_complete_qtr <- latest_complete_quarter()
+
 # ---- 4. Helper functions ------------------------------------------------
 ensure_dates <- function(df, start_qtr = "1997 Q3") {
   if (!"date" %in% tolower(names(df))) {
@@ -61,7 +68,8 @@ read_vintage_safe <- function(path) {
     ))
   }
   df <- ensure_dates(df) %>%
-      mutate(date = as.Date(date, frac = 0.5))   # ← mid-quarter
+      mutate(date = as.Date(date, frac = 0.5)) %>%  # ← mid-quarter
+      filter(date <= as.Date(latest_complete_qtr, frac = 0.5))
 
   idx <- which(df$date == file_date)
   if (length(idx) == 0) idx <- which.max(df$date)
@@ -91,7 +99,7 @@ read_nairu_model <- function(path, model_label) {
       qtr_lbl  = format(date_qtr, "%Y-Q%q")
     ) %>%
     arrange(date_qtr) %>%
-    filter(!is.na(median))
+    filter(!is.na(median), date_qtr <= latest_complete_qtr)
 }
 
 # Convert a decomposition CSV into a tidy, long format --------------------
@@ -160,7 +168,8 @@ mutate(
   date_qtr = as.yearqtr(date),
   date     = as.Date(date_qtr, frac = 0.5)   # ← mid-quarter
 ) %>%
-  filter(date_qtr >= as.yearqtr("1999 Q1")) %>%
+  filter(date_qtr >= as.yearqtr("1999 Q1"),
+         date_qtr <= latest_complete_qtr) %>%
   arrange(date_qtr)
 
 # immediately after you construct nairu_df ─────────────────────────────
@@ -317,7 +326,9 @@ vintages_df <- map2_dfr(files, labels, function(path, label) {
     return(tibble::tibble())
   }
 
-  ensure_dates(df) %>% mutate(vintage = label)
+  ensure_dates(df) %>%
+    mutate(vintage = label) %>%
+    filter(date <= as.Date(latest_complete_qtr, frac = 0.5))
 })
 
 if (nrow(vintages_df) > 0 && "vintage" %in% names(vintages_df)) {
