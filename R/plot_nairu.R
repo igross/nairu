@@ -127,7 +127,7 @@ tidy_decomposition <- function(path, series_label, component_labels) {
       date     = as.Date(date_qtr, frac = 0.5),
       series   = series_label
     ) %>%
-    filter(!is.na(value))
+    filter(!is.na(value), date_qtr <= latest_complete_qtr)
 
   if (nrow(df_long) == 0) return(df_long)
 
