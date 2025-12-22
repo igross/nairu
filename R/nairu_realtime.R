@@ -32,13 +32,22 @@ plot_out   <- file.path(out_dir, "nairu_realtime_estimates.png")
 # Helpers
 # ----------------------------------------------------------------------------
 fetch_abs_series <- function(series_ids, release_date) {
+  release_date <- as.Date(release_date)
   tryCatch(
     read_abs(series_id = series_ids, release_date = release_date),
     error = function(err) {
       message(
-        glue("⚠️ read_abs failed for {paste(series_ids, collapse = ', ')} @ {release_date}: {conditionMessage(err)}")
+        glue("⚠️ read_abs failed for {paste(series_ids, collapse = ', ')} @ {release_date}: {conditionMessage(err)} – retrying with latest available release")
       )
-      NULL
+      tryCatch(
+        read_abs(series_id = series_ids) %>% filter(date <= release_date),
+        error = function(err2) {
+          message(
+            glue("❌ Fallback read_abs failed for {paste(series_ids, collapse = ', ')}: {conditionMessage(err2)}")
+          )
+          NULL
+        }
+      )
     }
   )
 }
@@ -202,8 +211,36 @@ expectations <- readr::read_csv(file.path(root_dir, "inputs", "PIE_RBAQ.CSV"), s
 
 compiled_model <- stan_model(file.path(root_dir, "stan", "NAIRU_cpi_ulc.stan"))
 
+last_wednesday <- function(year_val, month_val) {
+  rollback(ymd(sprintf("%04d-%02d-01", year_val, month_val)) + months(1), roll_to_first = TRUE) -
+    days(wday(rollback(ymd(sprintf("%04d-%02d-01", year_val, month_val)) + months(1), roll_to_first = TRUE)) %% 7)
+}
+
+first_wednesday <- function(year_val, month_val) {
+  start <- ymd(sprintf("%04d-%02d-01", year_val, month_val))
+  start + days((3 - wday(start) + 7) %% 7)
+}
+
 years_to_run <- 2000:year(Sys.Date())
-release_dates <- as.Date(paste0(years_to_run, "-12-01"))
+
+cpi_release_dates <- map2(
+  rep(years_to_run, each = 4),
+  rep(c(1, 4, 7, 10), times = length(years_to_run)),
+  last_wednesday
+) %>%
+  unlist() %>%
+  as_date()
+
+na_release_dates <- map2(
+  rep(years_to_run, each = 4),
+  rep(c(3, 6, 9, 12), times = length(years_to_run)),
+  first_wednesday
+) %>%
+  unlist() %>%
+  as_date()
+
+release_dates <- sort(unique(c(cpi_release_dates, na_release_dates))) %>%
+  keep(~ .x <= Sys.Date())
 
 vintage_results <- map_dfr(release_dates, function(rel_date) {
   message(glue("▶ Running baseline vintage for {rel_date}"))
