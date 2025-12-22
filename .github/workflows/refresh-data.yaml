@@ -96,6 +96,8 @@ jobs:
       - uses: r-lib/actions/setup-r@v2
         with:
           use-public-rspm: true
+          # Pin to a stable release to avoid transient compiler download failures
+          r-version: '4.4.2'
 
       - uses: r-lib/actions/setup-pandoc@v2
 
