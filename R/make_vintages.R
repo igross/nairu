@@ -48,6 +48,15 @@ trimmed_mean_data <- tryCatch(
   }
 )
 
+# Normalise column names so downstream logic can rely on `series_id`
+if ("series" %in% names(trimmed_mean_data) && !"series_id" %in% names(trimmed_mean_data)) {
+  trimmed_mean_data <- trimmed_mean_data |> rename(series_id = series)
+}
+
+if (!"series_id" %in% names(trimmed_mean_data)) {
+  stop("Trimmed mean CPI data is missing a `series_id` column after fallback handling.")
+}
+
 pie_rbaq <- read_csv(file.path("inputs","PIE_RBAQ.CSV")) |>
             rename(date = OBS) |>
             mutate(date = as.yearqtr(date))
