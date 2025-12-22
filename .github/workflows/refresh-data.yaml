@@ -126,8 +126,8 @@ jobs:
         continue-on-error: true
         run: Rscript -e 'source("R/make_vintages.R", echo=TRUE)'
 
-#      - name: Make visuals
-#        run: Rscript -e 'source("R/plot_nairu.R", echo=TRUE)'
+      - name: Make visuals
+        run: Rscript -e 'source("R/plot_nairu.R", echo=TRUE)'
 
  #     - name: Make page
  #       run: Rscript -e 'source("R/write_html.R", echo=TRUE)'
