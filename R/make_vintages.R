@@ -119,6 +119,8 @@ make_est_data <- function(cutoff_qtr) {
            dummy4 = ifelse(date == as.yearqtr("2020 Q3"),1,0))
 
   return(est_data)
+
+  tail(est_data)
 }
 
 # ---------------------------------------------------------------------------
@@ -150,6 +152,8 @@ run_one_vintage <- function(rel_date) {
                     J = ncol(stan_Y),
                     Y = stan_Y)
 
+print(stan_Y)
+  
   fit <- sampling(compiled_model,
                   data    = data_list,
                   chains  = 4,
