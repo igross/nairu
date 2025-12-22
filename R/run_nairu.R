@@ -159,6 +159,29 @@ transformed_inputs <- list(
   Reduce(function(dtf1, dtf2) full_join(dtf1, dtf2, by = "date"), .) %>%
   arrange(date)
 
+log_dataset_debug <- function(df, label) {
+  non_date_cols <- setdiff(names(df), "date")
+
+  message(glue::glue("🔎 {label}: missing-value counts"))
+
+  if (length(non_date_cols) > 0) {
+    missing_summary <- df %>%
+      summarise(across(all_of(non_date_cols), ~ sum(is.na(.x)))) %>%
+      tidyr::pivot_longer(
+        everything(),
+        names_to = "column",
+        values_to = "missing_obs"
+      )
+
+    print(missing_summary, n = Inf, width = Inf)
+  } else {
+    message("No non-date columns to summarise.")
+  }
+
+  message(glue::glue("🗂 {label}: full data snapshot"))
+  print(as_tibble(df), n = Inf, width = Inf)
+}
+
 transformed_plot_data <- transformed_inputs %>%
   tidyr::pivot_longer(-date, names_to = "series", values_to = "value") %>%
   filter(!is.na(value)) %>%
@@ -215,7 +238,7 @@ if (latest_trimmed_mean_date > latest_pie_date) {
 data_set <- list(R_5206, R_6457, R_6202, R_trimmed_mean, pie_rbaq, R_6345) %>%
   Reduce(function(dtf1, dtf2) full_join(dtf1, dtf2, by = "date"), .)
 
-# print(as_tibble(data_set), n = Inf, width = Inf)
+log_dataset_debug(data_set, "Merged dataset (pre-filter/LOCF)")
 
 #data_set$pie_bondq <- replace(data_set$pie_bondq,is.na(data_set$pie_bondq),2.5/4)
 
@@ -252,9 +275,7 @@ est_data <- data_set %>%
          dummy3 = ifelse(date == "2020Q2", 1, 0),
          dummy4 = ifelse(date == "2020Q3", 1, 0))
 
-         
-
-# print(as_tibble(est_data), n = Inf, width = Inf)
+log_dataset_debug(est_data, "Estimation dataset (post-filter)")
          
 # Subset Data for Stan
 assert_complete_nonwage <- function(design_df, wage_col, context_label) {
