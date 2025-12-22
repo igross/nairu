@@ -182,7 +182,7 @@ run_one_vintage <- function(rel_date) {
   fit <- sampling(compiled_model,
                   data    = data_list,
                   chains  = 4,
-                  iter    = 1000,
+                  iter    = 100,
                   control = list(max_treedepth = 12),
                   refresh = 0)
 
