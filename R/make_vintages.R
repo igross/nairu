@@ -127,7 +127,7 @@ make_est_data <- function(cutoff_qtr) {
 options(mc.cores = max(1, parallel::detectCores() - 1))
 Sys.setenv(MAKEFLAGS = paste0("-j", max(1, parallel::detectCores() - 1)))
 
-compiled_model <- stan_model(file = file.path("stan","NAIRU_baseline.stan"))
+compiled_model <- stan_model(file = file.path("stan", "NAIRU_cpi_ulc.stan"))
 
 # ---------------------------------------------------------------------------
 # 4.  Loop through every release date
