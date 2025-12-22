@@ -856,6 +856,95 @@ for (spec in decomposition_specs) {
 }
 
 
+# ---- 11b. Demand vs supply attribution chart ------------------------------
+attribution_path <- file.path(data_dir, "infl_pi_decomp.csv")
+
+if (file.exists(attribution_path)) {
+  attribution_df <- read_csv(attribution_path, show_col_types = FALSE) %>%
+    clean_names() %>%
+    mutate(
+      date_qtr = as.yearqtr(date_qtr, "%Y Q%q"),
+      date     = as.Date(date_qtr, frac = 0.5)
+    ) %>%
+    filter(date_qtr <= latest_complete_qtr) %>%
+    mutate(
+      across(
+        c(expectations, import_price, unemp_gap, momentum, dummies, ulc_demeaned, actual),
+        as.numeric
+      ),
+      baseline       = expectations,
+      demand_raw     = unemp_gap + momentum,
+      supply_raw     = import_price + ulc_demeaned + dummies,
+      inflation_gap  = actual - baseline,
+      contrib_sum    = demand_raw + supply_raw,
+      scale_factor   = if_else(abs(contrib_sum) < 1e-8, NA_real_, inflation_gap / contrib_sum),
+      demand_scaled  = demand_raw * scale_factor,
+      supply_scaled  = supply_raw * scale_factor,
+      observed_ppa   = actual * 4,
+      baseline_ppa   = baseline * 4,
+      demand_ppa     = demand_scaled * 4,
+      supply_ppa     = supply_scaled * 4
+    ) %>%
+    filter(!is.na(observed_ppa), !is.na(baseline_ppa), !is.na(demand_ppa), !is.na(supply_ppa))
+
+  attribution_long <- attribution_df %>%
+    select(date, baseline_ppa, demand_ppa, supply_ppa) %>%
+    pivot_longer(
+      cols = -date,
+      names_to = "component",
+      values_to = "value"
+    ) %>%
+    mutate(
+      component = recode(
+        component,
+        baseline_ppa = "Inflation expectations / target",
+        demand_ppa   = "Demand",
+        supply_ppa   = "Supply"
+      ),
+      component = factor(
+        component,
+        levels = c("Inflation expectations / target", "Demand", "Supply")
+      )
+    )
+
+  attribution_palette <- c(
+    "Inflation expectations / target" = "grey70",
+    "Demand"                           = "#f5a623",
+    "Supply"                           = "#142b90"
+  )
+
+  p_attr <- ggplot(attribution_long, aes(x = date, y = value, fill = component)) +
+    geom_col(width = 80, colour = NA, position = "stack") +
+    geom_hline(yintercept = 2.5, linetype = "dashed", colour = "#8b0000", linewidth = 0.6) +
+    geom_line(
+      data = attribution_df,
+      aes(y = observed_ppa),
+      colour = "#4b0055",
+      linewidth = 1
+    ) +
+    scale_fill_manual(values = attribution_palette, name = NULL) +
+    scale_x_date(date_breaks = "2 years", date_labels = "%Y") +
+    labs(
+      title    = "Inflation: proportional demand vs supply attribution",
+      subtitle = "Quarterly annualised inflation with residual absorbed into demand/supply scaling",
+      x        = "Year",
+      y        = "% p.a."
+    ) +
+    my_theme +
+    theme(legend.position = "top")
+
+  ggsave(file.path(output_dir, "inflation_demand_supply.png"),
+         p_attr, width = 12, height = 6, dpi = 300)
+
+  saveWidget(plotly::ggplotly(p_attr, tooltip = c("x", "y", "fill")),
+             file.path(output_dir, "inflation_demand_supply.html"))
+
+  message("✔  Saved demand vs supply attribution chart")
+} else {
+  message("⚠  Missing decomposition CSV for demand/supply attribution")
+}
+
+
 # ---- 11. Phillips curve style scatter: inflation vs unemployment gap -----
 
 library(readrba)
