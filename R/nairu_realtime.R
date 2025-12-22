@@ -52,18 +52,74 @@ fetch_abs_series <- function(series_ids, release_date) {
   )
 }
 
+label_series_last_qtr <- function(df, value_col, base_name) {
+  last_qtr <- df %>%
+    filter(!is.na({{ value_col }})) %>%
+    summarise(last = max(date)) %>%
+    pull(last)
+
+  if (length(last_qtr) == 0 || is.na(last_qtr)) {
+    return(NULL)
+  }
+
+  labelled_name <- glue("{base_name}_{format(last_qtr, '%YQ%q')}")
+
+  list(
+    data = df %>% transmute(date, !!labelled_name := {{ value_col }}),
+    last_qtr = last_qtr,
+    base_name = base_name,
+    label = labelled_name
+  )
+}
+
+align_series_to_common_last_qtr <- function(series_entries) {
+  valid_entries <- purrr::compact(series_entries)
+
+  if (length(valid_entries) == 0) {
+    return(NULL)
+  }
+
+  common_last_qtr <- valid_entries %>%
+    map("last_qtr") %>%
+    reduce(min)
+
+  renamed <- valid_entries %>%
+    map(~ .x$data %>% filter(date <= common_last_qtr))
+
+  combined <- renamed %>%
+    reduce(full_join, by = "date") %>%
+    arrange(date) %>%
+    filter(!is.na(date))
+
+  rename_map <- set_names(
+    map_chr(valid_entries, "base_name"),
+    map_chr(valid_entries, ~ names(.x$data)[2])
+  )
+
+  list(
+    data = combined %>% rename(!!!rename_map),
+    labels = set_names(map_chr(valid_entries, "label"), map_chr(valid_entries, "base_name")),
+    last_qtr = common_last_qtr
+  )
+}
+
 prepare_vintage_est_data <- function(release_date, expectations_df) {
   release_date <- as.Date(release_date)
   cutoff_qtr <- zoo::as.yearqtr(release_date) - 0.25
 
-  abs_5206 <- fetch_abs_series(c("A2304402X", "A2302915V"), release_date)
-  abs_6457 <- fetch_abs_series("A2298279F", release_date)
-  abs_6202 <- fetch_abs_series("A84423050A", release_date)
-  abs_trimmed_mean <- fetch_abs_series("A3604510W", release_date)
+  abs_all <- fetch_abs_series(
+    c("A2304402X", "A2302915V", "A2298279F", "A84423050A", "A3604510W"),
+    release_date
+  )
 
-  if (any(map_lgl(list(abs_5206, abs_6457, abs_6202, abs_trimmed_mean), is.null))) {
+  if (is.null(abs_all)) {
     return(NULL)
   }
+
+  abs_5206 <- abs_all %>% filter(series_id %in% c("A2304402X", "A2302915V"))
+  abs_6457 <- abs_all %>% filter(series_id == "A2298279F")
+  abs_6202 <- abs_all %>% filter(series_id == "A84423050A")
+  abs_trimmed_mean <- abs_all %>% filter(series_id == "A3604510W")
 
   R_5206 <- abs_5206 %>%
     filter(series_id %in% c("A2304402X", "A2302915V"), date <= as.Date(cutoff_qtr)) %>%
@@ -100,27 +156,32 @@ prepare_vintage_est_data <- function(release_date, expectations_df) {
   pie_rbaq <- expectations_df %>%
     filter(date <= cutoff_qtr)
 
-  data_set <- list(R_5206, R_6457, R_6202, R_trimmed_mean, pie_rbaq) %>%
-    reduce(full_join, by = "date") %>%
-    arrange(date) %>%
-    filter(!is.na(date))
+  aligned <- align_series_to_common_last_qtr(list(
+    label_series_last_qtr(R_5206, DLNULC, "DLNULC"),
+    label_series_last_qtr(R_6457, dl4pmcg, "dl4pmcg"),
+    label_series_last_qtr(R_6202, LUR, "LUR"),
+    label_series_last_qtr(R_trimmed_mean, DLPTM, "DLPTM"),
+    label_series_last_qtr(pie_rbaq, PIE_RBAQ, "PIE_RBAQ")
+  ))
 
-  latest_data_date <- max(data_set$date, na.rm = TRUE)
-  latest_ulc_missing <- FALSE
-
-  if ("DLNULC" %in% names(data_set)) {
-    latest_ulc_missing <- data_set %>%
-      filter(date == latest_data_date) %>%
-      summarise(flag = all(is.na(DLNULC))) %>%
-      pull(flag)
+  if (is.null(aligned) || is.na(aligned$last_qtr)) {
+    message(glue("⚠️ Unable to align series for {release_date} – no common last quarter."))
+    return(NULL)
   }
 
-  data_set <- data_set %>%
+  required_cols <- c("DLNULC", "dl4pmcg", "LUR", "DLPTM", "PIE_RBAQ")
+  if (!all(required_cols %in% names(aligned$data))) {
+    message(glue("⚠️ Missing required series for {release_date}: {paste(setdiff(required_cols, names(aligned$data)), collapse = ', ')}"))
+    return(NULL)
+  }
+
+  label_text <- aligned$labels %>%
+    imap_chr(~ glue("{.y}→{.x}")) %>%
+    paste(collapse = ", ")
+  message(glue("ℹ Last observed quarters @ {release_date}: {label_text}"))
+
+  data_set <- aligned$data %>%
     mutate(across(-date, ~ zoo::na.locf(.x, na.rm = FALSE)))
-
-  if (isTRUE(latest_ulc_missing)) {
-    data_set$DLNULC[data_set$date == latest_data_date] <- NA_real_
-  }
 
   data_set <- data_set %>%
     mutate(
@@ -128,7 +189,7 @@ prepare_vintage_est_data <- function(release_date, expectations_df) {
     )
 
   est_data <- data_set %>%
-    filter(date >= as.yearqtr("2000 Q1"), date <= cutoff_qtr) %>%
+    filter(date >= as.yearqtr("2000 Q1"), date <= aligned$last_qtr) %>%
     mutate(
       dummy1 = ifelse(date >= as.yearqtr("2021 Q3") & date <= as.yearqtr("2023 Q1"), 1, 0),
       dummy2 = ifelse(date >= as.yearqtr("2022 Q1") & date <= as.yearqtr("2022 Q4"), 1, 0),
@@ -163,7 +224,11 @@ run_baseline_model <- function(est_df, compiled_model, release_date) {
     J = ncol(stan_matrix),
     Y = stan_matrix,
     ulc_obs = as.integer(wage_obs),
-    missing_ulc_index = as.integer(missing_index)
+    missing_ulc_index = as.integer(missing_index),
+    dummy_active = est_df %>%
+      summarise(across(starts_with("dummy"), ~ as.integer(any(. != 0)))) %>%
+      unlist(use.names = FALSE) %>%
+      as.integer()
   )
 
   fit <- sampling(

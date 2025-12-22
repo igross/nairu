@@ -374,6 +374,10 @@ run_single_wage_inflation_model <- function(
   )
   data_list[[obs_field]] <- as.integer(obs)
   data_list[[missing_index_field]] <- as.integer(missing_index)
+  data_list$dummy_active <- design %>%
+    summarise(across(starts_with("dummy"), ~ as.integer(any(. != 0)))) %>%
+    unlist(use.names = FALSE) %>%
+    as.integer()
 
   fit <- sampling(
     compiled_model,

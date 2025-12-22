@@ -146,14 +146,26 @@ run_one_vintage <- function(rel_date) {
   message(glue("▶  {rel_date}: computing vintage using data up to {cutoff_qtr}…"))
 
   est_data <- make_est_data(cutoff_qtr)
-  stan_Y   <- as.matrix(est_data[,-1])        # drop date column
+  wage_obs <- ifelse(is.na(est_data$DLNULC), 0L, 1L)
+  missing_index <- if (any(wage_obs == 0L)) tail(which(wage_obs == 0L), 1) else 0L
 
-  data_list <- list(T = nrow(stan_Y),
-                    J = ncol(stan_Y),
-                    Y = stan_Y)
+  stan_Y <- est_data %>%
+    mutate(DLNULC = ifelse(is.na(DLNULC), 0, DLNULC)) %>%
+    select(-date) %>%
+    as.matrix()
 
-print(stan_Y)
-  
+  data_list <- list(
+    T = nrow(stan_Y),
+    J = ncol(stan_Y),
+    Y = stan_Y,
+    ulc_obs = as.integer(wage_obs),
+    missing_ulc_index = as.integer(missing_index),
+    dummy_active = est_data %>%
+      summarise(across(starts_with("dummy"), ~ as.integer(any(. != 0)))) %>%
+      unlist(use.names = FALSE) %>%
+      as.integer()
+  )
+
   fit <- sampling(compiled_model,
                   data    = data_list,
                   chains  = 4,
