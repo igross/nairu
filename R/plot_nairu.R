@@ -918,7 +918,8 @@ if (file.exists(attribution_path)) {
     geom_hline(yintercept = 2.5, linetype = "dashed", colour = "#8b0000", linewidth = 0.6) +
     geom_line(
       data = attribution_df,
-      aes(y = observed_ppa),
+      aes(x = date, y = observed_ppa),
+      inherit.aes = FALSE,
       colour = "#4b0055",
       linewidth = 1
     ) +
