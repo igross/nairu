@@ -19,10 +19,14 @@ first_wed <- function(y, m) {
   d + days((3 - wday(d) + 7) %% 7)   # 3 = Wednesday
 }
 
-cpi_dates <- map2(years_vec, rep(c(1,4,7,10), each = length(years_vec)),
-                  last_wed)  |> unlist() |> as_date()
-na_dates  <- map2(years_vec, rep(c(3,6,9,12), each = length(years_vec)),
-                  first_wed) |> unlist() |> as_date()
+cpi_dates <- map2(rep(years_vec, each = 4),
+                  rep(c(1,4,7,10), times = length(years_vec)),
+                  last_wed)  |>
+             unlist() |> as_date()
+na_dates  <- map2(rep(years_vec, each = 4),
+                  rep(c(3,6,9,12), times = length(years_vec)),
+                  first_wed) |>
+             unlist() |> as_date()
 
 release_calendar <- sort(c(cpi_dates, na_dates)) |>
                     keep(~ .x < Sys.Date())      # only past dates
