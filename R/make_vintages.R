@@ -125,7 +125,11 @@ make_est_data <- function(cutoff_qtr) {
     mutate(dummy1 = ifelse(date >= as.yearqtr("2021 Q3") & date <= as.yearqtr("2023 Q1"),1,0),
            dummy2 = ifelse(date >= as.yearqtr("2022 Q1") & date <= as.yearqtr("2022 Q4"),1,0),
            dummy3 = ifelse(date == as.yearqtr("2020 Q2"),1,0),
-           dummy4 = ifelse(date == as.yearqtr("2020 Q3"),1,0))
+           dummy4 = ifelse(date == as.yearqtr("2020 Q3"),1,0)) |>
+    # Stan cannot accept any NA values. DLNULC can legitimately be missing,
+    # but the remaining inputs must be fully observed. Drop incomplete rows so
+    # we always hand Stan a dense matrix.
+    drop_na(-c(date, DLNULC))
 
   return(est_data)
 
