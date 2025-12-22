@@ -39,7 +39,14 @@ abs_6202 <- read_abs(series_id = c("A84423043C","A84423047L"))
 abs_6457 <- read_abs(series_id = c("A2298279F"))
 abs_6345 <- read_abs(series_id = c("A2713849C"))
 rba_g3   <- read_rba(series_id = "GBONYLD")
-rba_g1   <- read_abs(series_id = c("A3604510W","A2330530C","A2330575J"))
+trimmed_mean_series_ids <- c("A3604510W", "GCPIOCPMTMQP")
+trimmed_mean_data <- tryCatch(
+  read_abs(series_id = trimmed_mean_series_ids[1]),
+  error = function(err) {
+    message("read_abs failed for trimmed mean CPI – falling back to read_rba: ", conditionMessage(err))
+    read_rba(series_id = trimmed_mean_series_ids[2])
+  }
+)
 
 pie_rbaq <- read_csv(file.path("inputs","PIE_RBAQ.CSV")) |>
             rename(date = OBS) |>
@@ -84,8 +91,8 @@ make_est_data <- function(cutoff_qtr) {
            LUR  = 100*(1 - A84423043C/A84423047L)) |>
     select(date, LUR)
 
-  R_g1 <- rba_g1 |>
-    filter(series_id=="A3604510W", date <= as.Date(cutoff_qtr)) |>
+  R_g1 <- trimmed_mean_data |>
+    filter(series_id %in% trimmed_mean_series_ids, date <= as.Date(cutoff_qtr)) |>
     mutate(date = as.yearqtr(date), DLPTM = value) |>
     select(date, DLPTM)
 
