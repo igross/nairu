@@ -68,10 +68,10 @@ on:
     - cron: '40 0 27 10 *'  # 27 Oct 2027 – CPI Q3-2027
     - cron: '40 0  1 12 *'  # 01 Dec 2027 – Nat Acct Q3-2027
 
-  # manual & PR triggers (unchanged)
+    # Monthly vintage run for make_vintages.R
+    - cron: '40 0 1 * *'    # 1st of each month
 
-  push:
-    branches: [main, master]
+  # manual & PR triggers
   pull_request:
     branches: [main, master]
   workflow_dispatch:
@@ -123,6 +123,7 @@ jobs:
 #        run: Rscript -e 'source(here::here("R", "run_nairu.R"), echo = TRUE)'
 
       - name: Vintage NAIRU
+        if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && github.event.schedule == '40 0 1 * *')
         continue-on-error: true
         run: Rscript -e 'source("R/make_vintages.R", echo=TRUE)'
 
