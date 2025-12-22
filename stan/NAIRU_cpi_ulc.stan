@@ -18,6 +18,7 @@ data {
   matrix[T, J] Y;               // data matrix
   int<lower=0, upper=1> ulc_obs[T];
   int<lower=0, upper=T> missing_ulc_index;
+  array[4] int<lower=0, upper=1> dummy_active;
 }
 
 transformed data {
@@ -175,7 +176,8 @@ model {
       }
 
       pt_hat[t] = exp_now + ugap_now + mom_now + imp_now + ulc_now
-                + xi_pt[1]*Y[t,6] + xi_pt[2]*Y[t,7];
+                + xi_pt[1] * (dummy_active[1] == 1 ? Y[t,6] : 0)
+                + xi_pt[2] * (dummy_active[2] == 1 ? Y[t,7] : 0);
     }
 
     // ulc_t equation (t ≥ 3)
@@ -192,7 +194,8 @@ model {
       }
 
       pu_hat[t] = exp_now + ugap_now + mom_now
-                + xi_pu[1]*Y[t,8] + xi_pu[2]*Y[t,9];
+                + xi_pu[1] * (dummy_active[3] == 1 ? Y[t,8] : 0)
+                + xi_pu[2] * (dummy_active[4] == 1 ? Y[t,9] : 0);
     }
 
     // ── Likelihood ──────────────────────────────────────────────────────────
@@ -236,6 +239,8 @@ generated quantities {
     }
 
     pt_residuals[t] = Y[t,4] - (exp_now + ugap_now + mom_now + imp_now
-                               + ulc_now + xi_pt[1]*Y[t,6] + xi_pt[2]*Y[t,7]);
+                               + ulc_now
+                               + xi_pt[1] * (dummy_active[1] == 1 ? Y[t,6] : 0)
+                               + xi_pt[2] * (dummy_active[2] == 1 ? Y[t,7] : 0));
   }
 }
