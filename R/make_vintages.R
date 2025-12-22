@@ -131,6 +131,15 @@ make_est_data <- function(cutoff_qtr) {
     # we always hand Stan a dense matrix.
     drop_na(-c(date, DLNULC))
 
+  # Ensure the last observation is fully populated; if the trailing row contains
+  # any NA values (including DLNULC) drop it so the vintage reflects the most
+  # recent complete quarter of data.
+  non_date_cols <- setdiff(names(est_data), "date")
+  while (nrow(est_data) > 0 && any(is.na(est_data[nrow(est_data), non_date_cols]))) {
+    message(glue("⚠️ Dropping incomplete trailing row at {est_data$date[nrow(est_data)]}"))
+    est_data <- est_data |> slice_head(n = n() - 1)
+  }
+
   return(est_data)
 
   tail(est_data)
@@ -159,6 +168,12 @@ run_one_vintage <- function(rel_date) {
   message(glue("▶  {rel_date}: computing vintage using data up to {cutoff_qtr}…"))
 
   est_data <- make_est_data(cutoff_qtr)
+  if (nrow(est_data) == 0) {
+    message(glue("⚠️ No complete data available for {rel_date} – skipping vintage."))
+    return(invisible(NULL))
+  }
+
+  vintage_qtr <- tail(est_data$date, 1)
   wage_obs <- ifelse(is.na(est_data$DLNULC), 0L, 1L)
   missing_index <- if (any(wage_obs == 0L)) tail(which(wage_obs == 0L), 1) else 0L
 
@@ -194,10 +209,10 @@ run_one_vintage <- function(rel_date) {
               lower5 = quantile(value,0.05),
               upper95= quantile(value,0.95),
               .groups="drop") |>
-    mutate(vintage = rel_date)
+    mutate(vintage = format(vintage_qtr, "%Y-Q%q"))
 
   out_file <- file.path(vintage_dir,
-                        glue("{format(rel_date,'%Y-%m-%d')}.csv"))
+                        glue("{format(vintage_qtr,'%Y-Q%q')}.csv"))
   write_csv(summarised, out_file)
 
   message(glue("✔  saved → {basename(out_file)}"))
