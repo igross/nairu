@@ -7,7 +7,7 @@ library(glue);                library(here);         library(purrr)
 # 1.  Build the release-day calendar  (last Wed Jan/Apr/Jul/Oct; first Wed Mar/Jun/Sep/Dec)
 # ---------------------------------------------------------------------------
 this_year    <- year(Sys.Date())
-start_year   <- 2000
+start_year   <- 2020
 years_vec    <- start_year:this_year
 
 last_wed  <- function(y, m) lubridate::rollback(ymd(sprintf("%04d-%02d-01", y, m)) + months(1),
