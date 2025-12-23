@@ -31,38 +31,101 @@ na_dates  <- map2(rep(years_vec, each = 4),
 release_calendar <- sort(c(cpi_dates, na_dates)) |>
                     keep(~ .x < Sys.Date())      # only past dates
 
+# For now, only keep the last available release in each year so we build
+# one vintage per year.
+release_calendar <- release_calendar |>
+  split(year(.x)) |>
+  map(~ max(.x, na.rm = TRUE)) |>
+  unlist(use.names = FALSE) |>
+  as_date() |>
+  sort()
+
 # ---------------------------------------------------------------------------
-# 2.  Pull the full (current) datasets ONCE
+# 2.  Helpers to fetch release-specific datasets
 # ---------------------------------------------------------------------------
-abs_5206 <- read_abs(series_id = c("A2304402X","A2302915V"))
-abs_6202 <- read_abs(series_id = c("A84423043C","A84423047L"))
-abs_6457 <- read_abs(series_id = c("A2298279F"))
-abs_6345 <- read_abs(series_id = c("A2713849C"))
-rba_g3   <- read_rba(series_id = "GBONYLD")
+fetch_abs_series <- function(series_ids, release_date) {
+  rel_date <- as.Date(release_date)
+
+  tryCatch(
+    read_abs(series_id = series_ids, release_date = rel_date),
+    error = function(err) {
+      message(glue("⚠️ read_abs failed for {paste(series_ids, collapse = ', ')} @ {rel_date}: {conditionMessage(err)} – using latest data up to release date"))
+      tryCatch(
+        read_abs(series_id = series_ids) |> filter(date <= rel_date),
+        error = function(err2) {
+          message(glue("❌ Unable to fetch ABS data for {paste(series_ids, collapse = ', ')}: {conditionMessage(err2)}"))
+          NULL
+        }
+      )
+    }
+  )
+}
+
 trimmed_mean_series_ids <- c("A3604510W", "GCPIOCPMTMQP")
-trimmed_mean_data <- tryCatch(
-  read_abs(series_id = trimmed_mean_series_ids[1]),
-  error = function(err) {
-    message("read_abs failed for trimmed mean CPI – falling back to read_rba: ", conditionMessage(err))
-    read_rba(series_id = trimmed_mean_series_ids[2])
+
+fetch_trimmed_mean <- function(release_date) {
+  rel_date <- as.Date(release_date)
+
+  data <- tryCatch(
+    read_abs(series_id = trimmed_mean_series_ids[1], release_date = rel_date),
+    error = function(err) {
+      message("read_abs failed for trimmed mean CPI – falling back to read_rba: ", conditionMessage(err))
+      tryCatch(
+        read_rba(series_id = trimmed_mean_series_ids[2]),
+        error = function(rba_err) {
+          message("❌ read_rba fallback failed for trimmed mean CPI: ", conditionMessage(rba_err))
+          NULL
+        }
+      )
+    }
+  )
+
+  if (is.null(data)) {
+    return(NULL)
   }
-)
 
-# Normalise column names so downstream logic can rely on `series_id`
-if ("series" %in% names(trimmed_mean_data) && !"series_id" %in% names(trimmed_mean_data)) {
-  trimmed_mean_data <- trimmed_mean_data |> rename(series_id = series)
+  if ("series" %in% names(data) && !"series_id" %in% names(data)) {
+    data <- data |> rename(series_id = series)
+  }
+
+  if (!"series_id" %in% names(data)) {
+    message("Trimmed mean CPI data is missing a `series_id` column after fallback handling.")
+    return(NULL)
+  }
+
+  if ("date" %in% names(data)) {
+    data <- data |> filter(date <= rel_date)
+  }
+
+  data
 }
 
-if (!"series_id" %in% names(trimmed_mean_data)) {
-  stop("Trimmed mean CPI data is missing a `series_id` column after fallback handling.")
-}
+rba_g3   <- read_rba(series_id = "GBONYLD")
+
 
 pie_rbaq <- read_csv(file.path("inputs","PIE_RBAQ.CSV")) |>
             rename(date = OBS) |>
             mutate(date = as.yearqtr(date))
 
 # ---- helper that recreates est_data up to a cutoff quarter ---------------
-make_est_data <- function(cutoff_qtr) {
+make_est_data <- function(cutoff_qtr,
+                          abs_5206,
+                          abs_6202,
+                          abs_6457,
+                          abs_6345,
+                          rba_g3,
+                          trimmed_mean_data) {
+
+  if (is.null(abs_5206) || is.null(abs_6202) || is.null(abs_6457) ||
+      is.null(abs_6345) || is.null(rba_g3) || is.null(trimmed_mean_data)) {
+    message("❌ Missing required input datasets; skipping vintage.")
+    return(tibble())
+  }
+
+  if (!"series_id" %in% names(trimmed_mean_data)) {
+    message("Trimmed mean CPI data is missing a `series_id` column after fallback handling.")
+    return(tibble())
+  }
 
   R_5206 <- abs_5206 |>
     filter(series_id %in% c("A2304402X","A2302915V"),
@@ -141,8 +204,6 @@ make_est_data <- function(cutoff_qtr) {
   }
 
   return(est_data)
-
-  tail(est_data)
 }
 
 # ---------------------------------------------------------------------------
@@ -167,7 +228,21 @@ run_one_vintage <- function(rel_date) {
 
   message(glue("▶  {rel_date}: computing vintage using data up to {cutoff_qtr}…"))
 
-  est_data <- make_est_data(cutoff_qtr)
+  abs_5206 <- fetch_abs_series(c("A2304402X","A2302915V"), rel_date)
+  abs_6202 <- fetch_abs_series(c("A84423043C","A84423047L"), rel_date)
+  abs_6457 <- fetch_abs_series(c("A2298279F"), rel_date)
+  abs_6345 <- fetch_abs_series(c("A2713849C"), rel_date)
+  trimmed_mean_data <- fetch_trimmed_mean(rel_date)
+
+  est_data <- make_est_data(
+    cutoff_qtr,
+    abs_5206 = abs_5206,
+    abs_6202 = abs_6202,
+    abs_6457 = abs_6457,
+    abs_6345 = abs_6345,
+    rba_g3 = rba_g3,
+    trimmed_mean_data = trimmed_mean_data
+  )
   if (nrow(est_data) == 0) {
     message(glue("⚠️ No complete data available for {rel_date} – skipping vintage."))
     return(invisible(NULL))
