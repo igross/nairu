@@ -342,6 +342,12 @@ if (nrow(vintages_df) > 0 && "vintage" %in% names(vintages_df)) {
   write_csv(vintages_export, all_vintages_csv)
   message(sprintf("Saved combined vintages CSV → %s", all_vintages_csv))
 
+  vintage_medians_csv <- file.path(data_dir, "NAIRU_vintage_medians.csv")
+  vintages_export %>%
+    select(vintage, date_qtr, date, median) %>%
+    write_csv(vintage_medians_csv)
+  message(sprintf("Saved vintage medians CSV → %s", vintage_medians_csv))
+
   if ("Baseline" %in% all_vints) {
     palette   <- rainbow(length(all_vints) - 1)
     color_map <- setNames(c(palette, "black"), c(setdiff(all_vints, "Baseline"), "Baseline"))
