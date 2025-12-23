@@ -34,7 +34,7 @@ release_calendar <- sort(c(cpi_dates, na_dates)) |>
 # For now, only keep the last available release in each year so we build
 # one vintage per year.
 release_calendar <- release_calendar |>
-  split(year(.x)) |>
+  split(year(release_calendar)) |>
   map(~ max(.x, na.rm = TRUE)) |>
   unlist(use.names = FALSE) |>
   as_date() |>
