@@ -6,9 +6,9 @@ library(glue);                library(here);         library(purrr)
 # ---------------------------------------------------------------------------
 # 1.  Build the release-day calendar  (last Wed Jan/Apr/Jul/Oct; first Wed Mar/Jun/Sep/Dec)
 # ---------------------------------------------------------------------------
-this_year   <- year(Sys.Date())
-start_year  <- this_year - 10                      # 10-year window
-years_vec   <- start_year:this_year
+this_year    <- year(Sys.Date())
+start_year   <- 2000
+years_vec    <- start_year:this_year
 
 last_wed  <- function(y, m) lubridate::rollback(ymd(sprintf("%04d-%02d-01", y, m)) + months(1),
                                                roll_to_first = TRUE) - 
@@ -28,17 +28,8 @@ na_dates  <- map2(rep(years_vec, each = 4),
                   first_wed) |>
              unlist() |> as_date()
 
-release_calendar <- sort(c(cpi_dates, na_dates)) |>
+release_calendar <- sort(unique(c(cpi_dates, na_dates))) |>
                     keep(~ .x < Sys.Date())      # only past dates
-
-# For now, only keep the last available release in each year so we build
-# one vintage per year.
-release_calendar <- release_calendar |>
-  split(year(release_calendar)) |>
-  map(~ max(.x, na.rm = TRUE)) |>
-  unlist(use.names = FALSE) |>
-  as_date() |>
-  sort()
 
 # ---------------------------------------------------------------------------
 # 2.  Helpers to fetch datasets
