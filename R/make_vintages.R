@@ -41,10 +41,24 @@ release_calendar <- release_calendar |>
   sort()
 
 # ---------------------------------------------------------------------------
-# 2.  Helpers to fetch release-specific datasets
+# 2.  Helpers to fetch datasets
 # ---------------------------------------------------------------------------
-fetch_abs_series <- function(series_ids, release_date) {
-  rel_date <- as.Date(release_date)
+fetch_abs_series <- function(series_ids, release_date = NULL) {
+  rel_date <- if (is.null(release_date)) NULL else as.Date(release_date)
+
+  pull_latest <- function() {
+    tryCatch(
+      read_abs(series_id = series_ids),
+      error = function(err) {
+        message(glue("❌ Unable to fetch ABS data for {paste(series_ids, collapse = ', ')}: {conditionMessage(err)}"))
+        NULL
+      }
+    )
+  }
+
+  if (is.null(rel_date)) {
+    return(pull_latest())
+  }
 
   tryCatch(
     read_abs(series_id = series_ids, release_date = rel_date),
@@ -63,22 +77,42 @@ fetch_abs_series <- function(series_ids, release_date) {
 
 trimmed_mean_series_ids <- c("A3604510W", "GCPIOCPMTMQP")
 
-fetch_trimmed_mean <- function(release_date) {
-  rel_date <- as.Date(release_date)
+fetch_trimmed_mean <- function(release_date = NULL) {
+  rel_date <- if (is.null(release_date)) NULL else as.Date(release_date)
 
-  data <- tryCatch(
-    read_abs(series_id = trimmed_mean_series_ids[1], release_date = rel_date),
-    error = function(err) {
-      message("read_abs failed for trimmed mean CPI – falling back to read_rba: ", conditionMessage(err))
-      tryCatch(
-        read_rba(series_id = trimmed_mean_series_ids[2]),
-        error = function(rba_err) {
-          message("❌ read_rba fallback failed for trimmed mean CPI: ", conditionMessage(rba_err))
-          NULL
-        }
-      )
-    }
-  )
+  pull_latest <- function() {
+    tryCatch(
+      read_abs(series_id = trimmed_mean_series_ids[1]),
+      error = function(err) {
+        message("read_abs failed for trimmed mean CPI – falling back to read_rba: ", conditionMessage(err))
+        tryCatch(
+          read_rba(series_id = trimmed_mean_series_ids[2]),
+          error = function(rba_err) {
+            message("❌ read_rba fallback failed for trimmed mean CPI: ", conditionMessage(rba_err))
+            NULL
+          }
+        )
+      }
+    )
+  }
+
+  data <- if (is.null(rel_date)) {
+    pull_latest()
+  } else {
+    tryCatch(
+      read_abs(series_id = trimmed_mean_series_ids[1], release_date = rel_date),
+      error = function(err) {
+        message("read_abs failed for trimmed mean CPI – falling back to read_rba: ", conditionMessage(err))
+        tryCatch(
+          read_rba(series_id = trimmed_mean_series_ids[2]),
+          error = function(rba_err) {
+            message("❌ read_rba fallback failed for trimmed mean CPI: ", conditionMessage(rba_err))
+            NULL
+          }
+        )
+      }
+    )
+  }
 
   if (is.null(data)) {
     return(NULL)
@@ -93,7 +127,7 @@ fetch_trimmed_mean <- function(release_date) {
     return(NULL)
   }
 
-  if ("date" %in% names(data)) {
+  if (!is.null(rel_date) && "date" %in% names(data)) {
     data <- data |> filter(date <= rel_date)
   }
 
@@ -221,6 +255,14 @@ root        <- here::here()
 out_dir     <- file.path(root,"output"); dir.create(out_dir, showWarnings = FALSE)
 vintage_dir <- file.path(out_dir,"vintages"); dir.create(vintage_dir, showWarnings = FALSE)
 
+# Fetch all source data once and reuse across vintages ----------------------
+message("⬇️  Downloading latest datasets once for all vintages…")
+abs_5206_latest <- fetch_abs_series(c("A2304402X","A2302915V"))
+abs_6202_latest <- fetch_abs_series(c("A84423043C","A84423047L"))
+abs_6457_latest <- fetch_abs_series(c("A2298279F"))
+abs_6345_latest <- fetch_abs_series(c("A2713849C"))
+trimmed_mean_latest <- fetch_trimmed_mean()
+
 run_one_vintage <- function(rel_date) {
 
   # which quarter is fully observed on rel_date?
@@ -228,20 +270,14 @@ run_one_vintage <- function(rel_date) {
 
   message(glue("▶  {rel_date}: computing vintage using data up to {cutoff_qtr}…"))
 
-  abs_5206 <- fetch_abs_series(c("A2304402X","A2302915V"), rel_date)
-  abs_6202 <- fetch_abs_series(c("A84423043C","A84423047L"), rel_date)
-  abs_6457 <- fetch_abs_series(c("A2298279F"), rel_date)
-  abs_6345 <- fetch_abs_series(c("A2713849C"), rel_date)
-  trimmed_mean_data <- fetch_trimmed_mean(rel_date)
-
   est_data <- make_est_data(
     cutoff_qtr,
-    abs_5206 = abs_5206,
-    abs_6202 = abs_6202,
-    abs_6457 = abs_6457,
-    abs_6345 = abs_6345,
+    abs_5206 = abs_5206_latest,
+    abs_6202 = abs_6202_latest,
+    abs_6457 = abs_6457_latest,
+    abs_6345 = abs_6345_latest,
     rba_g3 = rba_g3,
-    trimmed_mean_data = trimmed_mean_data
+    trimmed_mean_data = trimmed_mean_latest
   )
   if (nrow(est_data) == 0) {
     message(glue("⚠️ No complete data available for {rel_date} – skipping vintage."))
