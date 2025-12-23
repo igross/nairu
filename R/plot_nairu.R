@@ -334,6 +334,14 @@ vintages_df <- map2_dfr(files, labels, function(path, label) {
 if (nrow(vintages_df) > 0 && "vintage" %in% names(vintages_df)) {
   all_vints <- unique(vintages_df$vintage)
 
+  vintages_export <- vintages_df %>%
+    mutate(date_qtr = format(zoo::as.yearqtr(date), "%Y-Q%q")) %>%
+    relocate(vintage, date_qtr, date)
+
+  all_vintages_csv <- file.path(data_dir, "NAIRU_all_vintages.csv")
+  write_csv(vintages_export, all_vintages_csv)
+  message(sprintf("Saved combined vintages CSV → %s", all_vintages_csv))
+
   if ("Baseline" %in% all_vints) {
     palette   <- rainbow(length(all_vints) - 1)
     color_map <- setNames(c(palette, "black"), c(setdiff(all_vints, "Baseline"), "Baseline"))
