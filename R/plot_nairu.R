@@ -1114,9 +1114,6 @@ ggsave(file.path(output_dir, "phillips_gap.png"),
 saveWidget(plotly::ggplotly(p_pc, tooltip = c("x", "y")),
            file.path(output_dir, "phillips_gap_target.html"))
 
-
-                           library(readrba)
-
 # Import unemployment rate (monthly, seasonally adjusted)
 unemployment_forecasts <- read_rba(series_id = "GLFSURSA")
 

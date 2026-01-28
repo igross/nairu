@@ -121,8 +121,8 @@ jobs:
           "readabs","readrba","plotly","purrr","ggthemes","reshape2","zoo",
           "rstan","readr","lubridate","janitor","ggforce","viridisLite"))'
 
-#      - name: Get data
-#        run: Rscript -e 'source(here::here("R", "run_nairu.R"), echo = TRUE)'
+      - name: Get data
+        run: Rscript -e 'source(here::here("R", "run_nairu.R"), echo = TRUE)'
 
       - name: Vintage NAIRU
         if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && github.event.schedule == '40 0 1 * *')
@@ -132,8 +132,8 @@ jobs:
       - name: Make visuals
         run: Rscript -e 'source("R/plot_nairu.R", echo=TRUE)'
 
- #     - name: Make page
- #       run: Rscript -e 'source("R/write_html.R", echo=TRUE)'
+      - name: Make page
+        run: Rscript -e 'source("R/write_html.r", echo=TRUE)'
 
       # Optional: inspect workspace tree in Actions log
       - name: Inspect workspace
