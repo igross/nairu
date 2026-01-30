@@ -877,15 +877,15 @@ run_wage_no_inflation_model <- function(
 }
 
 compiled_models <- list(
-  # cpi_aena = stan_model(file = file.path("stan", "NAIRU_cpi_aena.stan")),
-  cpi_ulc = stan_model(file = file.path("stan", "NAIRU_cpi_ulc.stan"))
-  # cpi_ulc_counterfactual = stan_model(file = file.path("stan", "NAIRU_cpi_ulc_counterfactual.stan")),
-  # cpi_wpi = stan_model(file = file.path("stan", "NAIRU_cpi_wpi.stan")),
-  # cpi_aena_wpi = stan_model(file = file.path("stan", "NAIRU_cpi_aena_wpi.stan")),
-  # cpi_ulc_wpi = stan_model(file = file.path("stan", "NAIRU_cpi_ulc_wpi.stan")),
-  # cpi_ulc_aena = stan_model(file = file.path("stan", "NAIRU_cpi_ulc_aena.stan")),
-  # cpi_ulc_aena_wpi = stan_model(file = file.path("stan", "NAIRU_cpi_ulc_aena_wpi.stan")),
-  # wpi_only = stan_model(file = file.path("stan", "NAIRU_wpi_only.stan"))
+  cpi_aena = stan_model(file = file.path("stan", "NAIRU_cpi_aena.stan")),
+  cpi_ulc = stan_model(file = file.path("stan", "NAIRU_cpi_ulc.stan")),
+  cpi_ulc_counterfactual = stan_model(file = file.path("stan", "NAIRU_cpi_ulc_counterfactual.stan")),
+  cpi_wpi = stan_model(file = file.path("stan", "NAIRU_cpi_wpi.stan")),
+  cpi_aena_wpi = stan_model(file = file.path("stan", "NAIRU_cpi_aena_wpi.stan")),
+  cpi_ulc_wpi = stan_model(file = file.path("stan", "NAIRU_cpi_ulc_wpi.stan")),
+  cpi_ulc_aena = stan_model(file = file.path("stan", "NAIRU_cpi_ulc_aena.stan")),
+  cpi_ulc_aena_wpi = stan_model(file = file.path("stan", "NAIRU_cpi_ulc_aena_wpi.stan")),
+  wpi_only = stan_model(file = file.path("stan", "NAIRU_wpi_only.stan"))
 )
 
 single_wage_variants <- list(
@@ -904,39 +904,39 @@ single_wage_variants <- list(
     missing_index_field = "missing_ulc_index",
     missing_param = "ulc_missing",
     wage_component_col = "ulc_demeaned"
+  ),
+  list(
+    wage_col = "DLAENA",
+    wage_label = "DLAENA",
+    file_stubs = list(
+      nairu = "NAIRU_aena",
+      inflation = "infl_pi_decomp_aena",
+      wage = "aena_decomp",
+      params = "posterior_summary_params_aena"
+    ),
+    variant_label = "CPI & AENA model",
+    model_key = "cpi_aena",
+    obs_field = "aena_obs",
+    missing_index_field = "missing_aena_index",
+    missing_param = "aena_missing",
+    wage_component_col = "aena_demeaned"
+  ),
+  list(
+    wage_col = "DLWPI",
+    wage_label = "DLWPI",
+    file_stubs = list(
+      nairu = "NAIRU_wpi",
+      inflation = "infl_pi_decomp_wpi",
+      wage = "wage_decomp_wpi",
+      params = "posterior_summary_params_wpi"
+    ),
+    variant_label = "CPI & WPI model",
+    model_key = "cpi_wpi",
+    obs_field = "wpi_obs",
+    missing_index_field = "missing_wpi_index",
+    missing_param = "wpi_missing",
+    wage_component_col = "wpi_demeaned"
   )
-  # list(
-  #   wage_col = "DLAENA",
-  #   wage_label = "DLAENA",
-  #   file_stubs = list(
-  #     nairu = "NAIRU_aena",
-  #     inflation = "infl_pi_decomp_aena",
-  #     wage = "aena_decomp",
-  #     params = "posterior_summary_params_aena"
-  #   ),
-  #   variant_label = "CPI & AENA model",
-  #   model_key = "cpi_aena",
-  #   obs_field = "aena_obs",
-  #   missing_index_field = "missing_aena_index",
-  #   missing_param = "aena_missing",
-  #   wage_component_col = "aena_demeaned"
-  # ),
-  # list(
-  #   wage_col = "DLWPI",
-  #   wage_label = "DLWPI",
-  #   file_stubs = list(
-  #     nairu = "NAIRU_wpi",
-  #     inflation = "infl_pi_decomp_wpi",
-  #     wage = "wage_decomp_wpi",
-  #     params = "posterior_summary_params_wpi"
-  #   ),
-  #   variant_label = "CPI & WPI model",
-  #   model_key = "cpi_wpi",
-  #   obs_field = "wpi_obs",
-  #   missing_index_field = "missing_wpi_index",
-  #   missing_param = "wpi_missing",
-  #   wage_component_col = "wpi_demeaned"
-  # )
 )
 
 wage_series_results <- vector("list", length(single_wage_variants))
@@ -1000,78 +1000,78 @@ if (length(rmse_plot_data_list) > 0) {
   message(glue::glue("💾 Saved inflation forecast RMSE diagnostics to {combined_rmse_path}"))
 }
 
-# counterfactual_result <- run_single_wage_inflation_model(
-#   est_df = est_data,
-#   wage_col = "DLNULC",
-#   wage_label = "DLNULC",
-#   compiled_model = compiled_models$cpi_ulc_counterfactual,
-#   file_stubs = list(
-#     nairu = "NAIRU_counterfactual",
-#     inflation = "infl_pi_decomp_counterfactual",
-#     wage = "ulc_decomp_counterfactual",
-#     params = "posterior_summary_params_counterfactual"
-#   ),
-#   variant_label = "CPI & ULC counterfactual (high NAIRU volatility)",
-#   obs_field = "ulc_obs",
-#   missing_index_field = "missing_ulc_index",
-#   missing_param = "ulc_missing",
-#   wage_component_col = "ulc_demeaned"
-# )
-#
-# run_dual_wage_model(
-#   est_df = est_data,
-#   wage_cols = c("DLAENA", "DLWPI"),
-#   compiled_model = compiled_models$cpi_aena_wpi,
-#   file_stubs = list(
-#     nairu = "NAIRU_aena_wpi",
-#     params = "posterior_summary_params_aena_wpi"
-#   ),
-#   variant_label = "CPI with AENA & WPI model"
-# )
-#
-# run_dual_wage_model(
-#   est_df = est_data,
-#   wage_cols = c("DLNULC", "DLWPI"),
-#   compiled_model = compiled_models$cpi_ulc_wpi,
-#   file_stubs = list(
-#     nairu = "NAIRU_ulc_wpi",
-#     params = "posterior_summary_params_ulc_wpi"
-#   ),
-#   variant_label = "CPI with ULC & WPI model"
-# )
-#
-# run_dual_wage_model(
-#   est_df = est_data,
-#   wage_cols = c("DLNULC", "DLAENA"),
-#   compiled_model = compiled_models$cpi_ulc_aena,
-#   file_stubs = list(
-#     nairu = "NAIRU_ulc_aena",
-#     params = "posterior_summary_params_ulc_aena"
-#   ),
-#   variant_label = "CPI with ULC & AENA model"
-# )
-#
-# run_dual_wage_model(
-#   est_df = est_data,
-#   wage_cols = c("DLNULC", "DLAENA", "DLWPI"),
-#   compiled_model = compiled_models$cpi_ulc_aena_wpi,
-#   file_stubs = list(
-#     nairu = "NAIRU_ulc_aena_wpi",
-#     params = "posterior_summary_params_ulc_aena_wpi"
-#   ),
-#   variant_label = "CPI with ULC, AENA & WPI model"
-# )
-#
-# run_wage_no_inflation_model(
-#   est_df = est_data,
-#   wage_col = "DLWPI",
-#   compiled_model = compiled_models$wpi_only,
-#   file_stubs = list(
-#     nairu = "NAIRU_wpi_no_inflation",
-#     params = "posterior_summary_params_wpi_no_inflation"
-#   ),
-#   variant_label = "WPI no-inflation model"
-# )
+counterfactual_result <- run_single_wage_inflation_model(
+  est_df = est_data,
+  wage_col = "DLNULC",
+  wage_label = "DLNULC",
+  compiled_model = compiled_models$cpi_ulc_counterfactual,
+  file_stubs = list(
+    nairu = "NAIRU_counterfactual",
+    inflation = "infl_pi_decomp_counterfactual",
+    wage = "ulc_decomp_counterfactual",
+    params = "posterior_summary_params_counterfactual"
+  ),
+  variant_label = "CPI & ULC counterfactual (high NAIRU volatility)",
+  obs_field = "ulc_obs",
+  missing_index_field = "missing_ulc_index",
+  missing_param = "ulc_missing",
+  wage_component_col = "ulc_demeaned"
+)
+
+run_dual_wage_model(
+  est_df = est_data,
+  wage_cols = c("DLAENA", "DLWPI"),
+  compiled_model = compiled_models$cpi_aena_wpi,
+  file_stubs = list(
+    nairu = "NAIRU_aena_wpi",
+    params = "posterior_summary_params_aena_wpi"
+  ),
+  variant_label = "CPI with AENA & WPI model"
+)
+
+run_dual_wage_model(
+  est_df = est_data,
+  wage_cols = c("DLNULC", "DLWPI"),
+  compiled_model = compiled_models$cpi_ulc_wpi,
+  file_stubs = list(
+    nairu = "NAIRU_ulc_wpi",
+    params = "posterior_summary_params_ulc_wpi"
+  ),
+  variant_label = "CPI with ULC & WPI model"
+)
+
+run_dual_wage_model(
+  est_df = est_data,
+  wage_cols = c("DLNULC", "DLAENA"),
+  compiled_model = compiled_models$cpi_ulc_aena,
+  file_stubs = list(
+    nairu = "NAIRU_ulc_aena",
+    params = "posterior_summary_params_ulc_aena"
+  ),
+  variant_label = "CPI with ULC & AENA model"
+)
+
+run_dual_wage_model(
+  est_df = est_data,
+  wage_cols = c("DLNULC", "DLAENA", "DLWPI"),
+  compiled_model = compiled_models$cpi_ulc_aena_wpi,
+  file_stubs = list(
+    nairu = "NAIRU_ulc_aena_wpi",
+    params = "posterior_summary_params_ulc_aena_wpi"
+  ),
+  variant_label = "CPI with ULC, AENA & WPI model"
+)
+
+run_wage_no_inflation_model(
+  est_df = est_data,
+  wage_col = "DLWPI",
+  compiled_model = compiled_models$wpi_only,
+  file_stubs = list(
+    nairu = "NAIRU_wpi_no_inflation",
+    params = "posterior_summary_params_wpi_no_inflation"
+  ),
+  variant_label = "WPI no-inflation model"
+)
 
 load_nairu_means <- function(path, model_label) {
   if (!file.exists(path)) {

@@ -124,10 +124,10 @@ jobs:
       - name: Get data
         run: Rscript -e 'source(here::here("R", "run_nairu.R"), echo = TRUE)'
 
-      - name: Vintage NAIRU
-        if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && github.event.schedule == '40 0 1 * *')
-        continue-on-error: true
-        run: Rscript -e 'source("R/make_vintages.R", echo=TRUE)'
+#      - name: Vintage NAIRU
+#        if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && github.event.schedule == '40 0 1 * *')
+#        continue-on-error: true
+#        run: Rscript -e 'source("R/make_vintages.R", echo=TRUE)'
 
 #      - name: State NAIRU
 #        run: Rscript -e 'source(here::here("R", "state_nairu.r"), echo = TRUE)'
