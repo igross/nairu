@@ -129,8 +129,8 @@ jobs:
         continue-on-error: true
         run: Rscript -e 'source("R/make_vintages.R", echo=TRUE)'
 
-      - name: State NAIRU
-        run: Rscript -e 'source(here::here("R", "state_nairu.r"), echo = TRUE)'
+#      - name: State NAIRU
+#        run: Rscript -e 'source(here::here("R", "state_nairu.r"), echo = TRUE)'
 
 
       - name: Make visuals
