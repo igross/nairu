@@ -129,6 +129,11 @@ jobs:
         continue-on-error: true
         run: Rscript -e 'source("R/make_vintages.R", echo=TRUE)'
 
+      - name: State NAIRU
+        if: github.event_name == 'schedule' && github.event.schedule == '40 0 1 * *'
+        run: Rscript -e 'source(here::here("R", "state_nairu.r"), echo = TRUE)'
+
+
       - name: Make visuals
         run: Rscript -e 'source("R/plot_nairu.R", echo=TRUE)'
 
