@@ -3,7 +3,7 @@
 
 # Australian NAIRU dashboard
 
-This repository contains the code that powers <https://nairu.angusgrossart.com>. It collects the
+This repository contains the code that powers <https://nairu.isaacgross.net>. It collects the
 latest Australian Bureau of Statistics (ABS) and Reserve Bank of Australia (RBA) data, estimates a
 suite of state-space Non-Accelerating Inflation Rate of Unemployment (NAIRU) models, and publishes
 the resulting charts and CSV extracts to the `docs/` folder for hosting with GitHub Pages.
