@@ -238,6 +238,115 @@ if (latest_trimmed_mean_date > latest_pie_date) {
 data_set <- list(R_5206, R_6457, R_6202, R_trimmed_mean, pie_rbaq, R_6345) %>%
   Reduce(function(dtf1, dtf2) full_join(dtf1, dtf2, by = "date"), .)
 
+
+# ---- Optional monthly partial update for latest quarter -----------------------------
+use_monthly_partial <- tolower(Sys.getenv("USE_MONTHLY_PARTIAL", unset = "false")) %in% c("1", "true", "yes")
+partial_debug <- NULL
+
+if (use_monthly_partial) {
+  message("🧩 USE_MONTHLY_PARTIAL enabled: building partial-quarter updates for unemployment and inflation.")
+
+  # Monthly unemployment partial (current quarter average of available months)
+  lur_monthly <- abs_6202 %>%
+    filter(series_id == "A84423050A") %>%
+    transmute(month_date = as.Date(date), LUR_monthly = value) %>%
+    filter(!is.na(month_date), !is.na(LUR_monthly))
+
+  latest_month <- max(lur_monthly$month_date, na.rm = TRUE)
+  latest_qtr <- as.yearqtr(latest_month)
+  qtr_start <- as.Date(latest_qtr)
+  qtr_end <- seq(qtr_start, by = "quarter", length.out = 2)[2] - 1
+
+  lur_partial <- lur_monthly %>%
+    filter(month_date >= qtr_start, month_date <= qtr_end) %>%
+    summarise(value = mean(LUR_monthly, na.rm = TRUE)) %>%
+    pull(value)
+
+  # Monthly inflation partial (ABS monthly CPI indicator all groups, SA)
+  monthly_cpi_raw <- tryCatch(
+    read_abs(series_id = "A124351883L"),
+    error = function(e) {
+      message("⚠ Unable to load monthly CPI indicator series A124351883L: ", conditionMessage(e))
+      tibble::tibble(date = as.Date(character()), value = numeric())
+    }
+  )
+
+  cpi_partial <- NA_real_
+  cpi_months_used <- 0L
+  if (nrow(monthly_cpi_raw) > 0) {
+    cpi_monthly <- monthly_cpi_raw %>%
+      transmute(month_date = as.Date(date), cpi_index = value) %>%
+      filter(!is.na(month_date), !is.na(cpi_index)) %>%
+      arrange(month_date)
+
+    prev_qtr <- latest_qtr - 0.25
+    prev_start <- as.Date(prev_qtr)
+    prev_end <- qtr_start - 1
+
+    prev_qtr_mean <- cpi_monthly %>%
+      filter(month_date >= prev_start, month_date <= prev_end) %>%
+      summarise(value = mean(cpi_index, na.rm = TRUE)) %>%
+      pull(value)
+
+    curr_qtr_months <- cpi_monthly %>%
+      filter(month_date >= qtr_start, month_date <= qtr_end)
+    cpi_months_used <- nrow(curr_qtr_months)
+
+    if (cpi_months_used > 0 && is.finite(prev_qtr_mean) && prev_qtr_mean > 0) {
+      last_idx <- dplyr::last(curr_qtr_months$cpi_index)
+      filled_idx <- c(curr_qtr_months$cpi_index, rep(last_idx, 3 - cpi_months_used))
+      curr_qtr_mean_partial <- mean(filled_idx)
+      cpi_partial <- 100 * (curr_qtr_mean_partial / prev_qtr_mean - 1)
+    }
+  }
+
+  if (is.finite(lur_partial)) {
+    data_set <- data_set %>%
+      mutate(LUR_full = LUR,
+             LUR = ifelse(date == latest_qtr, lur_partial, LUR))
+  }
+
+  if (is.finite(cpi_partial)) {
+    data_set <- data_set %>%
+      mutate(DLPTM_full = DLPTM,
+             DLPTM = ifelse(date == latest_qtr, cpi_partial, DLPTM))
+  }
+
+  partial_debug <- tibble::tibble(
+    date = latest_qtr,
+    LUR_full = data_set %>% filter(date == latest_qtr) %>% pull(LUR_full),
+    LUR_partial = data_set %>% filter(date == latest_qtr) %>% pull(LUR),
+    DLPTM_full = data_set %>% filter(date == latest_qtr) %>% pull(DLPTM_full),
+    DLPTM_partial = data_set %>% filter(date == latest_qtr) %>% pull(DLPTM),
+    cpi_months_used = cpi_months_used
+  )
+
+  readr::write_csv(partial_debug, file.path(data_dir, "latest_quarter_partial_inputs.csv"))
+
+  partial_long <- partial_debug %>%
+    tidyr::pivot_longer(
+      cols = c(LUR_full, LUR_partial, DLPTM_full, DLPTM_partial),
+      names_to = c("series", "version"),
+      names_sep = "_",
+      values_to = "value"
+    ) %>%
+    mutate(version = factor(version, levels = c("full", "partial")))
+
+  p_partial <- ggplot(partial_long, aes(x = version, y = value, fill = version)) +
+    geom_col(width = 0.6) +
+    facet_wrap(~series, scales = "free_y") +
+    labs(
+      title = paste0("Latest-quarter partial update crosswalk (", latest_qtr, ")"),
+      subtitle = paste0("Monthly CPI months used: ", cpi_months_used),
+      x = NULL,
+      y = "Value"
+    ) +
+    theme_minimal(base_size = 11) +
+    theme(legend.position = "none")
+
+  ggsave(file.path(out_dir, "latest_quarter_partial_crosswalk.png"), p_partial, width = 9, height = 5, dpi = 300)
+}
+
 log_dataset_debug(data_set, "Merged dataset (pre-filter/LOCF)")
 
 #data_set$pie_bondq <- replace(data_set$pie_bondq,is.na(data_set$pie_bondq),2.5/4)
