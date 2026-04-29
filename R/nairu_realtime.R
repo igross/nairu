@@ -103,6 +103,54 @@ align_series_to_common_last_qtr <- function(series_entries) {
   )
 }
 
+align_series_to_partial_last_qtr <- function(series_entries, target_series) {
+  valid_entries <- purrr::compact(series_entries)
+
+  if (length(valid_entries) == 0) {
+    return(NULL)
+  }
+
+  combined <- valid_entries %>%
+    map("data") %>%
+    reduce(full_join, by = "date") %>%
+    arrange(date) %>%
+    filter(!is.na(date))
+
+  rename_map <- set_names(
+    map_chr(valid_entries, "base_name"),
+    map_chr(valid_entries, ~ names(.x$data)[2])
+  )
+
+  combined <- combined %>% rename(!!!rename_map)
+
+  missing_targets <- setdiff(target_series, names(combined))
+  if (length(missing_targets) > 0) {
+    for (col_name in missing_targets) {
+      combined[[col_name]] <- NA_real_
+    }
+  }
+
+  target_values <- combined %>% select(any_of(target_series))
+  has_any_target_obs <- if (nrow(target_values) > 0) {
+    rowSums(!is.na(as.matrix(target_values))) > 0
+  } else {
+    logical(0)
+  }
+
+  candidate_dates <- combined$date[has_any_target_obs]
+  if (length(candidate_dates) == 0) {
+    return(NULL)
+  }
+
+  latest_qtr <- max(candidate_dates)
+
+  list(
+    data = combined %>% filter(date <= latest_qtr),
+    labels = set_names(map_chr(valid_entries, "label"), map_chr(valid_entries, "base_name")),
+    last_qtr = latest_qtr
+  )
+}
+
 prepare_vintage_est_data <- function(release_date, expectations_df) {
   release_date <- as.Date(release_date)
   cutoff_qtr <- zoo::as.yearqtr(release_date) - 0.25
@@ -156,22 +204,18 @@ prepare_vintage_est_data <- function(release_date, expectations_df) {
   pie_rbaq <- expectations_df %>%
     filter(date <= cutoff_qtr)
 
-  aligned <- align_series_to_common_last_qtr(list(
+  required_cols <- c("DLNULC", "dl4pmcg", "LUR", "DLPTM", "PIE_RBAQ")
+
+  aligned <- align_series_to_partial_last_qtr(list(
     label_series_last_qtr(R_5206, DLNULC, "DLNULC"),
     label_series_last_qtr(R_6457, dl4pmcg, "dl4pmcg"),
     label_series_last_qtr(R_6202, LUR, "LUR"),
     label_series_last_qtr(R_trimmed_mean, DLPTM, "DLPTM"),
     label_series_last_qtr(pie_rbaq, PIE_RBAQ, "PIE_RBAQ")
-  ))
+  ), target_series = required_cols)
 
   if (is.null(aligned) || is.na(aligned$last_qtr)) {
     message(glue("⚠️ Unable to align series for {release_date} – no common last quarter."))
-    return(NULL)
-  }
-
-  required_cols <- c("DLNULC", "dl4pmcg", "LUR", "DLPTM", "PIE_RBAQ")
-  if (!all(required_cols %in% names(aligned$data))) {
-    message(glue("⚠️ Missing required series for {release_date}: {paste(setdiff(required_cols, names(aligned$data)), collapse = ', ')}"))
     return(NULL)
   }
 
@@ -182,6 +226,17 @@ prepare_vintage_est_data <- function(release_date, expectations_df) {
 
   data_set <- aligned$data %>%
     mutate(across(-date, ~ zoo::na.locf(.x, na.rm = FALSE)))
+
+  available_counts <- data_set %>%
+    summarise(across(all_of(required_cols), ~ as.integer(!is.na(last(.x)))))
+
+  latest_available <- sum(unlist(available_counts), na.rm = TRUE)
+  if (latest_available < 1) {
+    message(glue("⚠️ No partial information available for {release_date} at {aligned$last_qtr}."))
+    return(NULL)
+  }
+
+  message(glue("ℹ Partial update inputs available @ {aligned$last_qtr}: {latest_available}/{length(required_cols)} series"))
 
   data_set <- data_set %>%
     mutate(
@@ -196,6 +251,9 @@ prepare_vintage_est_data <- function(release_date, expectations_df) {
       dummy3 = ifelse(date == as.yearqtr("2020 Q2"), 1, 0),
       dummy4 = ifelse(date == as.yearqtr("2020 Q3"), 1, 0)
     )
+
+  est_data <- est_data %>%
+    filter(if_all(all_of(setdiff(required_cols, "DLNULC")), ~ !is.na(.x)))
 
   if (nrow(est_data) < 12) {
     message(glue("⚠️ Not enough data to estimate for {release_date} (only {nrow(est_data)} rows)."))
