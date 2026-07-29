@@ -87,6 +87,7 @@ jobs:
     runs-on: macOS-latest
     env:
       R_KEEP_PKG_SOURCE: yes
+      USE_MONTHLY_PARTIAL: "true"
     steps:
       - uses: actions/checkout@v2
         with:
