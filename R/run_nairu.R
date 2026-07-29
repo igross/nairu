@@ -239,12 +239,18 @@ data_set <- list(R_5206, R_6457, R_6202, R_trimmed_mean, pie_rbaq, R_6345) %>%
   Reduce(function(dtf1, dtf2) full_join(dtf1, dtf2, by = "date"), .)
 
 
-# ---- Optional monthly partial update for latest quarter -----------------------------
-use_monthly_partial <- tolower(Sys.getenv("USE_MONTHLY_PARTIAL", unset = "false")) %in% c("1", "true", "yes")
+# ---- Monthly partial update for latest quarter --------------------------------------
+use_monthly_partial <- tolower(Sys.getenv("USE_MONTHLY_PARTIAL", unset = "true")) %in% c("1", "true", "yes")
 partial_debug <- NULL
 
 if (use_monthly_partial) {
   message("🧩 USE_MONTHLY_PARTIAL enabled: building partial-quarter updates for unemployment and inflation.")
+
+  data_set <- data_set %>%
+    mutate(
+      LUR_full = LUR,
+      DLPTM_full = DLPTM
+    )
 
   # Monthly unemployment partial (current quarter average of available months)
   lur_monthly <- abs_6202 %>%
@@ -289,7 +295,8 @@ if (use_monthly_partial) {
       pull(value)
 
     curr_qtr_months <- cpi_monthly %>%
-      filter(month_date >= qtr_start, month_date <= qtr_end)
+      filter(month_date >= qtr_start, month_date <= qtr_end) %>%
+      slice_tail(n = 3)
     cpi_months_used <- nrow(curr_qtr_months)
 
     if (cpi_months_used > 0 && is.finite(prev_qtr_mean) && prev_qtr_mean > 0) {
@@ -302,14 +309,12 @@ if (use_monthly_partial) {
 
   if (is.finite(lur_partial)) {
     data_set <- data_set %>%
-      mutate(LUR_full = LUR,
-             LUR = ifelse(date == latest_qtr, lur_partial, LUR))
+      mutate(LUR = ifelse(date == latest_qtr, lur_partial, LUR))
   }
 
   if (is.finite(cpi_partial)) {
     data_set <- data_set %>%
-      mutate(DLPTM_full = DLPTM,
-             DLPTM = ifelse(date == latest_qtr, cpi_partial, DLPTM))
+      mutate(DLPTM = ifelse(date == latest_qtr, cpi_partial, DLPTM))
   }
 
   partial_debug <- tibble::tibble(
@@ -629,6 +634,58 @@ run_single_wage_inflation_model <- function(
       forecast_error_h3 = dplyr::lead(actual, 3) - fitted,
       forecast_error_h4 = dplyr::lead(actual, 4) - fitted
     )
+
+  if (identical(file_stubs$nairu, "NAIRU_baseline")) {
+    latest_analysis_date <- if (!is.null(partial_debug) && nrow(partial_debug) > 0) {
+      partial_debug$date[[1]]
+    } else {
+      min(max(R_6202$date, na.rm = TRUE), max(R_trimmed_mean$date, na.rm = TRUE))
+    }
+
+    latest_analysis <- infl_pi_decomp %>%
+      mutate(unemployment_rate = est_df$LUR) %>%
+      filter(
+        date_qtr <= latest_analysis_date,
+        is.finite(unemployment_rate),
+        is.finite(fitted),
+        is.finite(actual)
+      ) %>%
+      slice_tail(n = 1) %>%
+      transmute(
+        date = date_qtr,
+        unemployment_rate,
+        expected_inflation = fitted,
+        actual_inflation = actual,
+        inflation_surprise = actual_inflation - expected_inflation,
+        nairu_revision = case_when(
+          inflation_surprise > 0.05 ~ "higher",
+          inflation_surprise < -0.05 ~ "lower",
+          TRUE ~ "unchanged"
+        )
+      ) %>%
+      mutate(
+        analysis = glue::glue(
+          "Given unemployment was {sprintf('%.2f', unemployment_rate)}%, ",
+          "we expect inflation to be around {sprintf('%.2f', expected_inflation)}%. ",
+          "It was in fact {sprintf('%.2f', actual_inflation)}%, which revises our ",
+          "NAIRU estimate {nairu_revision}."
+        )
+      )
+
+    if (nrow(latest_analysis) == 0) {
+      warning("Main model analysis was not written because no complete fitted observation was available.")
+    } else {
+      readr::write_csv(
+        latest_analysis,
+        file.path(data_dir, "main_model_latest_analysis.csv")
+      )
+      writeLines(
+        latest_analysis$analysis,
+        file.path(data_dir, "main_model_latest_analysis.txt")
+      )
+      message("📝 Main-model inflation analysis: ", latest_analysis$analysis)
+    }
+  }
 
   calc_rmse <- function(h) {
     if (h == 0) {
