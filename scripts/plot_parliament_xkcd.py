@@ -158,10 +158,10 @@ def layout_row(row, keys):
     return L
 
 
-def faces_up(lo, hi):
-    """Deltas ride the band edge facing the median seat, where the
-    marginal members sit."""
-    return (lo + hi) / 2.0 < 0
+def above_median(lo, hi):
+    """True when a band sits on the upper side of the median seat, so
+    'away from the centre' means upward for it."""
+    return (lo + hi) / 2.0 >= 0
 
 
 # ----------------------------------------------------------------------------
@@ -172,12 +172,11 @@ def draw_chamber(ax, wide, title):
     """Median-centred braided-stream chart, xkcd-1127 style.
 
     Between elections each band holds steady. At an election, the members
-    who stay put form a "core" that slides to its new position; seats a
-    band LOSES peel off its median-facing edge as a stream that tapers
-    away to nothing (members leaving parliament), and seats it GAINS flow
-    in as a stream that fades in from nothing and joins the band (new
-    members arriving) — so chamber enlargements literally pour new
-    tributaries into the river.
+    who stay put form a "core" anchored on the median side; seats a band
+    LOSES peel off its OUTER edge and run away from the centre as a stroke
+    that dies out (members leaving parliament), and seats it GAINS sweep
+    in from outside and join that edge (new members arriving) — so chamber
+    enlargements pour new tributaries in from the chamber's edges.
     """
     keys = [b[0] for b in BANDS]
     n = len(wide)
@@ -200,11 +199,11 @@ def draw_chamber(ax, wide, title):
             bB, tB = layouts[i + 1][key]
             A, B = tA - bA, tB - bB
             m = min(A, B)
-            if faces_up(bA, tA):
+            if above_median(bA, tA):
                 cA, sliceA = (bA, bA + m), (bA + m, tA)
             else:
                 cA, sliceA = (tA - m, tA), (bA, tA - m)
-            if faces_up(bB, tB):
+            if above_median(bB, tB):
                 cB, sliceB = (bB, bB + m), (bB + m, tB)
             else:
                 cB, sliceB = (tB - m, tB), (bB, tB - m)
@@ -230,18 +229,17 @@ def draw_chamber(ax, wide, title):
                 to.append(a[1] + (c[1] - a[1]) * f)
             if A > B:
                 wedges.append((w0, ramp, sliceA, colour, "out",
-                               1 if faces_up(bA, tA) else -1))
+                               1 if above_median(bA, tA) else -1))
             elif B > A:
                 wedges.append((w0, ramp, sliceB, colour, "in",
-                               1 if faces_up(bB, tB) else -1))
+                               1 if above_median(bB, tB) else -1))
         ax.fill_between(xs, bo, to, facecolor=colour,
                         edgecolor="black", linewidth=1.1, zorder=2)
 
     # Flows are thick solid strokes of the band's colour, one per change:
     # line weight grows with the number of seats moving, but stays a line.
-    # Leavers emerge from the median-facing edge and curl toward the median
-    # as the stroke dies; arrivals sweep in from the same side and plug
-    # into the band.
+    # Leavers head outward, away from the median, and die away at the
+    # chamber's edge; arrivals come in from out there and join the band.
     for x0, ramp, (lo, hi), colour, kind, sgn in wedges:
         mid, d = (lo + hi) / 2.0, hi - lo
         lw = min(9.0, 2.2 + 0.35 * d)
@@ -260,7 +258,8 @@ def draw_chamber(ax, wide, title):
     ax.axhline(0, color="black", lw=1.8, ls=(0, (7, 5)), zorder=4)
     ax.set_title(title, fontsize=26, pad=12)
     ax.set_xlim(mdates.date2num(date(1900, 6, 1)), mdates.date2num(END_OF_DATA))
-    half = max(wide[keys].sum(axis=1)) * 1.04 / 2.0
+    # Headroom so the outward strokes run clear of the panel edge.
+    half = max(wide[keys].sum(axis=1)) / 2.0 + 7.0
     ax.set_ylim(-half, half)
     ax.xaxis.set_major_locator(mdates.YearLocator(10))
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y"))
