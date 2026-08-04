@@ -141,14 +141,33 @@ def load_chamber(csv_name, effective_date_fn):
     return wide
 
 
-def step_series(wide):
-    """Duplicate boundary points so bands are piecewise-constant rectangles."""
+RAMP_DAYS = 400  # how long a band takes to flow to its next width
+
+
+def smoothstep(t):
+    return 3 * t ** 2 - 2 * t ** 3
+
+
+def flow_series(wide):
+    """Band widths over a fine time grid, xkcd-1127 style: hold each
+    composition for most of the term, then ease into the next one so bands
+    merge, branch and dry up like rivers instead of stepping like blocks."""
+    dnum = [mdates.date2num(d) for d in wide.index] + [mdates.date2num(END_OF_DATA)]
     xs, rows = [], []
-    dates = list(wide.index) + [END_OF_DATA]
-    for i, d in enumerate(wide.index):
-        xs += [d, dates[i + 1]]
+    for i in range(len(wide)):
+        x0, x1 = dnum[i], dnum[i + 1]
+        ramp = min(RAMP_DAYS, 0.55 * (x1 - x0)) if i < len(wide) - 1 else 0
+        xs += [x0, x1 - ramp]
         rows += [wide.iloc[i], wide.iloc[i]]
-    return [mdates.date2num(x) for x in xs], pd.DataFrame(rows)
+        if ramp:
+            nxt = wide.iloc[i + 1]
+            for k in range(1, 25):
+                t = k / 25.0
+                xs.append(x1 - ramp * (1 - t))
+                rows.append(wide.iloc[i] + (nxt - wide.iloc[i]) * smoothstep(t))
+    xs.append(dnum[-1])
+    rows.append(wide.iloc[-1])
+    return xs, pd.DataFrame(rows)
 
 
 # ----------------------------------------------------------------------------
@@ -156,12 +175,14 @@ def step_series(wide):
 # ----------------------------------------------------------------------------
 
 def draw_chamber(ax, wide, title):
-    xs, rows = step_series(wide)
+    xs, rows = flow_series(wide)
+    edges = {}  # band key -> (bottom array, top array), for flow ribbons
     bottom = [0.0] * len(xs)
     for key, colour, _label in BANDS:
         top = [b + v for b, v in zip(bottom, rows[key])]
         ax.fill_between(xs, bottom, top, facecolor=colour,
                         edgecolor="black", linewidth=1.1, zorder=2)
+        edges[key] = (list(bottom), list(top))
         bottom = top
     ax.set_title(title, fontsize=26, pad=12)
     ax.set_xlim(mdates.date2num(date(1900, 6, 1)), mdates.date2num(END_OF_DATA))
@@ -172,6 +193,26 @@ def draw_chamber(ax, wide, title):
     ax.set_ylabel("members", fontsize=15)
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
+    return xs, edges
+
+
+def edge_at(xs, arr, when):
+    x = mdates.date2num(when)
+    i = min(range(len(xs)), key=lambda j: abs(xs[j] - x))
+    return arr[i]
+
+
+def flow_ribbon(ax, xs, edges, t0, from_key, t1, to_key, width, colour):
+    """A river of `width` members leaving the top of one band and feeding
+    into the bottom of another, crossing whatever lies between (used for
+    splits whose bands are not adjacent in the stack)."""
+    y0 = edge_at(xs, edges[from_key][1], t0) - width  # slice off the top
+    y1 = edge_at(xs, edges[to_key][0], t1)            # land on the bottom
+    x0, x1 = mdates.date2num(t0), mdates.date2num(t1)
+    ts = [x0 + (x1 - x0) * k / 40.0 for k in range(41)]
+    lower = [y0 + (y1 - y0) * smoothstep(k / 40.0) for k in range(41)]
+    ax.fill_between(ts, lower, [y + width for y in lower], facecolor=colour,
+                    edgecolor="black", linewidth=1.1, zorder=3)
 
 
 def band_mid(wide, key, year):
@@ -220,8 +261,15 @@ def main():
         )
         fig.patch.set_facecolor("white")
 
-        draw_chamber(axh, house, "THE HOUSE OF REPRESENTATIVES")
+        hxs, hedges = draw_chamber(axh, house, "THE HOUSE OF REPRESENTATIVES")
         draw_chamber(axs, senate, "THE SENATE")
+
+        # Lyons and his followers leave Labor for the new UAP ahead of the
+        # Dec 1931 election — the one big split whose bands aren't adjacent,
+        # so it flows across the Country band. (The 1909 Fusion and the 1916
+        # Labor split flow on their own: those bands touch.)
+        flow_ribbon(axh, hxs, hedges, date(1931, 2, 1), "ALP",
+                    date(1931, 12, 19), "LIB", 5, "#3A66A8")
 
         # ------------------------------------------------------------------
         # House labels (band, year, text)
@@ -237,10 +285,26 @@ def main():
         label(axh, house, "LIB", 2005, "LIBERAL", fontsize=22)
         label(axh, house, "NAT", 1960, "COUNTRY PARTY", fontsize=13)
         label(axh, house, "NAT", 2004, "NATIONALS", fontsize=12)
+        axh.annotate("the Fusion, 1909:\nProtectionists + Free Traders merge",
+                     xy=(mdates.date2num(date(1909, 9, 1)), 60),
+                     xytext=(mdates.date2num(date(1906, 1, 1)), 93),
+                     fontsize=11, ha="center", va="center", zorder=6,
+                     arrowprops=dict(arrowstyle="->", lw=1.2, color="black"))
+        axh.annotate("the great Labor split, 1916:\nHughes walks out over conscription,\n"
+                     "takes his followers to the Nationalists",
+                     xy=(mdates.date2num(date(1916, 11, 1)), 36),
+                     xytext=(mdates.date2num(date(1916, 1, 1)), 109),
+                     fontsize=11, ha="center", va="center", zorder=6,
+                     arrowprops=dict(arrowstyle="->", lw=1.2, color="black"))
         annotate_arrow(axh, house, "NAT", 1921, "Country Party arrives, 1919",
-                       (mdates.date2num(date(1917, 1, 1)), 96))
+                       (mdates.date2num(date(1929, 1, 1)), 91))
         annotate_arrow(axh, house, "ALPX", 1933, "Lang Labor\n(the Labor split of 1931)",
-                       (mdates.date2num(date(1929, 6, 1)), 100))
+                       (mdates.date2num(date(1943, 1, 1)), 103))
+        axh.annotate("Lyons walks out too,\n1931", zorder=6,
+                     xy=(mdates.date2num(date(1931, 8, 1)), 42),
+                     xytext=(mdates.date2num(date(1938, 6, 1)), 64),
+                     fontsize=11, ha="center", va="center",
+                     arrowprops=dict(arrowstyle="->", lw=1.2, color="black"))
         annotate_arrow(axh, house, "GRN", 2023, "Greens",
                        (mdates.date2num(date(2016, 1, 1)), 12))
         annotate_arrow(axh, house, "OTH", 2023, "the teal wave etc.",
