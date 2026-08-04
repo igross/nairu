@@ -229,25 +229,33 @@ def draw_chamber(ax, wide, title):
                 bo.append(a[0] + (c[0] - a[0]) * f)
                 to.append(a[1] + (c[1] - a[1]) * f)
             if A > B:
-                wedges.append((w0, ramp, sliceA, colour, "out"))
+                wedges.append((w0, ramp, sliceA, colour, "out",
+                               1 if faces_up(bA, tA) else -1))
             elif B > A:
-                wedges.append((w0, ramp, sliceB, colour, "in"))
+                wedges.append((w0, ramp, sliceB, colour, "in",
+                               1 if faces_up(bB, tB) else -1))
         ax.fill_between(xs, bo, to, facecolor=colour,
                         edgecolor="black", linewidth=1.1, zorder=2)
 
-    for x0, ramp, (lo, hi), colour, kind in wedges:
+    # Flows are thick solid strokes of the band's colour, one per change:
+    # line weight grows with the number of seats moving, but stays a line.
+    # Leavers emerge from the median-facing edge and curl toward the median
+    # as the stroke dies; arrivals sweep in from the same side and plug
+    # into the band.
+    for x0, ramp, (lo, hi), colour, kind, sgn in wedges:
         mid, d = (lo + hi) / 2.0, hi - lo
-        ts, w = [], []
-        for j in range(41):
-            u = j / 40.0
-            ts.append(x0 + ramp * u)
-            if kind == "out":  # full width, then the stream dries up
-                w.append(d * (1 - smoothstep(min(1.0, max(0.0, (u - 0.2) / 0.65)))))
-            else:              # the stream swells, then runs in alongside
-                w.append(d * smoothstep(min(1.0, max(0.0, (u - 0.15) / 0.65))))
-        ax.fill_between(ts, [mid - v / 2 for v in w], [mid + v / 2 for v in w],
-                        facecolor=colour, edgecolor="black", linewidth=1.0,
-                        zorder=3)
+        lw = min(9.0, 2.2 + 0.35 * d)
+        drift = sgn * (d / 2.0 + 3.0)
+        px, py = [], []
+        for j in range(21):
+            u = j / 20.0
+            if kind == "out":
+                px.append(x0 + 0.55 * ramp * u)
+                py.append(mid + drift * smoothstep(u))
+            else:
+                px.append(x0 + ramp * (0.45 + 0.55 * u))
+                py.append(mid + drift * (1 - smoothstep(u)))
+        ax.plot(px, py, color=colour, lw=lw, solid_capstyle="round", zorder=3)
 
     ax.axhline(0, color="black", lw=1.8, ls=(0, (7, 5)), zorder=4)
     ax.set_title(title, fontsize=26, pad=12)
