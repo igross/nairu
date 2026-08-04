@@ -176,21 +176,28 @@ def flow_series(wide):
 
 def draw_chamber(ax, wide, title):
     xs, rows = flow_series(wide)
+    keys = [b[0] for b in BANDS]
+    totals = rows[keys].sum(axis=1).tolist()
     edges = {}  # band key -> (bottom array, top array), for flow ribbons
-    bottom = [0.0] * len(xs)
+    # Centre the stack on the median seat: y = 0 is always the middle
+    # member of the chamber, so whichever band crosses the line holds it.
+    bottom = [-t / 2.0 for t in totals]
     for key, colour, _label in BANDS:
         top = [b + v for b, v in zip(bottom, rows[key])]
         ax.fill_between(xs, bottom, top, facecolor=colour,
                         edgecolor="black", linewidth=1.1, zorder=2)
         edges[key] = (list(bottom), list(top))
         bottom = top
+    ax.axhline(0, color="black", lw=1.8, ls=(0, (7, 5)), zorder=4)
     ax.set_title(title, fontsize=26, pad=12)
     ax.set_xlim(mdates.date2num(date(1900, 6, 1)), mdates.date2num(END_OF_DATA))
-    ax.set_ylim(0, max(bottom) * 1.02)
+    half = max(totals) * 1.04 / 2.0
+    ax.set_ylim(-half, half)
     ax.xaxis.set_major_locator(mdates.YearLocator(10))
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y"))
+    ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: f"{abs(v):.0f}"))
     ax.tick_params(labelsize=13)
-    ax.set_ylabel("members", fontsize=15)
+    ax.set_ylabel("seats from the median", fontsize=15)
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
     return xs, edges
@@ -216,12 +223,12 @@ def flow_ribbon(ax, xs, edges, t0, from_key, t1, to_key, width, colour):
 
 
 def band_mid(wide, key, year):
-    """y midpoint of a band at a given year, for placing labels."""
+    """y midpoint of a band at a given year (median-centred coordinates)."""
     d = min(wide.index, key=lambda x: abs((x - date(year, 1, 1)).days))
     row = wide.loc[d]
     keys = [b[0] for b in BANDS]
     below = sum(row[k] for k in keys[: keys.index(key)])
-    return below + row[key] / 2.0
+    return below + row[key] / 2.0 - sum(row[k] for k in keys) / 2.0
 
 
 def label(ax, wide, key, year, text, colour="white", dy=0, fontsize=14, **kw):
@@ -286,32 +293,37 @@ def main():
         label(axh, house, "NAT", 1960, "COUNTRY PARTY", fontsize=13)
         label(axh, house, "NAT", 2004, "NATIONALS", fontsize=12)
         axh.annotate("the Fusion, 1909:\nProtectionists + Free Traders merge",
-                     xy=(mdates.date2num(date(1909, 9, 1)), 60),
-                     xytext=(mdates.date2num(date(1906, 1, 1)), 93),
+                     xy=(mdates.date2num(date(1909, 9, 1)), 22.5),
+                     xytext=(mdates.date2num(date(1906, 1, 1)), 55),
                      fontsize=11, ha="center", va="center", zorder=6,
                      arrowprops=dict(arrowstyle="->", lw=1.2, color="black"))
         axh.annotate("the great Labor split, 1916:\nHughes walks out over conscription,\n"
                      "takes his followers to the Nationalists",
-                     xy=(mdates.date2num(date(1916, 11, 1)), 36),
-                     xytext=(mdates.date2num(date(1916, 1, 1)), 109),
+                     xy=(mdates.date2num(date(1916, 11, 1)), -1.5),
+                     xytext=(mdates.date2num(date(1916, 1, 1)), 68),
                      fontsize=11, ha="center", va="center", zorder=6,
                      arrowprops=dict(arrowstyle="->", lw=1.2, color="black"))
         annotate_arrow(axh, house, "NAT", 1921, "Country Party arrives, 1919",
-                       (mdates.date2num(date(1929, 1, 1)), 91))
+                       (mdates.date2num(date(1929, 1, 1)), 53))
         annotate_arrow(axh, house, "ALPX", 1933, "Lang Labor\n(the Labor split of 1931)",
-                       (mdates.date2num(date(1943, 1, 1)), 103))
+                       (mdates.date2num(date(1943, 1, 1)), 65))
         axh.annotate("Lyons walks out too,\n1931", zorder=6,
-                     xy=(mdates.date2num(date(1931, 8, 1)), 42),
-                     xytext=(mdates.date2num(date(1938, 6, 1)), 64),
+                     xy=(mdates.date2num(date(1931, 8, 1)), 5),
+                     xytext=(mdates.date2num(date(1938, 6, 1)), 27),
                      fontsize=11, ha="center", va="center",
                      arrowprops=dict(arrowstyle="->", lw=1.2, color="black"))
         annotate_arrow(axh, house, "GRN", 2023, "Greens",
-                       (mdates.date2num(date(2016, 1, 1)), 12))
+                       (mdates.date2num(date(2016, 1, 1)), -63))
         annotate_arrow(axh, house, "OTH", 2023, "the teal wave etc.",
-                       (mdates.date2num(date(2013, 6, 1)), 118))
-        axh.text(mdates.date2num(date(1949, 6, 1)), 128,
+                       (mdates.date2num(date(2013, 6, 1)), 43))
+        axh.annotate("the median seat -\nmajority lives here",
+                     xy=(mdates.date2num(date(1960, 1, 1)), 0),
+                     xytext=(mdates.date2num(date(1960, 1, 1)), 14),
+                     fontsize=11, ha="center", va="center", zorder=6,
+                     arrowprops=dict(arrowstyle="->", lw=1.2, color="black"))
+        axh.text(mdates.date2num(date(1949, 6, 1)), 68,
                  "house enlarged\n75 to 121 seats", fontsize=11, ha="center")
-        axh.text(mdates.date2num(date(1980, 1, 1)), 152.5,
+        axh.text(mdates.date2num(date(1980, 1, 1)), 76,
                  "enlarged again (148)", fontsize=10, ha="center")
 
         # ------------------------------------------------------------------
@@ -326,16 +338,21 @@ def main():
         label(axs, senate, "NAT", 1965, "COUNTRY", fontsize=10)
         label(axs, senate, "GRN", 2019, "GREENS", fontsize=11)
         annotate_arrow(axs, senate, "ALP", 1921, "after 1919, Labor held\nONE Senate seat of 36",
-                       (mdates.date2num(date(1932, 6, 1)), 6.5))
+                       (mdates.date2num(date(1932, 6, 1)), -11.5))
         annotate_arrow(axs, senate, "ALPX", 1962, "D.L.P.\n(the Labor split of 1955)",
-                       (mdates.date2num(date(1952, 1, 1)), 47))
+                       (mdates.date2num(date(1952, 1, 1)), 17))
         annotate_arrow(axs, senate, "DEM", 1990, "Australian Democrats",
-                       (mdates.date2num(date(1983, 1, 1)), 55))
+                       (mdates.date2num(date(1983, 1, 1)), 23))
         annotate_arrow(axs, senate, "OTH", 2018, "One Nation, Xenophon,\nLambie, Palmer, ...",
-                       (mdates.date2num(date(2007, 6, 1)), 66))
-        axs.text(mdates.date2num(date(1949, 6, 1)), 66,
+                       (mdates.date2num(date(2007, 6, 1)), 28))
+        axs.annotate("the median seat -\nthe balance of power",
+                     xy=(mdates.date2num(date(1996, 1, 1)), 0),
+                     xytext=(mdates.date2num(date(1996, 1, 1)), 16),
+                     fontsize=11, ha="center", va="center", zorder=6,
+                     arrowprops=dict(arrowstyle="->", lw=1.2, color="black"))
+        axs.text(mdates.date2num(date(1949, 6, 1)), 36,
                  "senate enlarged\n36 to 60 seats", fontsize=11, ha="center")
-        axs.text(mdates.date2num(date(1981, 1, 1)), 78.5,
+        axs.text(mdates.date2num(date(1981, 1, 1)), 40,
                  "enlarged to 76", fontsize=10, ha="center")
 
         fig.suptitle("EVERY MEMBER OF THE AUSTRALIAN PARLIAMENT SINCE FEDERATION",
