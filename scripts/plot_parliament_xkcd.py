@@ -141,33 +141,27 @@ def load_chamber(csv_name, effective_date_fn):
     return wide
 
 
-RAMP_DAYS = 400  # how long a band takes to flow to its next width
+RAMP_DAYS = 400  # how long each election's flows take to play out
 
 
 def smoothstep(t):
     return 3 * t ** 2 - 2 * t ** 3
 
 
-def flow_series(wide):
-    """Band widths over a fine time grid, xkcd-1127 style: hold each
-    composition for most of the term, then ease into the next one so bands
-    merge, branch and dry up like rivers instead of stepping like blocks."""
-    dnum = [mdates.date2num(d) for d in wide.index] + [mdates.date2num(END_OF_DATA)]
-    xs, rows = [], []
-    for i in range(len(wide)):
-        x0, x1 = dnum[i], dnum[i + 1]
-        ramp = min(RAMP_DAYS, 0.55 * (x1 - x0)) if i < len(wide) - 1 else 0
-        xs += [x0, x1 - ramp]
-        rows += [wide.iloc[i], wide.iloc[i]]
-        if ramp:
-            nxt = wide.iloc[i + 1]
-            for k in range(1, 25):
-                t = k / 25.0
-                xs.append(x1 - ramp * (1 - t))
-                rows.append(wide.iloc[i] + (nxt - wide.iloc[i]) * smoothstep(t))
-    xs.append(dnum[-1])
-    rows.append(wide.iloc[-1])
-    return xs, pd.DataFrame(rows)
+def layout_row(row, keys):
+    """Median-centred (bottom, top) for each band in one composition."""
+    total = sum(row[k] for k in keys)
+    y, L = -total / 2.0, {}
+    for k in keys:
+        L[k] = (y, y + row[k])
+        y += row[k]
+    return L
+
+
+def faces_up(lo, hi):
+    """Deltas ride the band edge facing the median seat, where the
+    marginal members sit."""
+    return (lo + hi) / 2.0 < 0
 
 
 # ----------------------------------------------------------------------------
@@ -175,23 +169,90 @@ def flow_series(wide):
 # ----------------------------------------------------------------------------
 
 def draw_chamber(ax, wide, title):
-    xs, rows = flow_series(wide)
+    """Median-centred braided-stream chart, xkcd-1127 style.
+
+    Between elections each band holds steady. At an election, the members
+    who stay put form a "core" that slides to its new position; seats a
+    band LOSES peel off its median-facing edge as a stream that tapers
+    away to nothing (members leaving parliament), and seats it GAINS flow
+    in as a stream that fades in from nothing and joins the band (new
+    members arriving) — so chamber enlargements literally pour new
+    tributaries into the river.
+    """
     keys = [b[0] for b in BANDS]
-    totals = rows[keys].sum(axis=1).tolist()
-    edges = {}  # band key -> (bottom array, top array), for flow ribbons
-    # Centre the stack on the median seat: y = 0 is always the middle
-    # member of the chamber, so whichever band crosses the line holds it.
-    bottom = [-t / 2.0 for t in totals]
+    n = len(wide)
+    dnum = [mdates.date2num(d) for d in wide.index] + [mdates.date2num(END_OF_DATA)]
+    layouts = [layout_row(wide.iloc[i], keys) for i in range(n)]
+    wedges = []  # (x0, x1, (lo, hi), colour, "in"/"out")
+
     for key, colour, _label in BANDS:
-        top = [b + v for b, v in zip(bottom, rows[key])]
-        ax.fill_between(xs, bottom, top, facecolor=colour,
+        xs, bo, to = [], [], []
+        for i in range(n):
+            bA, tA = layouts[i][key]
+            x_start, x_next = dnum[i], dnum[i + 1]
+            ramp = min(RAMP_DAYS, 0.55 * (x_next - x_start)) if i < n - 1 else 0
+            w0 = x_next - ramp
+            xs += [x_start, w0]
+            bo += [bA, bA]
+            to += [tA, tA]
+            if not ramp:
+                continue
+            bB, tB = layouts[i + 1][key]
+            A, B = tA - bA, tB - bB
+            m = min(A, B)
+            if faces_up(bA, tA):
+                cA, sliceA = (bA, bA + m), (bA + m, tA)
+            else:
+                cA, sliceA = (tA - m, tA), (bA, tA - m)
+            if faces_up(bB, tB):
+                cB, sliceB = (bB, bB + m), (bB + m, tB)
+            else:
+                cB, sliceB = (tB - m, tB), (bB, tB - m)
+            # Losing bands shed the leavers in the first quarter of the
+            # window, then the core of survivors slides into place; gaining
+            # bands slide first while the newcomers' stream runs alongside,
+            # then absorb it in the last quarter — every confluence is a
+            # tangent curve, never a cliff.
+            for j in range(1, 33):
+                u = j / 33.0
+                if A > B:
+                    if u < 0.25:
+                        f, a, c = smoothstep(u / 0.25), (bA, tA), cA
+                    else:
+                        f, a, c = smoothstep((u - 0.25) / 0.75), cA, (bB, tB)
+                else:
+                    if u < 0.75:
+                        f, a, c = smoothstep(u / 0.75), (bA, tA), cB
+                    else:
+                        f, a, c = smoothstep((u - 0.75) / 0.25), cB, (bB, tB)
+                xs.append(w0 + ramp * u)
+                bo.append(a[0] + (c[0] - a[0]) * f)
+                to.append(a[1] + (c[1] - a[1]) * f)
+            if A > B:
+                wedges.append((w0, ramp, sliceA, colour, "out"))
+            elif B > A:
+                wedges.append((w0, ramp, sliceB, colour, "in"))
+        ax.fill_between(xs, bo, to, facecolor=colour,
                         edgecolor="black", linewidth=1.1, zorder=2)
-        edges[key] = (list(bottom), list(top))
-        bottom = top
+
+    for x0, ramp, (lo, hi), colour, kind in wedges:
+        mid, d = (lo + hi) / 2.0, hi - lo
+        ts, w = [], []
+        for j in range(41):
+            u = j / 40.0
+            ts.append(x0 + ramp * u)
+            if kind == "out":  # full width, then the stream dries up
+                w.append(d * (1 - smoothstep(min(1.0, max(0.0, (u - 0.2) / 0.65)))))
+            else:              # the stream swells, then runs in alongside
+                w.append(d * smoothstep(min(1.0, max(0.0, (u - 0.15) / 0.65))))
+        ax.fill_between(ts, [mid - v / 2 for v in w], [mid + v / 2 for v in w],
+                        facecolor=colour, edgecolor="black", linewidth=1.0,
+                        zorder=3)
+
     ax.axhline(0, color="black", lw=1.8, ls=(0, (7, 5)), zorder=4)
     ax.set_title(title, fontsize=26, pad=12)
     ax.set_xlim(mdates.date2num(date(1900, 6, 1)), mdates.date2num(END_OF_DATA))
-    half = max(totals) * 1.04 / 2.0
+    half = max(wide[keys].sum(axis=1)) * 1.04 / 2.0
     ax.set_ylim(-half, half)
     ax.xaxis.set_major_locator(mdates.YearLocator(10))
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y"))
@@ -200,26 +261,6 @@ def draw_chamber(ax, wide, title):
     ax.set_ylabel("seats from the median", fontsize=15)
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
-    return xs, edges
-
-
-def edge_at(xs, arr, when):
-    x = mdates.date2num(when)
-    i = min(range(len(xs)), key=lambda j: abs(xs[j] - x))
-    return arr[i]
-
-
-def flow_ribbon(ax, xs, edges, t0, from_key, t1, to_key, width, colour):
-    """A river of `width` members leaving the top of one band and feeding
-    into the bottom of another, crossing whatever lies between (used for
-    splits whose bands are not adjacent in the stack)."""
-    y0 = edge_at(xs, edges[from_key][1], t0) - width  # slice off the top
-    y1 = edge_at(xs, edges[to_key][0], t1)            # land on the bottom
-    x0, x1 = mdates.date2num(t0), mdates.date2num(t1)
-    ts = [x0 + (x1 - x0) * k / 40.0 for k in range(41)]
-    lower = [y0 + (y1 - y0) * smoothstep(k / 40.0) for k in range(41)]
-    ax.fill_between(ts, lower, [y + width for y in lower], facecolor=colour,
-                    edgecolor="black", linewidth=1.1, zorder=3)
 
 
 def band_mid(wide, key, year):
@@ -268,15 +309,8 @@ def main():
         )
         fig.patch.set_facecolor("white")
 
-        hxs, hedges = draw_chamber(axh, house, "THE HOUSE OF REPRESENTATIVES")
+        draw_chamber(axh, house, "THE HOUSE OF REPRESENTATIVES")
         draw_chamber(axs, senate, "THE SENATE")
-
-        # Lyons and his followers leave Labor for the new UAP ahead of the
-        # Dec 1931 election — the one big split whose bands aren't adjacent,
-        # so it flows across the Country band. (The 1909 Fusion and the 1916
-        # Labor split flow on their own: those bands touch.)
-        flow_ribbon(axh, hxs, hedges, date(1931, 2, 1), "ALP",
-                    date(1931, 12, 19), "LIB", 5, "#3A66A8")
 
         # ------------------------------------------------------------------
         # House labels (band, year, text)
