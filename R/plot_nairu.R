@@ -1517,3 +1517,113 @@ create_parameter_posterior_plots <- function(output_dir_param = file.path(output
 }
 
 create_parameter_posterior_plots()
+
+                                  # ---- 7. Figure 2: shocks to the NAIRU ----------------------------------
+
+# The state innovation is the quarter-on-quarter change in the posterior
+# median NAIRU. A trailing four-quarter average makes the persistent signal
+# easier to distinguish from quarter-to-quarter noise without using future
+# observations.
+nairu_shocks <- nairu_df %>%
+  transmute(
+    date,
+    qtr_lbl,
+    raw_shock = median - dplyr::lag(median)
+  ) %>%
+  mutate(
+    moving_average = zoo::rollapplyr(
+      raw_shock,
+      width = 4,
+      FUN = mean,
+      fill = NA_real_,
+      na.rm = FALSE
+    )
+  ) %>%
+  pivot_longer(
+    cols = c(raw_shock, moving_average),
+    names_to = "series",
+    values_to = "shock"
+  ) %>%
+  mutate(
+    series = recode(
+      series,
+      raw_shock = "Quarterly shock",
+      moving_average = "Four-quarter moving average"
+    ),
+    tooltip = sprintf(
+      "%s<br>%s: %+.2f pp",
+      qtr_lbl,
+      series,
+      shock
+    )
+  ) %>%
+  filter(!is.na(shock))
+
+p_shocks <- ggplot(
+  nairu_shocks,
+  aes(
+    x = date,
+    y = shock,
+    colour = series,
+    group = series,
+    text = tooltip
+  )
+) +
+  geom_hline(
+    yintercept = 0,
+    colour = "grey55",
+    linetype = "dashed"
+  ) +
+  geom_line(
+    aes(linewidth = series),
+    alpha = 0.9
+  ) +
+  scale_colour_manual(
+    values = c(
+      "Quarterly shock" = "#7f7f7f",
+      "Four-quarter moving average" = "#d62728"
+    )
+  ) +
+  scale_linewidth_manual(
+    values = c(
+      "Quarterly shock" = 0.55,
+      "Four-quarter moving average" = 1.15
+    ),
+    guide = "none"
+  ) +
+  scale_x_date(
+    date_breaks = "2 years",
+    date_labels = "%Y"
+  ) +
+  scale_y_continuous(
+    labels = scales::number_format(accuracy = 0.01)
+  ) +
+  labs(
+    title = "Shocks to the NAIRU over the sample",
+    subtitle = paste(
+      "Quarterly change in the posterior median",
+      "and trailing four-quarter average"
+    ),
+    x = "Year",
+    y = "Percentage points",
+    colour = NULL
+  ) +
+  my_theme +
+  theme(
+    legend.position = "bottom"
+  )
+
+ggsave(
+  filename = file.path(output_dir, "nairu_shocks.png"),
+  plot = p_shocks,
+  width = 9,
+  height = 5,
+  dpi = 300
+)
+
+saveWidget(
+  ggplotly(p_shocks, tooltip = "text"),
+  file.path(output_dir, "nairu_shocks.html")
+)
+
+message("✔ Saved raw and moving-average NAIRU shocks plot")
