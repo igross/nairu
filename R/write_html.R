@@ -94,7 +94,7 @@ model_average_html <- if (file.exists(model_avg_interactive)) {
 intro_paragraph <- '
   <p style="max-width:800px;margin:0 auto 30px auto;text-align:center;
             font-size:1.1rem;color:#444;">
-    Below is the latest results from a state-space NAIRU model. Thanks to David Stephan whose code was used as the basis for this model.
+    Latest estimates from a state-space NAIRU model, based on code by David Stephan.
   </p>'
 
 html <- sprintf('
@@ -127,5 +127,7 @@ html <- sprintf('
    intro_paragraph, spark_html, decomp_html, model_comparison_html,
    model_average_html)
 
+source("R/site_theme.R")
+html <- apply_site_theme(html, "nairu")
 writeLines(html, file.path(docs_dir, "index.html"))
 message("✅ docs/index.html written (interactive NAIRU plus comparison charts).")
