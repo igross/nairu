@@ -10,7 +10,7 @@ async function styleFrame(frame) {
       doc.head.append(style);
     }
     for(const plot of doc.querySelectorAll('.js-plotly-plot')) {
-      if(!plot.layout || !plot.data || plot.dataset.styling) continue;
+      if(!plot.layout || !plot.data || plot.dataset.styling || plot.dataset.styledWidth===String(frame.clientWidth)) continue;
       plot.dataset.styling='true';
       try {
         if(!originals.has(plot)) originals.set(plot, JSON.parse(JSON.stringify(plot.layout)));
@@ -69,12 +69,13 @@ async function styleFrame(frame) {
         await win.Plotly.relayout(plot,patch);
         await win.Plotly.Plots.resize(plot);
         plot.dataset.siteStyled='true';
+        plot.dataset.styledWidth=String(frame.clientWidth);
       } finally {delete plot.dataset.styling;}
     }
   } catch(e) {console.warn('Chart styling unavailable',e);}
 }
 for(const frame of document.querySelectorAll('iframe')) {
-  frame.addEventListener('load',()=>{styleFrame(frame);setTimeout(()=>styleFrame(frame),700);});
+  frame.addEventListener('load',()=>{styleFrame(frame);for(const delay of [500,1500,3000,6000,12000,20000]) setTimeout(()=>styleFrame(frame),delay);});
   styleFrame(frame);
 }
 for(const button of document.querySelectorAll('.tab-button')) button.addEventListener('click',()=>requestAnimationFrame(()=>document.querySelectorAll('.tab-content.active iframe').forEach(styleFrame)));
