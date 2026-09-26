@@ -14,7 +14,7 @@ async function styleFrame(frame) {
       plot.dataset.styling='true';
       try {
         if(!originals.has(plot)) originals.set(plot, JSON.parse(JSON.stringify(plot.layout)));
-        const source=originals.get(plot), small=frame.clientWidth<540;
+        const source=originals.get(plot), width=frame.clientWidth, small=width<540;
         const patch={'font':{family:'Arial, Helvetica, sans-serif',color:'#142f45',size:12},paper_bgcolor:'#fff',plot_bgcolor:'#fff',
           'margin.l':small?48:66,'margin.r':small?24:40,'margin.t':70,'margin.b':small?145:110,
           'title.font':{family:'Arial, Helvetica, sans-serif',size:small?12:17,color:'#142f45'},'title.x':0,'title.xanchor':'left',
@@ -69,7 +69,7 @@ async function styleFrame(frame) {
         await win.Plotly.relayout(plot,patch);
         await win.Plotly.Plots.resize(plot);
         plot.dataset.siteStyled='true';
-        plot.dataset.styledWidth=String(frame.clientWidth);
+        plot.dataset.styledWidth=String(width);
       } finally {delete plot.dataset.styling;}
     }
   } catch(e) {console.warn('Chart styling unavailable',e);}
@@ -77,6 +77,7 @@ async function styleFrame(frame) {
 for(const frame of document.querySelectorAll('iframe')) {
   frame.addEventListener('load',()=>{styleFrame(frame);for(const delay of [500,1500,3000,6000,12000,20000]) setTimeout(()=>styleFrame(frame),delay);});
   styleFrame(frame);
+  new ResizeObserver(()=>setTimeout(()=>styleFrame(frame),250)).observe(frame);
 }
 for(const button of document.querySelectorAll('.tab-button')) button.addEventListener('click',()=>requestAnimationFrame(()=>document.querySelectorAll('.tab-content.active iframe').forEach(styleFrame)));
 let resizeTimer;
