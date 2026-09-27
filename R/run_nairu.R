@@ -50,6 +50,7 @@ dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 data_dir <- file.path(out_dir, "data")
 dir.create(data_dir, showWarnings = FALSE, recursive = TRUE)
 setwd(root)
+source("R/fit_diagnostics.R")
 
 vintage_dir <- file.path(out_dir, "vintages")
 dir.create(vintage_dir, showWarnings = FALSE, recursive = TRUE)
@@ -493,12 +494,7 @@ run_single_wage_inflation_model <- function(
     unlist(use.names = FALSE) %>%
     as.integer()
 
-  fit <- sampling(
-    compiled_model,
-    data = data_list,
-    chains = 4,     iter = 100,
-    control = list(max_treedepth = 15)
-  )
+  fit <- sample_nairu(compiled_model, data_list)
 
   draws <- rstan::extract(fit)
   wage_missing_median <- median(draws[[missing_param]])
@@ -511,7 +507,7 @@ run_single_wage_inflation_model <- function(
   }
 
   summarised_state <- as.data.frame(fit) %>%
-    select(contains("NAIRU")) %>%
+    select(starts_with("NAIRU[", ignore.case = FALSE)) %>%
     melt() %>%
     group_by(variable) %>%
     summarise(
@@ -733,7 +729,7 @@ run_single_wage_inflation_model <- function(
   )
 
   param_draws <- as.data.frame(fit) %>%
-    select(-starts_with("NAIRU"), -lp__)
+    select(-starts_with("NAIRU"), -starts_with("nairu_innovation"), -lp__)
 
   param_summary <- param_draws %>%
     pivot_longer(
@@ -832,12 +828,7 @@ run_dual_wage_model <- function(
     missing_wage_index = missing_index
   )
 
-  fit <- sampling(
-    compiled_model,
-    data = data_list,
-    chains = 4,     iter = 100,
-    control = list(max_treedepth = 15)
-  )
+  fit <- sample_nairu(compiled_model, data_list)
 
   draws <- rstan::extract(fit)
   wage_missing_median <- apply(draws$wage_missing, 2, median)
@@ -852,7 +843,7 @@ run_dual_wage_model <- function(
   }
 
   summarised_state <- as.data.frame(fit) %>%
-    select(contains("NAIRU")) %>%
+    select(starts_with("NAIRU[", ignore.case = FALSE)) %>%
     melt() %>%
     group_by(variable) %>%
     summarise(
@@ -881,7 +872,7 @@ run_dual_wage_model <- function(
   )
 
   param_draws <- as.data.frame(fit) %>%
-    select(-starts_with("NAIRU"), -lp__)
+    select(-starts_with("NAIRU"), -starts_with("nairu_innovation"), -lp__)
 
   param_summary <- param_draws %>%
     pivot_longer(
@@ -968,12 +959,7 @@ run_wage_no_inflation_model <- function(
     missing_wage_index = as.integer(missing_index)
   )
 
-  fit <- sampling(
-    compiled_model,
-    data = data_list,
-    chains = 4,     iter = 100,
-    control = list(max_treedepth = 15)
-  )
+  fit <- sample_nairu(compiled_model, data_list)
 
   draws <- rstan::extract(fit)
   wage_missing_median <- median(draws$wage_missing)
@@ -986,7 +972,7 @@ run_wage_no_inflation_model <- function(
   }
 
   summarised_state <- as.data.frame(fit) %>%
-    select(contains("NAIRU")) %>%
+    select(starts_with("NAIRU[", ignore.case = FALSE)) %>%
     melt() %>%
     group_by(variable) %>%
     summarise(
@@ -1012,7 +998,7 @@ run_wage_no_inflation_model <- function(
   )
 
   param_draws <- as.data.frame(fit) %>%
-    select(-starts_with("NAIRU"), -lp__)
+    select(-starts_with("NAIRU"), -starts_with("nairu_innovation"), -lp__)
 
   param_summary <- param_draws %>%
     pivot_longer(

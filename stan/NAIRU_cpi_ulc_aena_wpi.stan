@@ -71,7 +71,7 @@ transformed data {
 }
 
 parameters {
-  vector[T] NAIRU;
+  vector[T] nairu_innovation;
   real<lower = 4.9,  upper = 6.1>        nhat_init;
   vector<lower = -4.5, upper = 7.5>[7]   pthat_init;
   vector<lower = -5,   upper = 7>[5]     wage1_init;
@@ -117,7 +117,16 @@ parameters {
   real<lower = 0,    upper = 4.17>       eps_wage3;
 }
 
+// Non-centred form of the same Gaussian random walk: avoids initialising
+// each NAIRU level independently far from its prior-supported path.
+transformed parameters {
+  vector[T] NAIRU;
+  NAIRU[1] = nhat_init + tau * nairu_innovation[1];
+  for (t in 2:T) NAIRU[t] = NAIRU[t-1] + tau * nairu_innovation[t];
+}
+
 model {
+  nairu_innovation ~ std_normal();
   for (k in 1:4) {
     phi_pt_lag[k]   ~ normal(pow(0.5, k) * 0.06 , 0.50);
     gamma_pt_lag[k] ~ normal(pow(0.7, k) * -0.38, 0.50);
@@ -155,7 +164,8 @@ model {
   xi_wage3       ~ normal(0    , 3);
   eps_wage3      ~ normal(2    , 1.00);
 
-  tau         ~ normal(0.05 , 0.02);
+  // Same prior centre for quarterly drift volatility; modestly stronger regularisation of its scale.
+  tau         ~ normal(0.05 , 0.015);
 
   nhat_init   ~ normal(5.5  , 0.2);
   pthat_init  ~ normal(1.5  , 2);
@@ -165,19 +175,16 @@ model {
   wage_missing ~ normal(0.7 , 1);
 
   {
-    vector[T] nairu_hat;
     vector[T] pt_hat;
     vector[T] wage1_hat;
     vector[T] wage2_hat;
     vector[T] wage3_hat;
 
-    nairu_hat[1] = nhat_init;
     pt_hat[1:7]  = pthat_init;
     wage1_hat[1:5] = wage1_init;
     wage2_hat[1:5] = wage2_init;
     wage3_hat[1:5] = wage3_init;
 
-    for (t in 2:T) nairu_hat[t] = NAIRU[t-1];
 
     for (t in 8:T) {
       real exp_now  = delta_pt_0 * Y[t, 7];
@@ -225,7 +232,6 @@ model {
                    + xi_wage3[1] * Y[t, 10] + xi_wage3[2] * Y[t, 11];
     }
 
-    target += normal_lpdf(NAIRU | nairu_hat, tau);
     target += normal_lpdf(Y[, 6] | pt_hat, eps_pt);
 
     for (t in 1:T) {

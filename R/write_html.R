@@ -55,14 +55,16 @@ models_interactive <- file.path(output_dir, "nairu_models.html")
 model_comparison_html <- if (file.exists(models_interactive)) {
   sprintf('
     <h2 style="text-align:center;">NAIRU estimates by model</h2>
+    <details class="model-note"><summary>Model assumptions</summary><p>The CPI with ULC, AENA &amp; WPI model uses a tighter prior on quarterly NAIRU drift volatility: prior standard deviation 0.015, previously 0.02, centred on 0.05. Its random walk has been reparameterised for stable sampling. This model was refitted on 27 September 2026 using the existing data vintage. Other estimates were unchanged in that update.</p></details>
     <div style="display:flex;justify-content:center;margin:40px 0;">
       <iframe src="%s"
               style="width:95%%;height:750px;border:none;border-radius:15px;"
               title="NAIRU model comparison"></iframe>
-    </div>', basename(models_interactive))
+    </div>', paste0(basename(models_interactive), "?v=20260927-prior2"))
 } else if (file.exists(models_static)) {
   sprintf('
     <h2 style="text-align:center;">NAIRU estimates by model</h2>
+    <details class="model-note"><summary>Model assumptions</summary><p>The CPI with ULC, AENA &amp; WPI model uses a tighter prior on quarterly NAIRU drift volatility: prior standard deviation 0.015, previously 0.02, centred on 0.05. Its random walk has been reparameterised for stable sampling. This model was refitted on 27 September 2026 using the existing data vintage. Other estimates were unchanged in that update.</p></details>
     <div class="chart-card" style="max-width:1000px;margin:0 auto;">
       <img src="%s" alt="NAIRU estimates by model">
     </div>', basename(models_static))
@@ -80,7 +82,7 @@ model_average_html <- if (file.exists(model_avg_interactive)) {
       <iframe src="%s"
               style="width:95%%;height:750px;border:none;border-radius:15px;"
               title="Average NAIRU estimate"></iframe>
-    </div>', basename(model_avg_interactive))
+    </div>', paste0(basename(model_avg_interactive), "?v=20260927-prior2"))
 } else if (file.exists(model_avg_static)) {
   sprintf('
     <h2 style="text-align:center;">Average NAIRU estimate across models</h2>

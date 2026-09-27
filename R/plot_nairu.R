@@ -579,6 +579,9 @@ if (nrow(nairu_models_df) > 0) {
         cleaned_name <- gsub(",[0-9]+$", "", cleaned_name)
         .x$name <- cleaned_name
       }
+      # Use the line, rather than its translucent band, as the legend swatch.
+      if (identical(.x$fill, "toself")) .x$showlegend <- FALSE
+      else if (!is.null(.x$mode) && grepl("lines", .x$mode)) .x$showlegend <- TRUE
       .x
     }
   )
